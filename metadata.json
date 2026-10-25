@@ -1,0 +1,6 @@
+{
+  "name": "Domaine des Trois Coteaux — Thos & Loul's",
+  "description": "Application de gestion viticole et chai d'exception pour le Domaine des Trois Coteaux avec copilote œnologique Thos & Loul's et persistance IndexedDB.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

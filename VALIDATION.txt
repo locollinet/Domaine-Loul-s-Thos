@@ -1,0 +1,5 @@
+Nouveau projet : 13 skills et 5 prompts optionnels.
+54 liens Markdown internes résolus ; frontmatters et noms contrôlés.
+Aucune référence aux anciens chemins de skills ou anciens labels de pack dans les documents.
+Validateur de référence exécuté : OK — fixture ERP, références, volumes, filiation, coûts, matières, réservations, livraison, facture, règlement, rejets et idempotence. Ne valide pas l'app.
+Non testé : Antigravity/Copilot, code applicatif, navigateur, backend et production.

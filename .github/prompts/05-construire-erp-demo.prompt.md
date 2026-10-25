@@ -1,0 +1,6 @@
+---
+description: Créer depuis zéro l’ERP de démonstration complet avec plusieurs millésimes
+agent: agent
+---
+
+Lire [AGENTS.md](../../AGENTS.md), [planification](../../.agents/skills/plan-domaine-delivery/SKILL.md), [produit](../../docs/domaine/PRODUCT.md) et [scénario](../../docs/domaine/DEMO-SCENARIO.md). Créer l'application depuis zéro dans ce dépôt contenant uniquement le cadrage. Aucun audit/reprise/migration d'ancienne app. Vérifier brièvement outils et permissions, initialiser une stack stable simple, puis implémenter les lots L0–L7 dans l'ordre utile et la capacité de l'environnement. Le mandat porte sur une application fonctionnelle complète, pas un plan seul. Domaine fictif de vins tranquilles blancs et rouges, plusieurs millésimes, projet futur, persistance locale sans clé externe. Couvrir vignoble/récolte, vinification, élevage/assemblage, mise, stocks/achats, commandes/livraisons, finance illustrative et pilotage. Charger les skills pertinents. Tester et poursuivre sans confirmation à chaque écran. Ne pas écraser les fichiers de cadrage, supprimer du travail, pousser ni déployer sans accord. Si blocage, HANDOFF.md exact. Simulations visibles, aucun KPI codé en dur ni conformité prétendue.

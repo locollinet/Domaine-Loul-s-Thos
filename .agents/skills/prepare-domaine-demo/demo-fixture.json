@@ -1,0 +1,226 @@
+{
+  "fixtureVersion": 1,
+  "mode": "demo-local",
+  "referenceDate": "2026-10-24T10:00:00+02:00",
+  "organization": {
+    "id": "demo-three-hills",
+    "name": "Domaine des Trois Coteaux — fictif",
+    "timeZone": "Europe/Paris",
+    "currency": "EUR"
+  },
+  "units": {
+    "wine": "mL",
+    "dryGoods": "each",
+    "money": "EUR-cent"
+  },
+  "origins": [
+    {
+      "id": "origin-a",
+      "name": "Les Hauts Rangs — fictif",
+      "gps": null,
+      "navigationUrl": null
+    },
+    {
+      "id": "origin-b",
+      "name": "La Combe Claire — fictif",
+      "gps": null,
+      "navigationUrl": null
+    }
+  ],
+  "wineLots": [
+    {
+      "id": "lot-2024-aging",
+      "vintage": 2024,
+      "stage": "aging",
+      "volumeMl": 200000,
+      "knownCostCents": null,
+      "origins": [
+        "origin-a"
+      ],
+      "quality": "released"
+    },
+    {
+      "id": "lot-2025-a",
+      "vintage": 2025,
+      "stage": "ready-for-blend",
+      "volumeMl": 600000,
+      "knownCostCents": 80000,
+      "origins": [
+        "origin-a"
+      ],
+      "quality": "released"
+    },
+    {
+      "id": "lot-2025-b",
+      "vintage": 2025,
+      "stage": "ready-for-blend",
+      "volumeMl": 400000,
+      "knownCostCents": 60000,
+      "origins": [
+        "origin-b"
+      ],
+      "quality": "released"
+    },
+    {
+      "id": "lot-2026-white",
+      "vintage": 2026,
+      "stage": "fermenting",
+      "volumeMl": 150000,
+      "knownCostCents": null,
+      "origins": [
+        "origin-a"
+      ],
+      "quality": "held"
+    },
+    {
+      "id": "lot-2026-red",
+      "vintage": 2026,
+      "stage": "fermenting",
+      "volumeMl": 180000,
+      "knownCostCents": null,
+      "origins": [
+        "origin-b"
+      ],
+      "quality": "held"
+    }
+  ],
+  "occupancies": [
+    {
+      "containerId": "demo-barrel-1",
+      "lotId": "lot-2024-aging",
+      "volumeMl": 120000,
+      "capacityMl": 225000
+    },
+    {
+      "containerId": "demo-barrel-2",
+      "lotId": "lot-2024-aging",
+      "volumeMl": 80000,
+      "capacityMl": 225000
+    }
+  ],
+  "openingBottledStocks": [
+    {
+      "batchId": "batch-2023-old",
+      "skuId": "sku-red-2023-750",
+      "vintage": 2023,
+      "quantity": 36,
+      "reserved": 0,
+      "quality": "released"
+    }
+  ],
+  "dryGoods": {
+    "bottle-750": 1000,
+    "closure": 1000,
+    "label-2025": 1000,
+    "carton-6": 200
+  },
+  "actions": [
+    {
+      "id": "blend-01",
+      "type": "blend",
+      "inputs": [
+        {
+          "lotId": "lot-2025-a",
+          "volumeMl": 300000
+        },
+        {
+          "lotId": "lot-2025-b",
+          "volumeMl": 200000
+        }
+      ],
+      "outputLotId": "lot-2025-blend",
+      "volumeMl": 500000
+    },
+    {
+      "id": "bottle-01",
+      "type": "bottle",
+      "lotId": "lot-2025-blend",
+      "inputVolumeMl": 500000,
+      "bottleSizeMl": 750,
+      "bottles": 660,
+      "lossMl": 5000,
+      "batchId": "batch-2025-01",
+      "skuId": "sku-red-2025-750",
+      "additionalKnownCostCents": 33000,
+      "materials": {
+        "bottle-750": 660,
+        "closure": 660,
+        "label-2025": 660,
+        "carton-6": 110
+      }
+    },
+    {
+      "id": "reserve-01",
+      "type": "reserve",
+      "orderId": "order-01",
+      "batchId": "batch-2025-01",
+      "quantity": 120
+    },
+    {
+      "id": "ship-01",
+      "type": "ship",
+      "orderId": "order-01",
+      "batchId": "batch-2025-01",
+      "quantity": 72
+    },
+    {
+      "id": "invoice-01",
+      "type": "demo-invoice",
+      "shipmentId": "ship-01",
+      "quantity": 72,
+      "unitPriceHtCents": 2000,
+      "vatBasisPoints": 2000
+    },
+    {
+      "id": "payment-01",
+      "type": "demo-payment",
+      "invoiceId": "invoice-01",
+      "amountCents": 100000
+    }
+  ],
+  "futureProjects": [
+    {
+      "id": "renewal-2027",
+      "year": 2027,
+      "status": "scenario",
+      "name": "Renouvellement fictif à étudier",
+      "authorization": "not-provided"
+    }
+  ],
+  "expected": {
+    "wineVolumesMl": {
+      "lot-2024-aging": 200000,
+      "lot-2025-a": 300000,
+      "lot-2025-b": 200000,
+      "lot-2025-blend": 0,
+      "lot-2026-white": 150000,
+      "lot-2026-red": 180000
+    },
+    "bottledBatch": {
+      "physical": 588,
+      "reserved": 48,
+      "available": 540
+    },
+    "dryGoods": {
+      "bottle-750": 340,
+      "closure": 340,
+      "label-2025": 340,
+      "carton-6": 90
+    },
+    "blendKnownCostCents": 70000,
+    "bottledKnownCostCents": 103000,
+    "invoice": {
+      "htCents": 144000,
+      "vatCents": 28800,
+      "ttcCents": 172800,
+      "paidCents": 100000,
+      "balanceCents": 72800
+    },
+    "unaffected2023Physical": 36
+  },
+  "notes": [
+    "Coûts connus fictifs, incomplets : ne pas présenter comme coût comptable ou marge réalisée.",
+    "Historique amont abrégé ; enrichir avant toute démonstration de traçabilité jusqu’à une récolte spécifique.",
+    "Les actions du scénario 2025 représentent une visite historique/rejouable, pas une recette œnologique en temps réel."
+  ]
+}
