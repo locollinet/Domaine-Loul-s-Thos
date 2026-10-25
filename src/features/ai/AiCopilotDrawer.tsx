@@ -105,7 +105,7 @@ export const AiCopilotDrawer: React.FC<{
             <span style={{ fontSize: '18px' }}>✨</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px' }}>Copilote IA Viticole</div>
-              <div style={{ fontSize: '11px', opacity: 0.85 }}>Connecté à Google AI Studio (Gemini 2.5 Flash)</div>
+              <div style={{ fontSize: '11px', opacity: 0.85 }}>Connecté à Google AI Studio (Gemini 3.8 Flash)</div>
             </div>
           </div>
           <button

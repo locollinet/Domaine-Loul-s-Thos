@@ -3,10 +3,13 @@ import { lotVolumeMl, batchPosition } from '../domain/selectors';
 import type { DomainState } from '../domain/types';
 
 export function getGeminiApiKey(): string | null {
-  const fromEnv = (import.meta.env['VITE_GEMINI_API_KEY'] as string | undefined)?.trim();
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-  const fromStorage = localStorage.getItem('domaine_gemini_api_key')?.trim();
-  return fromStorage && fromStorage.length > 0 ? fromStorage : null;
+  const fromStorage = typeof window !== 'undefined' ? localStorage.getItem('domaine_gemini_api_key')?.trim() : null;
+  if (fromStorage && fromStorage.length > 0) return fromStorage;
+
+  const fromViteEnv = (import.meta.env['VITE_GEMINI_API_KEY'] as string | undefined)?.trim();
+  if (fromViteEnv && fromViteEnv.length > 0) return fromViteEnv;
+
+  return null;
 }
 
 export function setGeminiApiKey(key: string): void {
@@ -114,14 +117,27 @@ ${contextSummary}
       },
     ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents,
-      config: {
-        systemInstruction,
-        temperature: 0.3,
-      },
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+        },
+      });
+    } catch (modelErr: unknown) {
+      console.warn('Fallback to gemini-flash-latest...', modelErr);
+      response = await ai.models.generateContent({
+        model: 'gemini-flash-latest',
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+        },
+      });
+    }
 
     return response.text || 'Aucune réponse générée.';
   } catch (err: unknown) {
