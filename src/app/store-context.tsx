@@ -11,6 +11,7 @@ export interface StoreContextValue {
   dispatch: (command: Command) => Promise<CommandResult>;
   resetDemo: () => Promise<void>;
   feedback: { type: 'success' | 'error'; message: string } | null;
+  setFeedback: (feedback: { type: 'success' | 'error'; message: string } | null) => void;
   clearFeedback: () => void;
   isReady: boolean;
 }
@@ -79,6 +80,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dispatch,
       resetDemo,
       feedback,
+      setFeedback,
       clearFeedback,
       isReady,
     }}>

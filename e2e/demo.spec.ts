@@ -49,4 +49,29 @@ test.describe('ERP Démo — Parcours transverse (DEMO-SCENARIO.md)', () => {
     await expect(page.getByText('48')).toBeVisible(); // 120 - 72 residual reserved
     await expect(page.getByText('540')).toBeVisible(); // 588 - 48 available
   });
+
+  test('vérifie la réactivité et l’absence de débordement horizontal sur mobile (390x844 et 320px)', async ({ page }) => {
+    // Test sur format mobile standard (390 x 844)
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    await expect(page.locator('h1')).toContainText('Vue d’ensemble');
+
+    // Vérifier pas de débordement horizontal global
+    const hasHorizontalScroll = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect(hasHorizontalScroll).toBe(false);
+
+    // Tester navigation mobile
+    await page.getByRole('button', { name: /Chai & Vinification/i }).click();
+    await expect(page.getByText('Occupation des contenants')).toBeVisible();
+
+    // Tester sur écran très étroit (320px)
+    await page.setViewportSize({ width: 320, height: 600 });
+    const hasHorizontalScroll320 = await page.evaluate(() => {
+      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+    });
+    expect(hasHorizontalScroll320).toBe(false);
+  });
 });

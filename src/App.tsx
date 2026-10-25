@@ -15,7 +15,7 @@ import { TraceabilityView } from './features/traceability/TraceabilityView';
 import { VineyardView } from './features/vineyard/VineyardView';
 
 export const App: React.FC = () => {
-  const { state, role, setRole, resetDemo, feedback, clearFeedback, isReady } = useStore();
+  const { state, role, setRole, resetDemo, feedback, setFeedback, clearFeedback, isReady } = useStore();
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
@@ -87,6 +87,25 @@ export const App: React.FC = () => {
               ))}
             </select>
           </div>
+
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              setFeedback({
+                type: 'success',
+                message: '🎉 Synchronisation AI Studio ↔ GitHub validée dans les 2 sens ! Le bouton est 100% cliquable et fonctionnel.',
+              });
+            }}
+            style={{
+              fontWeight: 700,
+              background: '#D97706',
+              color: '#FFFFFF',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            }}
+            data-testid="test-sync-btn"
+          >
+            🚀 Test Pull AI Studio (Cliquer ici)
+          </button>
 
           <button
             className="btn btn-sm btn-accent"

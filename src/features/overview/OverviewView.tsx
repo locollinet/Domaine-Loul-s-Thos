@@ -172,6 +172,13 @@ export const OverviewView: React.FC<{ onNavigate: (tab: string) => void }> = ({ 
               <div style={{ fontSize: '12px', color: 'var(--color-ink)', marginTop: '2px' }}>
                 Aucune mesure de densité depuis le 17 octobre 2026. La valeur n’est pas interpolée artificiellement.
               </div>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={{ marginTop: '8px', fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => onNavigate('cellar')}
+              >
+                Accéder à la cuve C-06 →
+              </button>
             </div>
 
             <div style={{ padding: '10px', background: 'var(--color-forest-soft)', border: '1px solid #C2DCC8', borderRadius: 'var(--radius-md)' }}>
@@ -181,6 +188,13 @@ export const OverviewView: React.FC<{ onNavigate: (tab: string) => void }> = ({ 
               <div style={{ fontSize: '12px', color: 'var(--color-ink)', marginTop: '2px' }}>
                 Le Clos du Puits (mission-h-c) : 12 caisses comptées à ce jour. Récolte partielle non clôturée.
               </div>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={{ marginTop: '8px', fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => onNavigate('vineyard')}
+              >
+                Accéder à la récolte →
+              </button>
             </div>
 
             <div style={{ padding: '10px', background: 'var(--color-surface-soft)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
@@ -190,6 +204,13 @@ export const OverviewView: React.FC<{ onNavigate: (tab: string) => void }> = ({ 
               <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
                 Cuve C-07 (400 L) en maintenance — refusera tout transfert ou assemblage.
               </div>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={{ marginTop: '8px', fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => onNavigate('cellar')}
+              >
+                Voir le plan de cuverie →
+              </button>
             </div>
           </div>
         </div>
