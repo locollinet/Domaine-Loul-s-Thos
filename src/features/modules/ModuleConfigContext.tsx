@@ -72,12 +72,12 @@ export const PRESET_CONFIGS: Record<
     },
   },
   harvest_field: {
-    title: 'Pack « Terrain, Cadastre IGN & Vendanges 5h00 »',
+    title: 'Pack « Terrain, Cadastre IGN & Vendanges »',
     badge: 'Spécial Vigne & Vendanges',
     targetAudience: 'Domaines équipés d’un vieux logiciel comptable qui veulent uniquement l’outil terrain et vendanges',
     pricePositioning: 'Offre Entrée de Gamme Terrain (Vignoble + Livret GPS + Quai de réception)',
     description:
-      'Masque toute la comptabilité, les ventes et l’élevage pour ne garder que l’Atlas Cadastral IGN, le Livret de Vendanges GPS 5h00, le Cahier Phyto/TESA et les pesées à quai.',
+      'Masque toute la comptabilité, les ventes et l’élevage pour ne garder que l’Atlas Cadastral IGN, le planning de vendanges GPS, le Cahier Phyto/TESA et les pesées à quai.',
     enabledMainModules: {
       overview: true,
       vineyard: true,

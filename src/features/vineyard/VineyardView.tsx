@@ -457,7 +457,7 @@ export const VineyardView: React.FC<{
   const [cfgPastilleNum, setCfgPastilleNum] = useState('');
   const [cfgAccessNotes, setCfgAccessNotes] = useState('');
   const [cfgContextNotes, setCfgContextNotes] = useState('');
-  const [newPhotoCaption, setNewPhotoCaption] = useState('Entrée des rangs & repère fourgon');
+  const [newPhotoCaption, setNewPhotoCaption] = useState('Entrée des rangs & repère d’accès');
   const [previewPhoto, setPreviewPhoto] = useState<ParcelFieldPhoto | null>(null);
   const [gpsStatusMsg, setGpsStatusMsg] = useState<string | null>(null);
 
@@ -794,7 +794,7 @@ export const VineyardView: React.FC<{
     setCfgSectionCadastrale(track.customSectionCadastrale ?? meta.sectionCadastrale);
     setCfgPageLivret(String(track.customPageLivret ?? meta.pageLivret));
     setCfgPastilleNum(String(track.customPastilleNum ?? meta.pastilleNum));
-    setCfgAccessNotes(track.customAccessNotes ?? parcel.access ?? 'Accès fourgon par le chemin communal haut');
+    setCfgAccessNotes(track.customAccessNotes ?? parcel.access ?? 'Accès véhicule par le chemin communal haut');
     setCfgContextNotes(track.customContextNotes ?? `${meta.terroir} · ${meta.altitude}`);
     setGpsStatusMsg(null);
   };
@@ -1155,13 +1155,13 @@ export const VineyardView: React.FC<{
                 type="button"
                 className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
                 onClick={onToggleRestrictedMode}
-                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour un ouvrier ou un transporteur"
+                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour les vendangeurs et chauffeurs"
               >
                 <Navigation size={14} />
                 <span>
                   {restrictedFieldMode
                     ? '🔒 Vue Restreinte Active (Quitter)'
-                    : '🚜 Vue Terrain 5h00 (Ouvrier / Transporteur)'}
+                    : '🚜 Mode Terrain (Vendangeurs & Chauffeurs)'}
                 </span>
               </button>
             )}
@@ -1369,7 +1369,7 @@ export const VineyardView: React.FC<{
         </div>
       </section>
 
-      {/* BANDEAU 05h00 DU MATIN : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
+      {/* BANDEAU FEUILLE DE ROUTE DU JOUR : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
       {importedBannerMsg && (
         <div
           style={{
@@ -1698,14 +1698,14 @@ export const VineyardView: React.FC<{
                     className="ds-clickable-card"
                     onClick={() => openParcelConfigModal(selectedParcel)}
                     style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}
-                    title="Cliquer pour modifier les consignes d’accès fourgon et notes terrain"
+                    title="Cliquer pour modifier les consignes d’accès véhicule et notes terrain"
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
                       <span>Accès & Contexte Terrain</span>
                       <span style={{ color: 'var(--color-forest)' }}>✎ Modifier</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px', color: 'var(--color-forest)' }}>
-                      {selectedTrack?.customAccessNotes ?? selectedParcel.access ?? 'Accès fourgon chemin haut'}
+                      {selectedTrack?.customAccessNotes ?? selectedParcel.access ?? 'Accès véhicule par chemin haut'}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-ink-light)' }}>
                       {selectedTrack?.customContextNotes ?? `${selectedMeta.terroir} · ${selectedMeta.altitude}`}
@@ -2973,7 +2973,7 @@ export const VineyardView: React.FC<{
               </div>
 
               <div className="form-group">
-                <label className="form-label">Lien Google Maps direct (Itinéraire fourgon / tracteur ou épingle partagée)</label>
+                <label className="form-label">Lien Google Maps direct (Itinéraire véhicule / benne ou épingle partagée)</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="url"

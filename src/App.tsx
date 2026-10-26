@@ -165,7 +165,7 @@ const AppInner: React.FC = () => {
   return (
     <div className="app-shell">
       <div className="app-body">
-        {/* Left Sidebar — Masquée en Mode Restreint Ouvrier / Transporteur 5h00 */}
+        {/* Left Sidebar — Masquée en Mode Restreint Terrain */}
         {!restrictedFieldMode && (
           <aside className="app-sidebar" aria-label="Menu latéral du domaine">
             <div>
@@ -385,10 +385,10 @@ const AppInner: React.FC = () => {
                     setActiveTab('vineyard');
                     setRestrictedFieldMode(true);
                   }}
-                  title="Verrouiller l'interface en mode Ouvrier / Transporteur 5h00 (uniquement GPS & priorités vendange)"
+                  title="Basculer vers l'interface simplifiée de terrain (Guidage GPS & feuille de route des équipes)"
                 >
                   <Navigation size={12} style={{ color: '#F97316' }} />
-                  <span>Vue Terrain 5h</span>
+                  <span>Mode Terrain</span>
                 </button>
 
                 <button

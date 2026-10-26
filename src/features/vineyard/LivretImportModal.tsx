@@ -216,7 +216,7 @@ const PRESET_SCENARIOS: Record<
 [Page 7] Pastille n°3 — Code: CP — Le Clos du Puits
 Appellation: Bâtard-Montrachet Grand Cru | Commune: Puligny-Montrachet (21512)
 Cadastre: Section AI n°0131 | Surface: 46,02 ares | Cépage: Chardonnay
-Rangs: 24 rangs (Rangs 1 à 24 · Priorité 05h00 Équipe A)
+Rangs: 24 rangs (Rangs 1 à 24 · Priorité Matin Équipe A)
 Planning: Aujourd'hui | Statut: En cours
 GPS: 46°56'47.1"N 4°44'33.3"E | Maps: https://www.google.com/maps/dir/?api=1&destination=46.94642,4.74258
 Accès: Chemin blanc du Puits, garer le fourgon face à la cabotte en pierre.
@@ -246,16 +246,16 @@ Accès: Entrée par le portillon en fer forgé côté Sud, attention marche haut
 21512;Puligny-Montrachet;AI;0131;CP;Le Clos du Puits;Bâtard-Montrachet Grand Cru;Chardonnay;0 ha 46 a 02 ca;24 rangs (1 à 24);3;7;today;Entrée chemin du Puits face au murger
 21512;Puligny-Montrachet;AH;0092;HR;Les Hauts Rangs;Puligny-Montrachet 1er Cru;Chardonnay;0 ha 25 a 38 ca;42 rangs (Coteau Est);1;12;done;Chemin des Hauts Rangs
 21512;Puligny-Montrachet;AH;0091;CHV;Les Chalumeaux;Puligny-Montrachet 1er Cru;Chardonnay;0 ha 38 a 40 ca;30 rangs (Vignes franches);10;21;today;Accès par le chemin de Blagny, borne blanche
-21512;Puligny-Montrachet;AI;0130;BBM;Bienvenues-Coteau;Bienvenues-Bâtard-Montrachet Grand Cru;Chardonnay;0 ha 39 a 40 ca;26 rangs (Cheval de trait uniquement);11;9;tomorrow;Accès strict par l'allée centrale à 05h30`,
+21512;Puligny-Montrachet;AI;0130;BBM;Bienvenues-Coteau;Bienvenues-Bâtard-Montrachet Grand Cru;Chardonnay;0 ha 39 a 40 ca;26 rangs (Travail du sol soigné);11;9;tomorrow;Accès par l'allée centrale`,
   },
   csv_planning: {
-    title: '3. Tableau Excel / CSV de Briefing Matin 5h00 (Mise à jour de l’existant)',
+    title: '3. Tableau Excel / CSV de Feuille de Route / Briefing Matin (Mise à jour de l’existant)',
     subtitle:
       'Met à jour instantanément les parcelles existantes du domaine (Planning Aujourd’hui/Demain, Rangs ouverts, Consignes chauffeurs & Liens Google Maps)',
     formatLabel: 'CSV Excel / Google Sheets',
     content: `code,nom,pastille,page,planning,statut,rangs,consignes_acces,google_maps
-CP,Le Clos du Puits,3,7,today,en_cours,"24 rangs (Équipe A à 05h00 - Rangs 1 à 14 ouverts)","Fourgon blanc garé au croisement du murger Sud",https://www.google.com/maps/dir/?api=1&destination=46.94642,4.74258
-PP-1,Les Pierres Plates Nord,5,31,today,a_faire,"16 rangs (Équipe B à 05h15 - Caissettes percées)","Entrée haute par le chemin des Pierres Plates",https://www.google.com/maps/dir/?api=1&destination=46.94945,4.74135
+CP,Le Clos du Puits,3,7,today,en_cours,"24 rangs (Équipe A - Rangs 1 à 14 ouverts)","Véhicule stationné au croisement du chemin Sud",https://www.google.com/maps/dir/?api=1&destination=46.94642,4.74258
+PP-1,Les Pierres Plates Nord,5,31,today,a_faire,"16 rangs (Équipe B - Caissettes ajourées)","Entrée haute par le chemin des Pierres Plates",https://www.google.com/maps/dir/?api=1&destination=46.94945,4.74135
 VM,La Vigne du Moulin,7,38,tomorrow,a_faire,"22 rangs (Prévu demain 06h00 - Benne élévatrice)","Accès par le chemin du Moulin, sol sec",https://www.google.com/maps/dir/?api=1&destination=46.95122,4.73955
 TB,Les Terrasses Basses,4,24,upcoming,a_faire,"26 rangs (Attente contrôle maturité +0.4% vol.)","Accès plaine haute",https://www.google.com/maps/dir/?api=1&destination=46.94295,4.74415`,
   },
@@ -278,7 +278,7 @@ TB,Les Terrasses Basses,4,24,upcoming,a_faire,"26 rangs (Attente contrôle matur
           numero: '0131',
           grape: 'Chardonnay',
           areaAres: 46.02,
-          nbRangs: '24 rangs (Rangs 1 à 24 · Priorité 05h00)',
+          nbRangs: '24 rangs (Rangs 1 à 24 · Priorité Matin)',
           daySlot: 'today',
           status: 'en_cours',
           lat: 46.94642,
@@ -963,7 +963,7 @@ export const LivretImportModal: React.FC<LivretImportModalProps> = ({
                 <th>Pastille & Livret</th>
                 <th>Climat & Appellation</th>
                 <th>Réf. Cadastrale & Surface</th>
-                <th>Rangs & Consignes 5h00</th>
+                <th>Rangs & Consignes de coupe</th>
                 <th>Géolocalisation & Contour IGN</th>
               </tr>
             </thead>
@@ -1041,7 +1041,7 @@ export const LivretImportModal: React.FC<LivretImportModalProps> = ({
           >
             <CheckCircle2 size={15} />
             <span>
-              Injecter ces {parsedRecords.length} parcelle(s) sur la Carte & le Livret 5h00
+              Injecter ces {parsedRecords.length} parcelle(s) sur la Carte & le Planning Terrain
             </span>
           </button>
         </div>

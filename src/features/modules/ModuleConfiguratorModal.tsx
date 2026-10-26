@@ -43,7 +43,7 @@ const MAIN_MODULE_DESCRIPTIONS: Array<{
   },
   {
     id: 'vineyard',
-    label: '1. Vignoble, Cadastre IGN & Vendanges 5h00',
+    label: '1. Vignoble, Cadastre IGN & Vendanges',
     subtitle: 'Carte satellite, livret parcellaire GPS, planning de coupe et pesées à quai',
     icon: Grape,
   },
@@ -253,7 +253,7 @@ export const ModuleConfiguratorModal: React.FC<{ onClose: () => void }> = ({ onC
             </h3>
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-ink-muted)' }}>
               Adaptez l’ERP en 1 clic à la taille et au besoin exact du client : du vigneron qui ne
-              veut que <strong>l’outil Terrain & Vendanges 5h00</strong> jusqu’à la{' '}
+              veut que <strong>l’outil Terrain & Vendanges</strong> jusqu’à la{' '}
               <strong>Grande Maison de Bourgogne (Domaine + Négoce + Allocations + Douanes)</strong>.
             </p>
           </div>

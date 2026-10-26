@@ -365,7 +365,7 @@ export const OverviewView: React.FC<{ onNavigate: (tab: string) => void }> = ({ 
               <Navigation size={17} />
             </span>
             <span className="ds-row-main">
-              <span className="ds-row-title" style={{ display: 'block' }}>Guider les équipes à 5h</span>
+              <span className="ds-row-title" style={{ display: 'block' }}>Feuille de route & Guidage terrain</span>
               <span className="ds-row-sub" style={{ display: 'block' }}>Carte GPS simplifiée pour vendangeurs et chauffeurs</span>
             </span>
             <span className="ds-go"><ChevronRight size={16} /></span>

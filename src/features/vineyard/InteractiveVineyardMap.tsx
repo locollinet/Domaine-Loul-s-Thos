@@ -523,7 +523,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
           </div>
         )}
 
-        {/* Légende Flottante Haut-Droite (Codes Couleurs Vendanges 5h00) */}
+        {/* Légende Flottante Haut-Droite (Codes Couleurs Vendanges) */}
         <div
           style={{
             position: 'absolute',
