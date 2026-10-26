@@ -316,6 +316,7 @@ export const AgingView: React.FC = () => {
             {lotsReadyForBlend.map((l) => {
               const volL = lotVolumeMl(state, l.id) / 1000;
               const occs = lotOccupancies(state, l.id);
+              const firstContId = occs[0]?.containerId ?? 'demo-barrel-1';
               const totalCapL = occs.reduce(
                 (acc, o) => acc + (state.containers[o.containerId]?.capacityMl ?? o.volumeMl) / 1000,
                 0
@@ -324,12 +325,19 @@ export const AgingView: React.FC = () => {
               return (
                 <div
                   key={l.id}
+                  className="ds-clickable-card"
+                  onClick={() => {
+                    setTransferLotId(l.id);
+                    setTransferFromCont(firstContId);
+                    setShowTransferModal(true);
+                  }}
                   style={{
                     padding: '16px',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-md)',
                     background: 'var(--color-bg)',
                   }}
+                  title="Cliquer pour soutirer ou transférer ce lot"
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -380,9 +388,32 @@ export const AgingView: React.FC = () => {
                           .join(' + ') || 'Aucun contenant'}
                       </strong>
                     </span>
-                    <span className="badge badge-muted">
-                      {l.stage === 'ready' ? 'Prêt pour assemblage / mise' : 'En élevage sous bois'}
-                    </span>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="ds-action-chip"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTransferLotId(l.id);
+                          setTransferFromCont(firstContId);
+                          setShowTransferModal(true);
+                        }}
+                      >
+                        <ArrowLeftRight size={11} /> Soutirer
+                      </button>
+                      {l.stage === 'ready' && (
+                        <button
+                          type="button"
+                          className="ds-action-chip"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowBlendModal(true);
+                          }}
+                        >
+                          <Sparkles size={11} /> Assembler
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -395,7 +426,7 @@ export const AgingView: React.FC = () => {
           <div className="ds-section-head">
             <div>
               <h2 className="ds-section-title">Parc à barriques (Élevage 2024)</h2>
-              <span className="ds-section-meta">Pièces bourguignonnes en chêne · 225 L</span>
+              <span className="ds-section-meta">Cliquez sur une pièce en chêne pour la soutirer ou la transférer</span>
             </div>
             <span className="badge badge-grape">Millésime 2024</span>
           </div>
@@ -411,7 +442,19 @@ export const AgingView: React.FC = () => {
               const occ = state.occupancies[bId];
               const fillPct = occ ? Math.round((occ.volumeMl / (c?.capacityMl || 1)) * 100) : 0;
               return (
-                <div key={bId} className="ds-barrel-card">
+                <div
+                  key={bId}
+                  className="ds-barrel-card ds-clickable-card"
+                  onClick={() => {
+                    if (occ) {
+                      setTransferLotId(occ.lotId);
+                      setTransferFromCont(bId);
+                      setTransferVolL(String(Math.min(50, occ.volumeMl / 1000)));
+                    }
+                    setShowTransferModal(true);
+                  }}
+                  title={`Cliquer pour soutirer ou transférer la barrique ${c?.code ?? bId}`}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '15px', color: 'var(--color-ink)' }}>🪵 {c?.code}</strong>
                     <span className="badge badge-gold">Fût 225 L</span>
@@ -425,9 +468,9 @@ export const AgingView: React.FC = () => {
                   <div className="ds-bar" aria-hidden="true">
                     <span style={{ width: `${fillPct}%`, background: 'var(--color-gold-dark)' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
                     <span>Remplissage : <strong>{fillPct}%</strong></span>
-                    <span>Creux : {c ? (c.capacityMl - (occ?.volumeMl ?? 0)) / 1000 : 0} L</span>
+                    <span className="ds-action-chip">Soutirer ce fût →</span>
                   </div>
                 </div>
               );

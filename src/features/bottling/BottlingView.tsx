@@ -352,13 +352,73 @@ export const BottlingView: React.FC = () => {
             </div>
           </section>
 
+          {/* 3B. CUVÉES PRÊTES AU TIRAGE EN 1 CLIC (MANIPULATION DIRECTE) */}
+          {eligibleLots.length > 0 && (
+            <div className="ds-panel ds-rise ds-rise-2">
+              <div className="ds-section-head">
+                <div>
+                  <h2 className="ds-section-title">Cuvées prêtes au tirage (Cliquez sur un lot pour lancer sa mise)</h2>
+                  <span className="ds-section-meta">
+                    La sélection pré-remplit automatiquement le lot, son volume disponible et l’habillage associé
+                  </span>
+                </div>
+                <span className="badge badge-gold">{eligibleLots.length} lot(s) éligible(s)</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}>
+                {eligibleLots.map((l) => {
+                  const volMl = lotVolumeMl(state, l.id);
+                  const maxCols = Math.max(1, Math.floor((volMl - 5000) / 750));
+                  return (
+                    <div
+                      key={l.id}
+                      className="ds-clickable-card"
+                      onClick={() => {
+                        setSelectedLotId(l.id);
+                        setBottleCount(String(Math.min(660, maxCols)));
+                        setShowBottlingModal(true);
+                      }}
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--color-border)',
+                        background: 'var(--color-bg)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '14.5px', color: 'var(--color-ink)' }}>{l.name}</strong>
+                        <span className="badge badge-green">{l.code}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }} className="tabular">
+                        <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-forest)' }}>
+                          {(volMl / 1000).toLocaleString('fr-FR')} L
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+                          ≈ {maxCols} cols (75 cl)
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                        <span style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
+                          Millésime {l.vintage} · {l.color === 'red' ? 'Rouge' : 'Blanc'}
+                        </span>
+                        <span className="ds-action-chip">+ Mettre en bouteilles →</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 4. TABLEAU & JAUGES DES LOTS DE BOUTEILLES */}
           <div className="ds-panel ds-rise ds-rise-3">
             <div className="ds-section-head">
               <div>
                 <h2 className="ds-section-title">Lots de bouteilles en stock</h2>
                 <span className="ds-section-meta">
-                  Distinction automatique : Physique = Disponible vendable + Réservé clients + Isolé
+                  Cliquez sur n’importe quel lot pour inspecter son emplacement en cave ou agir sur son statut
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -366,7 +426,7 @@ export const BottlingView: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
-                  onClick={() => setSubTab('cellar_map')}
+                  onClick={() => selectSubTabAndScroll('cellar_map')}
                 >
                   Voir où ils sont rangés →
                 </button>
@@ -386,7 +446,7 @@ export const BottlingView: React.FC = () => {
                     <th>Bloqué / Retour</th>
                     <th>Disponible vendable</th>
                     <th>Coût connu</th>
-                    <th>Statut</th>
+                    <th>Statut & Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -397,7 +457,12 @@ export const BottlingView: React.FC = () => {
                     const bResPct = pos.physical > 0 ? Math.round((pos.reserved / pos.physical) * 100) : 0;
                     const bIsoPct = pos.physical > 0 ? Math.round(((pos.blocked + pos.quarantine) / pos.physical) * 100) : 0;
                     return (
-                      <tr key={b.id}>
+                      <tr
+                        key={b.id}
+                        className="ds-clickable-row"
+                        onClick={() => selectSubTabAndScroll('cellar_map')}
+                        title="Cliquer pour localiser ce lot dans le plan des casiers & palox"
+                      >
                         <td style={{ fontWeight: 700 }}>{b.code}</td>
                         <td style={{ fontWeight: 600 }}>{article?.label ?? b.skuId}</td>
                         <td>
@@ -430,10 +495,38 @@ export const BottlingView: React.FC = () => {
                         <td className="tabular" style={{ fontSize: '12px' }}>
                           {b.cost.knownCents ? `${(b.cost.knownCents / 100).toLocaleString('fr-FR')} €` : 'Partiel'}
                         </td>
-                        <td>
-                          <span className={`badge ${b.quality === 'released' ? 'badge-green' : 'badge-amber'}`}>
-                            {b.quality === 'released' ? 'Libéré' : 'Retenu'}
-                          </span>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span className={`badge ${b.quality === 'released' ? 'badge-green' : 'badge-amber'}`}>
+                              {b.quality === 'released' ? 'Libéré' : 'Retenu'}
+                            </span>
+                            <button
+                              type="button"
+                              className="ds-action-chip"
+                              onClick={() => selectSubTabAndScroll('cellar_map')}
+                            >
+                              📍 Cave
+                            </button>
+                            <button
+                              type="button"
+                              className="ds-action-chip"
+                              onClick={() => {
+                                void dispatch({
+                                  type: b.quality === 'released' ? 'quality.hold' : 'quality.release',
+                                  payload: {
+                                    target: 'batch',
+                                    id: b.id,
+                                    reason:
+                                      b.quality === 'released'
+                                        ? 'Mise en retenue qualité depuis la cave à bouteilles'
+                                        : 'Libération qualité validée pour commercialisation',
+                                  },
+                                });
+                              }}
+                            >
+                              {b.quality === 'released' ? '🔒 Isoler' : '✓ Libérer'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

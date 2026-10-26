@@ -478,7 +478,19 @@ export const SalesView: React.FC = () => {
                     const cust = state.customers[o.customerId];
                     const totalHt = o.lines.reduce((a, l) => a + l.quantity * l.unitPriceHtCents, 0);
                     return (
-                      <tr key={o.id}>
+                      <tr
+                        key={o.id}
+                        className={o.status !== 'shipped' && o.status !== 'cancelled' ? 'ds-clickable-row' : undefined}
+                        onClick={() => {
+                          if (o.status === 'confirmed' || o.status === 'partially_shipped') {
+                            setShowShipModal(o.id);
+                            setShipLineId(o.lines[0]?.id ?? '');
+                            setShipQty(String(o.lines[0]?.reserved ?? 0));
+                          } else if (o.status === 'quote') {
+                            void handleConfirmOrder(o.id);
+                          }
+                        }}
+                      >
                         <td style={{ fontWeight: 700 }}>{o.code}</td>
                         <td>
                           <div style={{ fontWeight: 600 }}>{cust?.name ?? o.customerId}</div>
@@ -604,7 +616,14 @@ export const SalesView: React.FC = () => {
                     const totalShipped = s.lines.reduce((a, l) => a + l.quantity, 0);
                     const order = state.orders[s.orderId];
                     return (
-                      <tr key={s.id}>
+                      <tr
+                        key={s.id}
+                        className="ds-clickable-row"
+                        onClick={() => {
+                          setShowReturnModal(s.id);
+                          setReturnBatchId(s.lines[0]?.batchId ?? '');
+                        }}
+                      >
                         <td style={{ fontWeight: 700 }}>{s.code}</td>
                         <td>{order?.code ?? s.orderId}</td>
                         <td className="tabular" style={{ fontWeight: 600 }}>{totalShipped} bouteilles</td>

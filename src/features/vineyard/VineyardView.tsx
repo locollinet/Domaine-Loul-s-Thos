@@ -1674,11 +1674,17 @@ export const VineyardView: React.FC<{
                   </div>
                 </div>
 
-                {/* 3 Infos Terrain Essentielles (Paramétrables) */}
+                {/* 3 Infos Terrain Essentielles (Directement cliquables pour modifier) */}
                 <div className="grid-3" style={{ gap: '10px' }}>
-                  <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-                    <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Subdivision & Rangs
+                  <div
+                    className="ds-clickable-card"
+                    onClick={() => openParcelConfigModal(selectedParcel)}
+                    style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}
+                    title="Cliquer pour modifier le nombre de rangs et les repères du livret"
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      <span>Subdivision & Rangs</span>
+                      <span style={{ color: 'var(--color-forest)' }}>✎ Modifier</span>
                     </div>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, marginTop: '2px' }}>
                       {selectedTrack?.customNbRangs ?? selectedMeta.nbRangs}
@@ -1688,9 +1694,15 @@ export const VineyardView: React.FC<{
                     </div>
                   </div>
 
-                  <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-                    <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Accès & Contexte Terrain
+                  <div
+                    className="ds-clickable-card"
+                    onClick={() => openParcelConfigModal(selectedParcel)}
+                    style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}
+                    title="Cliquer pour modifier les consignes d’accès fourgon et notes terrain"
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      <span>Accès & Contexte Terrain</span>
+                      <span style={{ color: 'var(--color-forest)' }}>✎ Modifier</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px', color: 'var(--color-forest)' }}>
                       {selectedTrack?.customAccessNotes ?? selectedParcel.access ?? 'Accès fourgon chemin haut'}
@@ -1700,9 +1712,15 @@ export const VineyardView: React.FC<{
                     </div>
                   </div>
 
-                  <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
-                    <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Point GPS & Lien Maps
+                  <div
+                    className="ds-clickable-card"
+                    onClick={() => openParcelConfigModal(selectedParcel)}
+                    style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}
+                    title="Cliquer pour ajuster le point GPS d’entrée de rang ou le lien Google Maps"
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      <span>Point GPS & Lien Maps</span>
+                      <span style={{ color: 'var(--color-forest)' }}>✎ Modifier</span>
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px' }} className="tabular">
                       {effectivePin.lat.toFixed(5)}, {effectivePin.lng.toFixed(5)}
@@ -2467,6 +2485,12 @@ export const VineyardView: React.FC<{
               {transports.map((t) => (
                 <div
                   key={t.id}
+                  className={t.status === 'in_transit' && canRecordReception ? 'ds-clickable-card' : undefined}
+                  onClick={() => {
+                    if (t.status === 'in_transit' && canRecordReception) {
+                      setShowReceptionModal(t.id);
+                    }
+                  }}
                   style={{
                     padding: '14px',
                     border: '1px solid var(--color-border)',

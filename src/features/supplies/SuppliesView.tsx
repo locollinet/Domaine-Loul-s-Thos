@@ -346,7 +346,15 @@ export const SuppliesView: React.FC = () => {
                   Math.round((g.onHand / Math.max(1, g.reorderPoint * 2)) * 100)
                 );
                 return (
-                  <tr key={g.id}>
+                  <tr
+                    key={g.id}
+                    className="ds-clickable-row"
+                    onClick={() => {
+                      setShowInvModal(g.id);
+                      setInvCounted(String(g.onHand));
+                    }}
+                    title="Cliquer pour ajuster le stock d’inventaire de cet article"
+                  >
                     <td style={{ fontWeight: 700 }}>{g.name}</td>
                     <td style={{ minWidth: '150px' }}>
                       <div className="ds-bar">
@@ -373,16 +381,29 @@ export const SuppliesView: React.FC = () => {
                     <td className="tabular">
                       {g.unitCostCents !== null ? `${(g.unitCostCents / 100).toFixed(2)} €` : 'Inconnu'}
                     </td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => {
-                          setShowInvModal(g.id);
-                          setInvCounted(String(g.onHand));
-                        }}
-                      >
-                        Ajuster inventaire
-                      </button>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          className={`btn btn-sm ${isLow ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => {
+                            setPoGoodId(g.id);
+                            setPoQuantity(String(Math.max(500, g.reorderPoint * 2)));
+                            setPoCostEur(g.unitCostCents !== null ? (g.unitCostCents / 100).toFixed(2) : '0.35');
+                            setShowPoModal(true);
+                          }}
+                        >
+                          + Commander
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => {
+                            setShowInvModal(g.id);
+                            setInvCounted(String(g.onHand));
+                          }}
+                        >
+                          Ajuster inventaire
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -398,7 +419,7 @@ export const SuppliesView: React.FC = () => {
           <div>
             <h2 className="ds-section-title">Commandes fournisseurs</h2>
             <span className="ds-section-meta">
-              Une commande fournisseur n’augmente le stock physique qu’à la réception effective
+              Cliquez sur une commande ouverte pour enregistrer sa réception physique
             </span>
           </div>
           <span className="badge badge-muted">{purchaseOrders.length} commande(s)</span>
@@ -418,7 +439,17 @@ export const SuppliesView: React.FC = () => {
             </thead>
             <tbody>
               {purchaseOrders.map((po) => (
-                <tr key={po.id}>
+                <tr
+                  key={po.id}
+                  className={po.status !== 'received' ? 'ds-clickable-row' : undefined}
+                  onClick={() => {
+                    if (po.status !== 'received') {
+                      setShowReceiveModal(po.id);
+                      const remaining = (po.lines[0]?.ordered ?? 0) - (po.lines[0]?.received ?? 0);
+                      setReceiveQty(String(remaining));
+                    }
+                  }}
+                >
                   <td style={{ fontWeight: 700 }}>{po.code}</td>
                   <td style={{ fontWeight: 600 }}>{po.supplier}</td>
                   <td style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)' }}>

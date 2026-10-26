@@ -28,6 +28,16 @@ export const FinanceView: React.FC = () => {
   const [creditHtEur, setCreditHtEur] = useState('50');
   const [creditReason, setCreditReason] = useState('Geste commercial suite incident de transport (fictif)');
 
+  // Interactive 2027 Plantation Scenario adjustments
+  const [budgetDeltasCents, setBudgetDeltasCents] = useState<Record<number, number>>(() => {
+    try {
+      const raw = localStorage.getItem('domaine-erp-2027-budget-deltas-v1');
+      return raw ? (JSON.parse(raw) as Record<number, number>) : {};
+    } catch {
+      return {};
+    }
+  });
+
   if (!state) return null;
 
   const invoices = Object.values(state.invoices);
@@ -101,9 +111,26 @@ export const FinanceView: React.FC = () => {
   );
   const paidPct = financeTotals.ttc > 0 ? Math.round((financeTotals.paid / financeTotals.ttc) * 100) : 0;
   const unpaidInvoices = invoices.filter((inv) => invoiceBalance(state, inv.id).balance > 0);
-  const projectTotalEur = project
-    ? Math.round(project.budgetLines.reduce((a, b) => a + b.amountCents, 0) / 100)
-    : 0;
+  const adjustBudgetLine = (idx: number, deltaCents: number) => {
+    setBudgetDeltasCents((prev) => {
+      const next = { ...prev, [idx]: (prev[idx] ?? 0) + deltaCents };
+      try {
+        localStorage.setItem('domaine-erp-2027-budget-deltas-v1', JSON.stringify(next));
+      } catch {
+        // Ignore quota
+      }
+      return next;
+    });
+  };
+  const effectiveBudgetLines = project
+    ? project.budgetLines.map((l, idx) => ({
+        ...l,
+        amountCents: Math.max(0, l.amountCents + (budgetDeltasCents[idx] ?? 0)),
+      }))
+    : [];
+  const projectTotalEur = Math.round(
+    effectiveBudgetLines.reduce((a, b) => a + b.amountCents, 0) / 100
+  );
 
   return (
     <div className="ds-overview">
@@ -413,7 +440,16 @@ export const FinanceView: React.FC = () => {
                     const bal = invoiceBalance(state, inv.id);
                     const invPaidPct = inv.ttcCents > 0 ? Math.min(100, Math.round((bal.paid / inv.ttcCents) * 100)) : 0;
                     return (
-                      <tr key={inv.id}>
+                      <tr
+                        key={inv.id}
+                        className={bal.balance > 0 ? 'ds-clickable-row' : undefined}
+                        onClick={() => {
+                          if (bal.balance > 0) {
+                            setShowPayModal(inv.id);
+                            setPayAmountEur((bal.balance / 100).toFixed(2));
+                          }
+                        }}
+                      >
                         <td style={{ fontWeight: 700 }}>{inv.code}</td>
                         <td style={{ fontWeight: 600 }}>{cust?.name ?? inv.customerId}</td>
                         <td style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
@@ -560,26 +596,44 @@ export const FinanceView: React.FC = () => {
 
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '8px' }}>
-                    Répartition des postes d’investissement
+                    Répartition des postes d’investissement (ajustables en 1 clic)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {project.budgetLines.map((l, i) => {
-                      const totalCents = project.budgetLines.reduce((a, b) => a + b.amountCents, 0);
+                    {effectiveBudgetLines.map((l, i) => {
+                      const totalCents = effectiveBudgetLines.reduce((a, b) => a + b.amountCents, 0);
                       const pct = totalCents > 0 ? Math.round((l.amountCents / totalCents) * 100) : 0;
                       return (
                         <div
                           key={i}
                           style={{
-                            padding: '8px 12px',
+                            padding: '10px 12px',
                             background: 'var(--color-bg)',
                             border: '1px solid var(--color-border-subtle)',
                             borderRadius: 'var(--radius-sm)',
                             fontSize: '12.5px',
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600 }}>{l.label}</span>
-                            <strong className="tabular">{(l.amountCents / 100).toLocaleString('fr-FR')} € ({pct}%)</strong>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                className="ds-action-chip"
+                                onClick={() => adjustBudgetLine(i, -50_000)}
+                                title="Réduire ce poste de 500 €"
+                              >
+                                -500 €
+                              </button>
+                              <strong className="tabular">{(l.amountCents / 100).toLocaleString('fr-FR')} € ({pct}%)</strong>
+                              <button
+                                type="button"
+                                className="ds-action-chip"
+                                onClick={() => adjustBudgetLine(i, 50_000)}
+                                title="Augmenter ce poste de 500 €"
+                              >
+                                +500 €
+                              </button>
+                            </div>
                           </div>
                           <div className="ds-bar" style={{ height: '5px' }}>
                             <span style={{ width: `${pct}%`, background: 'var(--color-grape)' }} />

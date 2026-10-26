@@ -19,6 +19,7 @@ import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { Container, ContainerKind, Measurement, MeasurementParameter } from '../../domain/types';
 
 const CUSTOM_CONTAINERS_KEY = 'domaine-erp-custom-containers-v1';
+const CONTAINER_OVERRIDES_KEY = 'domaine-erp-container-overrides-v1';
 
 const STAGE_LABELS_FR: Record<string, string> = {
   fermenting: 'En fermentation',
@@ -31,6 +32,7 @@ const STAGE_LABELS_FR: Record<string, string> = {
 export const CellarView: React.FC = () => {
   const { state, dispatch } = useStore();
   const [selectedLotId, setSelectedLotId] = useState<string>('lot-2026-white');
+  const [selectedContainerId, setSelectedContainerId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'plan' | 'table'>('plan');
   // Progressive disclosure inside the Lot Inspector to eliminate vertical clutter
   const [lotTab, setLotTab] = useState<'analytics' | 'itinerary' | 'journal'>('analytics');
@@ -74,16 +76,49 @@ export const CellarView: React.FC = () => {
       return [];
     }
   });
+  const [containerOverrides, setContainerOverrides] = useState<Record<string, Partial<Container>>>(() => {
+    try {
+      const raw = localStorage.getItem(CONTAINER_OVERRIDES_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, Partial<Container>>) : {};
+    } catch {
+      return {};
+    }
+  });
 
   if (!state) return null;
 
   const lots = Object.values(state.lots);
   const baseContainers = Object.values(state.containers);
-  const containers: Container[] = [
+  const rawContainers: Container[] = [
     ...baseContainers,
     ...customContainers.filter((cc) => !state.containers[cc.id]),
   ];
+  const containers: Container[] = rawContainers.map((c) => ({
+    ...c,
+    ...(containerOverrides[c.id] ?? {}),
+  }));
   const selectedLot = state.lots[selectedLotId] || lots[0];
+  const selectedContainer = selectedContainerId
+    ? containers.find((c) => c.id === selectedContainerId) ?? null
+    : null;
+
+  const updateContainerOverride = (containerId: string, patch: Partial<Container>) => {
+    setContainerOverrides((prev) => {
+      const next = {
+        ...prev,
+        [containerId]: {
+          ...(prev[containerId] ?? {}),
+          ...patch,
+        },
+      };
+      try {
+        localStorage.setItem(CONTAINER_OVERRIDES_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore quota
+      }
+      return next;
+    });
+  };
 
   const lotMeas = Object.values(state.measurements)
     .filter((m) => m.lotId === selectedLot?.id && m.supersededBy === null)
@@ -512,32 +547,33 @@ export const CellarView: React.FC = () => {
         </div>
 
         {viewMode === 'plan' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '12px' }}>
             {containers.map((c) => {
               const occ = state.occupancies[c.id];
               const lot = occ ? state.lots[occ.lotId] : null;
               const fillPct = occ ? Math.min(100, Math.round((occ.volumeMl / c.capacityMl) * 100)) : 0;
-              const isSelected = lot && lot.id === selectedLot?.id;
+              const isSelected = c.id === selectedContainer?.id || (lot && lot.id === selectedLot?.id && selectedContainer?.id === c.id);
 
               return (
                 <div
                   key={c.id}
                   onClick={() => {
+                    setSelectedContainerId(c.id);
                     if (lot) {
                       setSelectedLotId(lot.id);
-                      setTimeout(() => {
-                        const el = document.getElementById('cellar-lot-inspector');
-                        if (el && typeof el.scrollIntoView === 'function') {
-                          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                      }, 40);
                     }
+                    setTimeout(() => {
+                      const el = document.getElementById(lot ? 'cellar-lot-inspector' : 'cellar-container-action-bar');
+                      if (el && typeof el.scrollIntoView === 'function') {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }
+                    }, 40);
                   }}
-                  className="vessel-visual-card"
+                  className="vessel-visual-card ds-clickable-card"
                   style={{
                     border: isSelected ? '2px solid var(--color-forest)' : '1px solid var(--color-border)',
                     background: c.state === 'maintenance' ? '#F6F0F0' : isSelected ? 'var(--color-forest-soft)' : 'var(--color-surface)',
-                    cursor: lot ? 'pointer' : 'default',
+                    cursor: 'pointer',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -576,9 +612,9 @@ export const CellarView: React.FC = () => {
                           <span style={{ fontSize: '10px', opacity: 0.85 }}>{fillPct}% plein</span>
                         </>
                       ) : c.state === 'maintenance' ? (
-                        <span style={{ color: 'var(--color-crimson)', fontSize: '11px' }}>🔧 Indisponible</span>
+                        <span style={{ color: 'var(--color-crimson)', fontSize: '11px' }}>🔧 Maintenance</span>
                       ) : (
-                        <span style={{ color: 'var(--color-ink-light)', fontSize: '11px' }}>Vide</span>
+                        <span style={{ color: 'var(--color-ink-light)', fontSize: '11px' }}>Vide · Prêt</span>
                       )}
                     </div>
                   </div>
@@ -593,7 +629,7 @@ export const CellarView: React.FC = () => {
                       </div>
                     ) : (
                       <div style={{ fontSize: '11.5px', color: 'var(--color-ink-light)', marginTop: '2px' }}>
-                        {c.state === 'maintenance' ? 'Hors service' : 'Prêt à recevoir'}
+                        {c.state === 'maintenance' ? 'Cliquer pour réactiver' : 'Cliquer pour entonner'}
                       </div>
                     )}
                   </div>
@@ -611,7 +647,7 @@ export const CellarView: React.FC = () => {
                   <th>Capacité</th>
                   <th>Occupation</th>
                   <th>Lot affecté</th>
-                  <th>État</th>
+                  <th>État & Action rapide</th>
                 </tr>
               </thead>
               <tbody>
@@ -619,7 +655,14 @@ export const CellarView: React.FC = () => {
                   const occ = state.occupancies[c.id];
                   const lot = occ ? state.lots[occ.lotId] : null;
                   return (
-                    <tr key={c.id}>
+                    <tr
+                      key={c.id}
+                      className="ds-clickable-row"
+                      onClick={() => {
+                        setSelectedContainerId(c.id);
+                        if (lot) setSelectedLotId(lot.id);
+                      }}
+                    >
                       <td style={{ fontWeight: 700 }}>{c.code}</td>
                       <td>{c.kind === 'barrel' ? 'Barrique chêne' : 'Cuve'} · {c.location}</td>
                       <td className="tabular">{c.capacityMl / 1000} L</td>
@@ -639,11 +682,26 @@ export const CellarView: React.FC = () => {
                         )}
                       </td>
                       <td>
-                        {c.state === 'maintenance' ? (
-                          <span className="badge badge-crimson">Maintenance</span>
-                        ) : (
-                          <span className="badge badge-green">Disponible</span>
-                        )}
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {c.state === 'maintenance' ? (
+                            <span className="badge badge-crimson">Maintenance</span>
+                          ) : (
+                            <span className="badge badge-green">Disponible</span>
+                          )}
+                          {!occ && c.state === 'available' && (
+                            <button
+                              type="button"
+                              className="ds-action-chip"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeclareContainerId(c.id);
+                                setShowDeclareVolModal(true);
+                              }}
+                            >
+                              + Entonner ici
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -652,6 +710,91 @@ export const CellarView: React.FC = () => {
             </table>
           </div>
         )}
+
+        {/* Bandeau de Manipulation Directe du Contenant Sélectionné (Plein, Vide ou en Maintenance) */}
+        {selectedContainer && (() => {
+          const selOcc = state.occupancies[selectedContainer.id];
+          const selLot = selOcc ? state.lots[selOcc.lotId] : null;
+          return (
+            <div id="cellar-container-action-bar" className="ds-direct-bar">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 800, fontSize: '14.5px', color: 'var(--color-ink)' }}>
+                    Contenant sélectionné : {selectedContainer.code}
+                  </span>
+                  <span className="badge badge-muted">
+                    {selectedContainer.kind === 'barrel' ? 'Pièce 228 L' : 'Cuve Inox'} · Capacité {selectedContainer.capacityMl / 1000} L · {selectedContainer.location}
+                  </span>
+                  <span className={`badge ${selectedContainer.state === 'maintenance' ? 'badge-crimson' : 'badge-green'}`}>
+                    {selectedContainer.state === 'maintenance' ? '🔧 En maintenance' : '✓ En service'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginTop: '3px' }}>
+                  {selLot && selOcc
+                    ? `Occupe actuellement ${selOcc.volumeMl / 1000} L du lot ${selLot.code} (${selLot.name}).`
+                    : selectedContainer.state === 'maintenance'
+                    ? 'Ce contenant est isolé pour nettoyage/maintenance. Vous pouvez le remettre en service en 1 clic.'
+                    : 'Ce contenant est vide et propre : vous pouvez y entonner un lot ou le placer en maintenance.'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {selLot ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => {
+                        setSelectedLotId(selLot.id);
+                        setShowMeasModal(true);
+                      }}
+                    >
+                      <Thermometer size={13} /> + Relevé sur {selectedContainer.code}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => {
+                        setSelectedLotId(selLot.id);
+                        setShowTastingModal(true);
+                      }}
+                    >
+                      <MessageSquare size={13} /> + Dégustation
+                    </button>
+                  </>
+                ) : selectedContainer.state === 'available' ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => {
+                        setDeclareContainerId(selectedContainer.id);
+                        setShowDeclareVolModal(true);
+                      }}
+                    >
+                      <Droplets size={13} /> Entonner un lot dans {selectedContainer.code}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => updateContainerOverride(selectedContainer.id, { state: 'maintenance' })}
+                    >
+                      🔧 Passer en maintenance
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => updateContainerOverride(selectedContainer.id, { state: 'available' })}
+                  >
+                    <CheckCircle2 size={13} /> Remettre {selectedContainer.code} en service
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Lot selector and Progressive Disclosure Winemaking Inspector */}
