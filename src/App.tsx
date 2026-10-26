@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Navigation,
   Lock,
+  Sliders,
 } from 'lucide-react';
 import { useStore } from './app/store-context';
 import { ROLE_LABELS } from './domain/selectors';
@@ -27,6 +28,12 @@ import { CellarView } from './features/cellar/CellarView';
 import { DemoGuideModal } from './features/demo/DemoGuideModal';
 import { AiCopilotDrawer } from './features/ai/AiCopilotDrawer';
 import { FinanceView } from './features/finance/FinanceView';
+import {
+  ModuleConfigProvider,
+  useModuleConfig,
+  type MainModuleId,
+} from './features/modules/ModuleConfigContext';
+import { ModuleConfiguratorModal } from './features/modules/ModuleConfiguratorModal';
 import { OverviewView } from './features/overview/OverviewView';
 import { SalesView } from './features/sales/SalesView';
 import { GlobalSearchModal } from './features/search/GlobalSearchModal';
@@ -42,13 +49,15 @@ const ROLE_PRIMARY_TABS: Record<RoleId, string[]> = {
   accounting: ['finance', 'supplies', 'sales'],
 };
 
-export const App: React.FC = () => {
+const AppInner: React.FC = () => {
   const { state, role, setRole, resetDemo, feedback, clearFeedback, isReady } = useStore();
+  const { isMainEnabled } = useModuleConfig();
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [restrictedFieldMode, setRestrictedFieldMode] = useState<boolean>(false);
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState<boolean>(false);
+  const [showModuleConfigurator, setShowModuleConfigurator] = useState<boolean>(false);
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
   // Raccourci clavier Cmd+K / Ctrl+K
@@ -98,7 +107,7 @@ export const App: React.FC = () => {
         { id: 'aging', label: 'Élevage & Assemblage', icon: Layers },
         { id: 'bottling', label: 'Conditionnement & Stocks', icon: Package },
         { id: 'supplies', label: 'Matières sèches & Achats', icon: ShoppingBag },
-      ],
+      ].filter((item) => isMainEnabled(item.id as MainModuleId)),
     },
     {
       groupLabel: 'Allocations & Maison',
@@ -106,11 +115,11 @@ export const App: React.FC = () => {
         { id: 'sales', label: 'Ventes & Commerce', icon: Award },
         { id: 'traceability', label: 'Traçabilité', icon: GitBranch },
         { id: 'finance', label: 'Pilotage & Finance démo', icon: TrendingUp },
-      ],
+      ].filter((item) => isMainEnabled(item.id as MainModuleId)),
     },
-  ];
+  ].filter((g) => g.items.length > 0);
 
-  // Fil conducteur compact par icônes (zéro surcharge de texte)
+  // Fil conducteur compact par icônes (filtré selon les modules souscrits par le domaine)
   const compactSteps = [
     { id: 'vineyard', short: '1. Vigne', icon: Grape },
     { id: 'cellar', short: '2. Cuverie', icon: Wine },
@@ -118,7 +127,7 @@ export const App: React.FC = () => {
     { id: 'bottling', short: '4. Mise', icon: Package },
     { id: 'sales', short: '5. Allocations', icon: Award },
     { id: 'traceability', short: '6. Filiation', icon: GitBranch },
-  ];
+  ].filter((st) => isMainEnabled(st.id as MainModuleId));
 
   return (
     <div className="app-shell">
@@ -321,6 +330,16 @@ export const App: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
+                  onClick={() => setShowModuleConfigurator(true)}
+                  title="Configurer les modules souscrits par le domaine (Packs commerciaux & extensions à la carte)"
+                >
+                  <Sliders size={12} style={{ color: 'var(--color-burgundy)' }} />
+                  <span>Modules</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
                   onClick={() => {
                     setActiveTab('vineyard');
                     setRestrictedFieldMode(true);
@@ -497,6 +516,17 @@ export const App: React.FC = () => {
         isOpen={showAiCopilot}
         onClose={() => setShowAiCopilot(false)}
       />
+
+      {/* Configurateur d'Offre & Modules à la Carte */}
+      {showModuleConfigurator && (
+        <ModuleConfiguratorModal onClose={() => setShowModuleConfigurator(false)} />
+      )}
     </div>
   );
 };
+
+export const App: React.FC = () => (
+  <ModuleConfigProvider>
+    <AppInner />
+  </ModuleConfigProvider>
+);

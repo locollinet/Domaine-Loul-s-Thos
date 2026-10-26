@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
+import { TrendingUp, Landmark } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { invoiceBalance } from '../../domain/selectors';
+import { useModuleConfig } from '../modules/ModuleConfigContext';
+import { CustomsDrmPanel } from './CustomsDrmPanel';
 
 export const FinanceView: React.FC = () => {
   const { state, dispatch } = useStore();
+  const { isAddonEnabled } = useModuleConfig();
+  const [subTab, setSubTab] = useState<'finance' | 'drm'>('finance');
 
   // Payment Modal
   const [showPayModal, setShowPayModal] = useState<string | null>(null); // invoiceId
@@ -72,24 +77,62 @@ export const FinanceView: React.FC = () => {
     }
   };
 
+  const showDrmAddon = isAddonEnabled('drm_douanes');
+  const effectiveSubTab = showDrmAddon ? subTab : 'finance';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-forest)' }}>
-          Pilotage, Finance de démo & Scénarios
-        </h1>
-        <p style={{ color: 'var(--color-ink-muted)', fontSize: '14px' }}>
-          Facturation illustrative, prévisions de trésorerie et budget de renouvellement parcellaire 2027.
-        </p>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-forest)' }}>
+            Pilotage, DRM Douanes (CIEL) & Finance de démo
+          </h1>
+          <p style={{ color: 'var(--color-ink-muted)', fontSize: '14px' }}>
+            Comptabilité matières douanière (DRM hL), facturation illustrative, trésorerie et budget parcellaire 2027.
+          </p>
+        </div>
+
+        {showDrmAddon && (
+          <div className="segmented-control">
+            <button
+              type="button"
+              className={`segmented-btn ${effectiveSubTab === 'finance' ? 'active' : ''}`}
+              onClick={() => setSubTab('finance')}
+            >
+              <TrendingUp size={14} />
+              <span>1. Facturation, Trésorerie & Budget 2027</span>
+            </button>
+            <button
+              type="button"
+              className={`segmented-btn ${effectiveSubTab === 'drm' ? 'active' : ''}`}
+              onClick={() => setSubTab('drm')}
+            >
+              <Landmark size={14} />
+              <span>2. DRM Douanes (CIEL) & DAE/DSA</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Legal & Demo Disclaimer */}
       <div className="alert alert-warning">
         <div>
-          <strong>Document de démonstration :</strong> Les factures, avoirs et prévisions ci-dessous sont générés à titre illustratif dans le cadre du Domaine des Trois Coteaux (fictif). Ils n’ont aucune valeur comptable, bancaire ou fiscale réelle.
+          <strong>Document de démonstration :</strong> Les factures, avoirs, balances DRM et prévisions ci-dessous sont générés à titre illustratif dans le cadre du Domaine des Trois Coteaux (fictif). Ils n’ont aucune valeur comptable, bancaire, douanière ou fiscale réelle.
         </div>
       </div>
 
+      {effectiveSubTab === 'drm' && showDrmAddon ? (
+        <CustomsDrmPanel state={state} />
+      ) : (
+      <>
       {/* Invoices List */}
       <div className="card">
         <div className="card-header">
@@ -389,6 +432,8 @@ export const FinanceView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

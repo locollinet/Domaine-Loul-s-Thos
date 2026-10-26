@@ -27,6 +27,8 @@ import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { HarvestCount, Mission, MissionStatus, Parcel } from '../../domain/types';
 import { InteractiveVineyardMap, type ParcelMapItem } from './InteractiveVineyardMap';
 import { LivretImportModal, type ImportedParcelRecord } from './LivretImportModal';
+import { PhytoAndTesaPanel } from './PhytoAndTesaPanel';
+import { useModuleConfig } from '../modules/ModuleConfigContext';
 
 function normalizeAccents(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -414,8 +416,9 @@ export const VineyardView: React.FC<{
   onToggleRestrictedMode?: () => void;
 }> = ({ restrictedFieldMode = false, onToggleRestrictedMode }) => {
   const { state, dispatch, role } = useStore();
-  // Navigation simple en 3 onglets clairs (Zéro surcharge à l'écran)
-  const [subTab, setSubTab] = useState<'atlas' | 'harvest' | 'reception'>('atlas');
+  const { isAddonEnabled } = useModuleConfig();
+  // Navigation simple par onglets clairs (Zéro surcharge à l'écran)
+  const [subTab, setSubTab] = useState<'atlas' | 'harvest' | 'reception' | 'phyto_tesa'>('atlas');
   const [fieldMode, setFieldMode] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>('parcel-c');
   const [parcelSearch, setParcelSearch] = useState('');
@@ -1134,6 +1137,16 @@ export const VineyardView: React.FC<{
               >
                 <Scale size={14} />
                 <span>3. Quai & Pesées ({inTransitCount} en transit)</span>
+              </button>
+            )}
+            {!restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
+              <button
+                type="button"
+                className={`segmented-btn ${subTab === 'phyto_tesa' ? 'active' : ''}`}
+                onClick={() => setSubTab('phyto_tesa')}
+              >
+                <CheckCircle2 size={14} />
+                <span>4. Phyto Bio/HVE & TESA</span>
               </button>
             )}
           </div>
@@ -2299,19 +2312,105 @@ export const VineyardView: React.FC<{
                         <td className="tabular" style={{ fontWeight: 700, color: 'var(--color-forest)' }}>
                           {(r.netG / 1000).toLocaleString('fr-FR')} kg
                         </td>
-                        <td>
-                          <span className="badge badge-grape">{lot?.code ?? r.destinationLotId}</span>{' '}
-                          <span style={{ fontSize: '12px', fontWeight: 500 }}>{lot?.name}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+                         <td>
+                           <span className="badge badge-grape">{lot?.code ?? r.destinationLotId}</span>{' '}
+                           <span style={{ fontSize: '12px', fontWeight: 500 }}>{lot?.name}</span>
+                         </td>
+                       </tr>
+                     );
+                   })}
+                 </tbody>
+               </table>
+             </div>
+
+             {isAddonEnabled('negoce') && (
+               <div
+                 style={{
+                   marginTop: '18px',
+                   paddingTop: '14px',
+                   borderTop: '1px solid var(--color-border)',
+                 }}
+               >
+                 <div
+                   style={{
+                     display: 'flex',
+                     justifyContent: 'space-between',
+                     alignItems: 'center',
+                     marginBottom: '8px',
+                     flexWrap: 'wrap',
+                     gap: '6px',
+                   }}
+                 >
+                   <div>
+                     <span className="badge badge-gold">MODE MAISON DE NÉGOCE ACTIVÉ</span>
+                     <h3 style={{ margin: '4px 0 0 0', fontSize: '15.5px' }}>
+                       Apports sous Contrat d’Achat de Raisins / Moûts (Séparation Douanes Domaine vs Négoce)
+                     </h3>
+                   </div>
+                   <span className="badge badge-green">Traçabilité Apporteurs</span>
+                 </div>
+
+                 <table>
+                   <thead>
+                     <tr>
+                       <th>Contrat & Vigneron Apporteur</th>
+                       <th>Appellation & Climat</th>
+                       <th>Nature Apport</th>
+                       <th>Volume / Poids Reçu</th>
+                       <th>Cuve Négoce Dédiée</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     <tr>
+                       <td>
+                         <strong>CTR-NEG-2026-01</strong>
+                         <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                           Domaine Morel & Fils (Apporteur Partenaire — fictif)
+                         </div>
+                       </td>
+                       <td>Meursault Village · Les Narvaux</td>
+                       <td>
+                         <span className="badge badge-gold">Raisins entiers (Caissettes 18 kg)</span>
+                       </td>
+                       <td className="tabular" style={{ fontWeight: 700 }}>
+                         1 420 kg (Pressurage séparé)
+                       </td>
+                       <td>
+                         <span className="badge badge-grape">Cuve Inox C-04 (Isolement Négoce)</span>
+                       </td>
+                     </tr>
+                     <tr>
+                       <td>
+                         <strong>CTR-NEG-2026-02</strong>
+                         <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                           EARL des Combes (Apporteur Partenaire — fictif)
+                         </div>
+                       </td>
+                       <td>Puligny-Montrachet Village</td>
+                       <td>
+                         <span className="badge badge-green">Moût débourbé (Achat hL)</span>
+                       </td>
+                       <td className="tabular" style={{ fontWeight: 700 }}>
+                         11,40 hL (Ticket pont-bascule #892)
+                       </td>
+                       <td>
+                         <span className="badge badge-grape">Fûts F-12 à F-16 (Lot Négoce)</span>
+                       </td>
+                     </tr>
+                   </tbody>
+                 </table>
+               </div>
+             )}
+           </div>
+         </div>
+       )}
+
+       {/* =====================================================================
+           SOUS-VUE 4 : REGISTRE PHYTOSANITAIRE BIO/HVE (DAR) & POINTAGE TESA MSA
+          ===================================================================== */}
+       {subTab === 'phyto_tesa' && !restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
+         <PhytoAndTesaPanel parcels={parcels} />
+       )}
 
       {/* Modal Ajout Comptage */}
       {showCountModal && (

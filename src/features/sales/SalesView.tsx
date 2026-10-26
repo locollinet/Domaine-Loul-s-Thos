@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
+import { Award, Crown } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { batchPosition } from '../../domain/selectors';
+import { useModuleConfig } from '../modules/ModuleConfigContext';
+import { AllocationsAndPrimeursPanel } from './AllocationsAndPrimeursPanel';
 
 export const SalesView: React.FC = () => {
   const { state, dispatch } = useStore();
+  const { isAddonEnabled } = useModuleConfig();
+  const [subTab, setSubTab] = useState<'orders' | 'allocations'>('orders');
 
   // Create Order Modal
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -115,21 +120,85 @@ export const SalesView: React.FC = () => {
     }
   };
 
+  const showAllocationsAddon = isAddonEnabled('allocations');
+  const effectiveSubTab = showAllocationsAddon ? subTab : 'orders';
+
+  const handleConvertAllocationToOrder = async (
+    customerId: string,
+    qty: number,
+    unitPriceEur: number
+  ) => {
+    const targetBatch = batches[0];
+    if (!targetBatch) return;
+    try {
+      await dispatch({
+        type: 'order.create',
+        payload: {
+          customerId,
+          asQuote: false,
+          lines: [
+            {
+              skuId: targetBatch.skuId,
+              batchId: targetBatch.id,
+              quantity: Math.min(qty, 24),
+              unitPriceHtCents: Math.round(unitPriceEur * 100),
+            },
+          ],
+        },
+      });
+    } catch {
+      // Handled
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-forest)' }}>
-            Ventes & Commerce
+            Ventes, Allocations Grands Crus & Commerce
           </h1>
           <p style={{ color: 'var(--color-ink-muted)', fontSize: '14px' }}>
-            Devis, commandes fermes avec réservations, expéditions partielles et gestion des retours.
+            Devis, commandes fermes avec réservations, quotas d’allocations annuelles et gestion des retours.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowOrderModal(true)}>
-          + Nouvelle commande ou devis
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {showAllocationsAddon && (
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${effectiveSubTab === 'orders' ? 'active' : ''}`}
+                onClick={() => setSubTab('orders')}
+              >
+                <Award size={14} />
+                <span>1. Commandes & Livraisons ({orders.length})</span>
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${effectiveSubTab === 'allocations' ? 'active' : ''}`}
+                onClick={() => setSubTab('allocations')}
+              >
+                <Crown size={14} />
+                <span>2. Allocations & Quotas Grands Crus</span>
+              </button>
+            </div>
+          )}
+
+          <button className="btn btn-primary" onClick={() => setShowOrderModal(true)}>
+            + Nouvelle commande ou devis
+          </button>
+        </div>
       </div>
+
+      {effectiveSubTab === 'allocations' && showAllocationsAddon ? (
+        <AllocationsAndPrimeursPanel
+          customers={state.customers}
+          batches={batches}
+          skus={state.skus}
+          onConvertAllocationToOrder={handleConvertAllocationToOrder}
+        />
+      ) : (
+      <>
 
       {/* Orders Table */}
       <div className="card">
@@ -463,6 +532,8 @@ export const SalesView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

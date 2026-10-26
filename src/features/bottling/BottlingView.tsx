@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import { Package, QrCode } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { bottlingRequirements } from '../../domain/commands/cellar';
 import { batchPosition, lotOccupancies, lotVolumeMl } from '../../domain/selectors';
+import { useModuleConfig } from '../modules/ModuleConfigContext';
+import { ELabelQrPanel } from './ELabelQrPanel';
 
 export const BottlingView: React.FC = () => {
   const { state, dispatch } = useStore();
+  const { isAddonEnabled } = useModuleConfig();
+  const [subTab, setSubTab] = useState<'stocks' | 'elabel'>('stocks');
   const [showBottlingModal, setShowBottlingModal] = useState(false);
 
   // Form states
@@ -62,30 +67,60 @@ export const BottlingView: React.FC = () => {
     }
   };
 
+  const showElabelAddon = isAddonEnabled('elabel_qr');
+  const effectiveSubTab = showElabelAddon ? subTab : 'stocks';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-forest)' }}>
-            Conditionnement & Stock Bouteilles
+            Conditionnement, Stock Bouteilles & E-Labeling UE
           </h1>
           <p style={{ color: 'var(--color-ink-muted)', fontSize: '14px' }}>
-            Ordres de mise en bouteilles, consommation atomique vin/matières sèches et suivi des stocks.
+            Ordres de mise en bouteilles, consommation atomique vin/matières sèches et étiquetage nutritionnel QR Code UE 2021/2117.
           </p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            if (eligibleLots.length > 0) {
-              setSelectedLotId(eligibleLots[0]!.id);
-            }
-            setShowBottlingModal(true);
-          }}
-        >
-          + Nouvelle mise en bouteilles
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {showElabelAddon && (
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${effectiveSubTab === 'stocks' ? 'active' : ''}`}
+                onClick={() => setSubTab('stocks')}
+              >
+                <Package size={14} />
+                <span>1. Mises & Stocks ({batches.length})</span>
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${effectiveSubTab === 'elabel' ? 'active' : ''}`}
+                onClick={() => setSubTab('elabel')}
+              >
+                <QrCode size={14} />
+                <span>2. QR Code E-Labeling UE</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (eligibleLots.length > 0) {
+                setSelectedLotId(eligibleLots[0]!.id);
+              }
+              setShowBottlingModal(true);
+            }}
+          >
+            + Nouvelle mise en bouteilles
+          </button>
+        </div>
       </div>
 
+      {effectiveSubTab === 'elabel' && showElabelAddon ? (
+        <ELabelQrPanel batches={batches} skus={state.skus} lots={state.lots} />
+      ) : (
+      <>
       {/* Stocks Table */}
       <div className="card">
         <div className="card-header">
@@ -297,6 +332,8 @@ export const BottlingView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
