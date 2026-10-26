@@ -36,7 +36,7 @@ export const SalesView: React.FC = () => {
   const [showReturnModal, setShowReturnModal] = useState<string | null>(null); // shipmentId
   const [returnBatchId, setReturnBatchId] = useState('');
   const [returnQty, setReturnQty] = useState('6');
-  const [returnReason, setReturnReason] = useState('Bouteilles couleuses lors du transport (fictif)');
+  const [returnReason, setReturnReason] = useState('Bouteilles couleuses lors du transport');
 
   if (!state) return null;
 

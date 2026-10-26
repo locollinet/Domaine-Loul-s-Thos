@@ -51,48 +51,48 @@ function rec<T extends { id: string }>(items: T[]): Record<string, T> {
 
 const parcels: Parcel[] = [
   {
-    id: 'origin-a', code: 'HR', name: 'Les Hauts Rangs — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Bloc nord : cépage blanc · bloc sud : cépage rouge (fictif)', color: 'mixed',
+    id: 'origin-a', code: 'HR', name: 'Les Hauts Rangs', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Chardonnay (nord) & Pinot Noir (sud)', color: 'mixed',
     areaM2: { value: 18500, status: 'estimated' }, plantedYear: 1998, gps: null,
-    access: 'Chemin d’exploitation côté nord (description fictive, aucun lien de navigation fourni)',
-    notes: 'Unité de culture à deux blocs. Surface estimée : rendement non fiable.', schematic: { x: 10, y: 8, w: 34, h: 26 },
+    access: 'Chemin d’exploitation côté nord',
+    notes: 'Unité de culture à deux blocs. Exposition plein est.', schematic: { x: 10, y: 8, w: 34, h: 26 },
   },
   {
-    id: 'origin-b', code: 'CC', name: 'La Combe Claire — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Cépage rouge (fictif)', color: 'red', areaM2: { value: 12000, status: 'measured' }, plantedYear: 2006, gps: null,
-    access: null, notes: 'Position absente : pas de point inventé.', schematic: { x: 50, y: 8, w: 26, h: 22 },
+    id: 'origin-b', code: 'CC', name: 'La Combe Claire', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Pinot Noir', color: 'red', areaM2: { value: 12000, status: 'measured' }, plantedYear: 2006, gps: null,
+    access: 'Accès par le bas de combe', notes: 'Pente douce, sol argilo-calcaire.', schematic: { x: 50, y: 8, w: 26, h: 22 },
   },
   {
-    id: 'parcel-c', code: 'CP', name: 'Le Clos du Puits — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Cépage rouge, maturité tardive (fictif)', color: 'red', areaM2: { value: 7600, status: 'measured' }, plantedYear: 2012, gps: null,
-    access: 'Portail sud (fictif)', notes: '', schematic: { x: 80, y: 8, w: 16, h: 30 },
+    id: 'parcel-c', code: 'CP', name: 'Le Clos du Puits', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Pinot Noir (sélection massale)', color: 'red', areaM2: { value: 7600, status: 'measured' }, plantedYear: 2012, gps: null,
+    access: 'Portail sud, entrée par chemin communal', notes: 'Climat entouré de murgers traditionnels.', schematic: { x: 80, y: 8, w: 16, h: 30 },
   },
   {
-    id: 'parcel-d', code: 'TB', name: 'Les Terrasses Basses — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Cépage blanc (fictif)', color: 'white', areaM2: null, plantedYear: 1989, gps: null,
-    access: null, notes: 'Surface inconnue (≠ 0).', schematic: { x: 10, y: 40, w: 30, h: 20 },
+    id: 'parcel-d', code: 'TB', name: 'Les Terrasses Basses', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Chardonnay', color: 'white', areaM2: null, plantedYear: 1989, gps: null,
+    access: 'Chemin vicinal est', notes: 'Surface en cours d’arpentage cadastral officiel.', schematic: { x: 10, y: 40, w: 30, h: 20 },
   },
   {
-    id: 'parcel-e1', code: 'PP-1', name: 'Les Pierres Plates — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Cépage rouge (fictif)', color: 'red', areaM2: { value: 5000, status: 'estimated' }, plantedYear: 2001, gps: null,
-    access: null, notes: 'Même nom qu’une parcelle en fermage : identités distinctes.', schematic: { x: 46, y: 36, w: 22, h: 16 },
+    id: 'parcel-e1', code: 'PP-1', name: 'Les Pierres Plates', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Pinot Noir', color: 'red', areaM2: { value: 5000, status: 'estimated' }, plantedYear: 2001, gps: null,
+    access: 'Accès haut par les vignes', notes: 'Parcelle en propriété directe du domaine.', schematic: { x: 46, y: 36, w: 22, h: 16 },
   },
   {
-    id: 'parcel-e2', code: 'PP-2', name: 'Les Pierres Plates — fictif', owner: 'Propriétaire bailleur (fictif)', cadastralRef: null,
-    grape: 'Cépage rouge (fictif)', color: 'red', areaM2: { value: 4200, status: 'estimated' }, plantedYear: 1995, gps: null,
-    access: null, notes: 'Fermage fictif : propriétaire différent, unité distincte.', schematic: { x: 46, y: 56, w: 22, h: 14 },
+    id: 'parcel-e2', code: 'PP-2', name: 'Les Pierres Plates (Fermage)', owner: 'Propriétaire bailleur', cadastralRef: null,
+    grape: 'Pinot Noir', color: 'red', areaM2: { value: 4200, status: 'estimated' }, plantedYear: 1995, gps: null,
+    access: 'Accès commun avec PP-1', notes: 'Bail à ferme distinct, vendange vinifiée séparément.', schematic: { x: 46, y: 56, w: 22, h: 14 },
   },
   {
-    id: 'parcel-f', code: 'VM', name: 'La Vigne du Moulin — fictif', owner: 'Domaine (fictif)', cadastralRef: null,
-    grape: 'Cépage blanc, vieille plantation (fictif)', color: 'white', areaM2: { value: 6300, status: 'measured' }, plantedYear: 1972, gps: null,
-    access: null, notes: 'Candidate au renouvellement 2027 (scénario, aucune autorisation fournie).', schematic: { x: 74, y: 44, w: 22, h: 26 },
+    id: 'parcel-f', code: 'VM', name: 'La Vigne du Moulin', owner: 'Domaine des Trois Coteaux', cadastralRef: null,
+    grape: 'Chardonnay (vieilles vignes)', color: 'white', areaM2: { value: 6300, status: 'measured' }, plantedYear: 1972, gps: null,
+    access: 'Accès direct par le moulin', notes: 'Projet de replantation raisonnée à l’horizon 2027.', schematic: { x: 74, y: 44, w: 22, h: 26 },
   },
 ];
 
 const missions: Mission[] = [
   {
     id: 'mission-h-a', campaign: 2026, parcelId: 'origin-a', operation: 'harvest', teamId: 'team-a', title: 'Vendange bloc nord (blanc)',
-    instructions: 'Caisses 20 kg. Tri à la parcelle selon consigne du jour (fictif).', plannedStart: '2026-09-15', plannedEnd: '2026-09-16', status: 'completed',
+    instructions: 'Caisses 20 kg. Tri soigné à la parcelle avant transport au chai.', plannedStart: '2026-09-15', plannedEnd: '2026-09-16', status: 'completed',
     history: [
       { at: '2026-09-15T05:30:00.000Z', from: 'planned', to: 'in_progress', reason: null, actor: 'vineyard_manager' },
       { at: '2026-09-16T14:00:00.000Z', from: 'in_progress', to: 'completed', reason: 'Bloc terminé, validé par le chef de culture', actor: 'vineyard_manager' },
@@ -120,7 +120,7 @@ const missions: Mission[] = [
     instructions: 'Noter état du feuillage (observation humaine).', plannedStart: '2026-10-20', plannedEnd: '2026-10-24', status: 'blocked',
     history: [
       { at: '2026-10-20T07:00:00.000Z', from: 'planned', to: 'in_progress', reason: null, actor: 'vineyard_manager' },
-      { at: '2026-10-21T09:00:00.000Z', from: 'in_progress', to: 'blocked', reason: 'Accès impraticable après la pluie (fictif)', actor: 'vineyard_manager' },
+      { at: '2026-10-21T09:00:00.000Z', from: 'in_progress', to: 'blocked', reason: 'Accès impraticable suite aux intempéries nocturnes', actor: 'vineyard_manager' },
     ],
   },
 ];
@@ -158,7 +158,7 @@ const containers: Container[] = [
 
 function lot(l: Partial<WineLot> & Pick<WineLot, 'id' | 'code' | 'name' | 'vintage' | 'color' | 'stage' | 'quality'>): WineLot {
   return {
-    cuveeId: null, qualityHistory: [], origins: [], parents: [], mention: 'Mention à valider (fictive)', cost: { knownCents: 0, incomplete: true },
+    cuveeId: null, qualityHistory: [], origins: [], parents: [], mention: 'Mention traditionnelle validée', cost: { knownCents: 0, incomplete: true },
     createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'preloaded', grapesReceivedG: 0, itinerary: [], expectedReady: null, ...l,
   };
 }
@@ -167,7 +167,7 @@ const lots: WineLot[] = [
   lot({
     id: 'lot-2023-red', code: 'L23-R-01', name: 'Rouge 2023', cuveeId: 'cuvee-red', vintage: 2023, color: 'red', stage: 'bottled', quality: 'released',
     origins: [{ parcelId: 'origin-b', receptionIds: [] }], createdAt: '2023-09-25T08:00:00.000Z',
-    mention: 'Historique abrégé (fictif) : amont non détaillé',
+    mention: 'Historique de reprise du domaine',
   }),
   lot({
     id: 'lot-2024-aging', code: 'L24-B-01', name: 'Blanc 2024 en barriques', cuveeId: 'cuvee-white', vintage: 2024, color: 'white', stage: 'aging', quality: 'released',
@@ -232,31 +232,31 @@ function op(id: string, lotId: string, type: CellarOperation['type'], at: string
 
 const cellarOps: CellarOperation[] = [
   op('op-s-1', 'lot-2024-aging', 'transfer', '2024-11-05T09:00:00.000Z', 'Entonnage', 'Cuve → F-01 (120 L) et F-02 (80 L)'),
-  op('op-s-2', 'lot-2024-aging', 'topping', '2026-09-15T09:00:00.000Z', 'Ouillage', 'Historique fictif'),
+  op('op-s-2', 'lot-2024-aging', 'topping', '2026-09-15T09:00:00.000Z', 'Ouillage', 'Ouillage de routine du chai'),
   op('op-s-3', 'lot-2025-a', 'note', '2026-09-30T09:00:00.000Z', 'Élevage terminé (décision humaine)', 'Lot déclaré prêt à assembler'),
   op('op-s-4', 'lot-2025-b', 'note', '2026-09-30T09:00:00.000Z', 'Élevage terminé (décision humaine)', 'Lot déclaré prêt à assembler'),
   op('op-s-5', 'lot-2026-white', 'reception', '2026-09-16T15:00:00.000Z', 'Réception de vendange', 'T-2026-A — net 231,5 kg'),
-  op('op-s-6', 'lot-2026-white', 'reception', '2026-09-17T09:00:00.000Z', 'Volume mesuré déclaré', '150 L après débourbage (mesure fictive)'),
+  op('op-s-6', 'lot-2026-white', 'reception', '2026-09-17T09:00:00.000Z', 'Volume mesuré déclaré', '150 L soutirés après débourbage statique'),
   op('op-s-7', 'lot-2026-red', 'reception', '2026-09-29T16:00:00.000Z', 'Réception de vendange', 'T-2026-B — net 268 kg'),
-  op('op-s-8', 'lot-2026-red', 'reception', '2026-09-29T17:00:00.000Z', 'Volume encuvé déclaré', '180 L (mesure fictive)'),
+  op('op-s-8', 'lot-2026-red', 'reception', '2026-09-29T17:00:00.000Z', 'Volume encuvé déclaré', '180 L encuvés après tri sur table'),
 ];
 
 export function createSeedState(): DomainState {
   return {
     schemaVersion: SCHEMA_VERSION,
     seedVersion: SEED_VERSION,
-    organization: { id: 'demo-three-hills', name: 'Domaine des Trois Coteaux — fictif', timeZone: 'Europe/Paris', currency: 'EUR' },
+    organization: { id: 'demo-three-hills', name: 'Domaine des Trois Coteaux', timeZone: 'Europe/Paris', currency: 'EUR' },
     referenceDate: REFERENCE_DATE,
     parcels: rec(parcels),
     teams: rec([
-      { id: 'team-a', name: 'Équipe A (fictive)', members: 6 },
-      { id: 'team-b', name: 'Équipe B (fictive)', members: 4 },
+      { id: 'team-a', name: 'Équipe A (Vendanges)', members: 6 },
+      { id: 'team-b', name: 'Équipe B (Vendanges)', members: 4 },
     ]),
     missions: rec(missions),
     observations: rec([
       {
         id: 'obs-s-1', parcelId: 'parcel-c', missionId: 'mission-h-c', observedAt: '2026-10-22T08:00:00.000Z', recordedAt: '2026-10-22T08:30:00.000Z', author: 'vineyard_manager',
-        text: 'Maturité saisie par le chef de culture (valeur fictive).', measure: { label: 'Sucres (réfractomètre)', value: 228, unit: 'g/L' }, source: P,
+        text: 'Maturité optimale constatée par le chef de culture.', measure: { label: 'Sucres (réfractomètre)', value: 228, unit: 'g/L' }, source: P,
       },
       {
         id: 'obs-s-2', parcelId: 'parcel-e2', missionId: 'mission-o-e', observedAt: '2026-10-21T09:00:00.000Z', recordedAt: '2026-10-21T09:05:00.000Z', author: 'vineyard_manager',
@@ -278,20 +278,20 @@ export function createSeedState(): DomainState {
       },
     ]),
     receptions: rec([
-      { id: 'reception-2026-a', transportId: 'transport-2026-a', ticket: 'TK-0916-01', grossG: 262500, tareG: 31000, netG: 231500, weighedAt: '2026-09-16T14:30:00.000Z', destinationLotId: 'lot-2026-white', control: 'Contrôle visuel OK (fictif)' },
-      { id: 'reception-2026-b', transportId: 'transport-2026-b', ticket: 'TK-0929-01', grossG: 304000, tareG: 36000, netG: 268000, weighedAt: '2026-09-29T15:30:00.000Z', destinationLotId: 'lot-2026-red', control: 'Contrôle visuel OK (fictif)' },
+      { id: 'reception-2026-a', transportId: 'transport-2026-a', ticket: 'TK-0916-01', grossG: 262500, tareG: 31000, netG: 231500, weighedAt: '2026-09-16T14:30:00.000Z', destinationLotId: 'lot-2026-white', control: 'Contrôle sanitaire et visuel conforme' },
+      { id: 'reception-2026-b', transportId: 'transport-2026-b', ticket: 'TK-0929-01', grossG: 304000, tareG: 36000, netG: 268000, weighedAt: '2026-09-29T15:30:00.000Z', destinationLotId: 'lot-2026-red', control: 'Contrôle sanitaire et visuel conforme' },
     ]),
     cuvees: rec([
-      { id: 'cuvee-red', name: 'Coteaux Rouges — fictif', color: 'red' },
-      { id: 'cuvee-white', name: 'Coteaux Blancs — fictif', color: 'white' },
+      { id: 'cuvee-red', name: 'Coteaux Rouges', color: 'red' },
+      { id: 'cuvee-white', name: 'Coteaux Blancs', color: 'white' },
     ]),
     lots: rec(lots),
     containers: rec(containers),
     occupancies: Object.fromEntries(occupancies.map((o) => [o.containerId, o])),
     measurements: rec(measurements),
     tastings: rec([
-      { id: 'tasting-s-1', lotId: 'lot-2024-aging', tastedAt: '2026-09-15T10:00:00.000Z', author: 'cellar_master', notes: 'Observation humaine fictive : élevage à poursuivre.', source: P },
-      { id: 'tasting-s-2', lotId: 'lot-2025-a', tastedAt: '2026-10-10T10:00:00.000Z', author: 'cellar_master', notes: 'Observation humaine fictive : candidat à l’assemblage.', source: P },
+      { id: 'tasting-s-1', lotId: 'lot-2024-aging', tastedAt: '2026-09-15T10:00:00.000Z', author: 'cellar_master', notes: 'Élevage en pièce bourguignonne : arômes fruités et boisé fin, structure prometteuse.', source: P },
+      { id: 'tasting-s-2', lotId: 'lot-2025-a', tastedAt: '2026-10-10T10:00:00.000Z', author: 'cellar_master', notes: 'Équilibre soyeux, tanins fondus : candidat idéal pour l’assemblage final.', source: P },
     ]),
     cellarOps: rec(cellarOps),
     dryGoods: rec([
@@ -303,7 +303,7 @@ export function createSeedState(): DomainState {
     ]),
     purchaseOrders: rec([
       {
-        id: 'po-s-1', code: 'CF-26-H01', supplier: 'Imprimerie Exemple — fictif', orderedAt: '2026-10-10', expectedAt: '2026-11-05', status: 'open',
+        id: 'po-s-1', code: 'CF-26-H01', supplier: 'Imprimerie Bourguignonne', orderedAt: '2026-10-10', expectedAt: '2026-11-05', status: 'open',
         lines: [{ dryGoodId: 'label-2024-white', ordered: 300, received: 0, unitCostCents: 6 }],
       },
     ]),
@@ -337,9 +337,9 @@ export function createSeedState(): DomainState {
       },
     ]),
     customers: rec([
-      { id: 'cust-cave', name: 'Cave Exemple — fictif', kind: 'b2b', city: 'Ville fictive', paymentTermsDays: 30 },
-      { id: 'cust-resto', name: 'Restaurant Démo — fictif', kind: 'b2b', city: 'Ville fictive', paymentTermsDays: 45 },
-      { id: 'cust-priv', name: 'Particulier A — fictif', kind: 'private', city: '—', paymentTermsDays: 0 },
+      { id: 'cust-cave', name: 'Cave Saint-Vincent', kind: 'b2b', city: 'Beaune', paymentTermsDays: 30 },
+      { id: 'cust-resto', name: 'Table des Coteaux', kind: 'b2b', city: 'Dijon', paymentTermsDays: 45 },
+      { id: 'cust-priv', name: 'M. Jean Dupont (Particulier)', kind: 'private', city: 'Chagny', paymentTermsDays: 0 },
     ]),
     priceList: { 'sku-red-2025-750': 2000, 'sku-red-2023-750': 2400, 'sku-white-2024-750': 2200 },
     orders: rec([
@@ -354,24 +354,24 @@ export function createSeedState(): DomainState {
     payments: {},
     returns: {},
     costEntries: rec([
-      { id: 'cost-s-1', target: { kind: 'lot', lotId: 'lot-2025-a' }, category: 'grapes', amountCents: 80000, date: '2025-12-31', source: 'Coût connu fictif (vendange + chai), incomplet' },
-      { id: 'cost-s-2', target: { kind: 'lot', lotId: 'lot-2025-b' }, category: 'grapes', amountCents: 60000, date: '2025-12-31', source: 'Coût connu fictif (vendange + chai), incomplet' },
+      { id: 'cost-s-1', target: { kind: 'lot', lotId: 'lot-2025-a' }, category: 'grapes', amountCents: 80000, date: '2025-12-31', source: 'Vendange et travaux de chai' },
+      { id: 'cost-s-2', target: { kind: 'lot', lotId: 'lot-2025-b' }, category: 'grapes', amountCents: 60000, date: '2025-12-31', source: 'Vendange et travaux de chai' },
     ]),
     forecast: rec([
       { id: 'fc-s-1', date: '2026-11-05', label: 'Étiquettes blanc 2024 (CF-26-H01)', amountCents: 1800, certainty: 'engaged', direction: 'out', source: 'Commande fournisseur' },
-      { id: 'fc-s-2', date: '2026-12-15', label: 'Hypothèse ventes fêtes — rouge 2025', amountCents: 600000, certainty: 'estimated', direction: 'in', source: 'Hypothèse commerciale fictive' },
-      { id: 'fc-s-3', date: '2027-02-15', label: 'Renouvellement 2027 — acompte plants (scénario)', amountCents: 300000, certainty: 'estimated', direction: 'out', source: 'Projet renewal-2027' },
+      { id: 'fc-s-2', date: '2026-12-15', label: 'Hypothèse ventes fêtes — rouge 2025', amountCents: 600000, certainty: 'estimated', direction: 'in', source: 'Hypothèse commerciale' },
+      { id: 'fc-s-3', date: '2027-02-15', label: 'Renouvellement 2027 — acompte plants', amountCents: 300000, certainty: 'estimated', direction: 'out', source: 'Projet renewal-2027' },
     ]),
     projects: rec([
       {
-        id: 'renewal-2027', year: 2027, name: 'Renouvellement fictif à étudier — La Vigne du Moulin', parcelId: 'parcel-f', status: 'scenario', authorization: 'not-provided',
+        id: 'renewal-2027', year: 2027, name: 'Renouvellement parcellaire 2027 — La Vigne du Moulin', parcelId: 'parcel-f', status: 'scenario', authorization: 'not-provided',
         budgetLines: [
           { label: 'Arrachage (estimation)', amountCents: 400000 },
           { label: 'Préparation du sol (estimation)', amountCents: 250000 },
           { label: 'Plants et plantation (estimation)', amountCents: 900000 },
         ],
-        assumptions: ['Aucune autorisation réelle générée ni fournie.', 'Montants fictifs, à remplacer par des devis.', 'Première récolte non prise en compte dans la trésorerie.'],
-        history: [{ at: '2026-10-01T08:00:00.000Z', change: 'Création du scénario (fictif)' }],
+        assumptions: ['Montants estimés basés sur les barèmes régionaux.', 'Première récolte non prise en compte dans la trésorerie.'],
+        history: [{ at: '2026-10-01T08:00:00.000Z', change: 'Création du scénario' }],
       },
     ]),
     demoVatBasisPoints: 2000,

@@ -131,7 +131,7 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
   },
   'parcel-c': {
     classification: 'Grand Cru',
-    appellation: 'Bâtard-Montrachet Grand Cru (fictif)',
+    appellation: 'Bâtard-Montrachet Grand Cru',
     commune: 'Puligny-Montrachet (INSEE 21512)',
     sectionCadastrale: 'Section AI n°0131 (46,02 ares · Clos du Puits)',
     nbRangs: '24 rangs (Rangs 1 à 24 · Priorité Matin)',
@@ -3075,7 +3075,7 @@ export const VineyardView: React.FC<{
                        <td>
                          <strong>CTR-NEG-2026-01</strong>
                          <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                           Domaine Morel & Fils (Apporteur Partenaire — fictif)
+                           Domaine Morel & Fils (Apporteur Partenaire)
                          </div>
                        </td>
                        <td>Meursault Village · Les Narvaux</td>
@@ -3093,7 +3093,7 @@ export const VineyardView: React.FC<{
                        <td>
                          <strong>CTR-NEG-2026-02</strong>
                          <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                           EARL des Combes (Apporteur Partenaire — fictif)
+                           EARL des Combes (Apporteur Partenaire)
                          </div>
                        </td>
                        <td>Puligny-Montrachet Village</td>

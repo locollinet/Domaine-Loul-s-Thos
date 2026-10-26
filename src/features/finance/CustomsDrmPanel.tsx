@@ -243,7 +243,7 @@ ${drmLines
               <td>
                 <span className="badge badge-gold">DAE (e-AD Export)</span>
               </td>
-              <td>Comptoir Nordique (Importateur UE / Export — fictif)</td>
+              <td>Comptoir Nordique (Importateur UE / Export)</td>
               <td className="tabular">180 cols (1,35 hL)</td>
               <td>Suspension de droits</td>
               <td>
@@ -259,7 +259,7 @@ ${drmLines
               <td>
                 <span className="badge badge-grape">DSA / Facture CRD</span>
               </td>
-              <td>Table des Coteaux (CHR France — fictif)</td>
+              <td>Table des Coteaux (CHR France)</td>
               <td className="tabular">120 cols (0,90 hL)</td>
               <td>Droits acquittés (3,98 €/hL)</td>
               <td>

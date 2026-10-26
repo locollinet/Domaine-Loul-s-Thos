@@ -20,7 +20,7 @@ const INITIAL_ALLOCATIONS: AllocationRow[] = [
   {
     id: 'alloc-1',
     customerId: 'cust-resto',
-    customerName: 'Table des Coteaux (Restaurant Gastronomique — fictif)',
+    customerName: 'Table des Coteaux (Restaurant Gastronomique)',
     channel: 'CHR Étoilé France',
     cuveeLabel: 'Bâtard-Montrachet Grand Cru · Le Clos du Puits',
     vintage: 2025,
@@ -33,7 +33,7 @@ const INITIAL_ALLOCATIONS: AllocationRow[] = [
   {
     id: 'alloc-2',
     customerId: 'cust-export',
-    customerName: 'Comptoir Nordique (Importateur Tokyo / Stockholm — fictif)',
+    customerName: 'Comptoir Nordique (Importateur Tokyo / Stockholm)',
     channel: 'Importateur Grand Export',
     cuveeLabel: 'Puligny-Montrachet 1er Cru · Les Hauts Rangs',
     vintage: 2025,
@@ -46,7 +46,7 @@ const INITIAL_ALLOCATIONS: AllocationRow[] = [
   {
     id: 'alloc-3',
     customerId: 'cust-cave',
-    customerName: 'Cave Saint-Vincent (Allocataire Historique — fictif)',
+    customerName: 'Cave Saint-Vincent (Allocataire Historique)',
     channel: 'Caviste Historique',
     cuveeLabel: 'Puligny-Montrachet 1er Cru · Les Pierres Plates',
     vintage: 2025,
@@ -59,7 +59,7 @@ const INITIAL_ALLOCATIONS: AllocationRow[] = [
   {
     id: 'alloc-4',
     customerId: 'cust-resto',
-    customerName: 'Table des Coteaux (Restaurant Gastronomique — fictif)',
+    customerName: 'Table des Coteaux (Restaurant Gastronomique)',
     channel: 'CHR Étoilé France',
     cuveeLabel: 'Bâtard-Montrachet Grand Cru · Le Clos du Puits',
     vintage: 2024,

@@ -26,7 +26,7 @@ export const FinanceView: React.FC = () => {
   // Credit Note Modal
   const [showCreditModal, setShowCreditModal] = useState<string | null>(null);
   const [creditHtEur, setCreditHtEur] = useState('50');
-  const [creditReason, setCreditReason] = useState('Geste commercial suite incident de transport (fictif)');
+  const [creditReason, setCreditReason] = useState('Geste commercial suite incident de transport');
 
   // Interactive 2027 Plantation Scenario adjustments
   const [budgetDeltasCents, setBudgetDeltasCents] = useState<Record<number, number>>(() => {

@@ -147,7 +147,7 @@ const AppInner: React.FC = () => {
       items: [
         { id: 'sales', label: 'Ventes & Commerce', icon: Award },
         { id: 'traceability', label: 'Traçabilité', icon: GitBranch },
-        { id: 'finance', label: 'Pilotage & Finance démo', icon: TrendingUp },
+        { id: 'finance', label: 'Pilotage & Finance', icon: TrendingUp },
       ].filter((item) => isMainEnabled(item.id as MainModuleId)),
     },
   ].filter((g) => g.items.length > 0);

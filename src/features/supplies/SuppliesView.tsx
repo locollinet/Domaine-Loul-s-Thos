@@ -15,10 +15,14 @@ export const SuppliesView: React.FC = () => {
 
   // PO Modal
   const [showPoModal, setShowPoModal] = useState(false);
-  const [supplier, setSupplier] = useState('Verrerie Exemple — fictif');
+  const [supplier, setSupplier] = useState('Verreries de Bourgogne');
   const [poGoodId, setPoGoodId] = useState('bottle-750');
   const [poQuantity, setPoQuantity] = useState('1000');
   const [poCostEur, setPoCostEur] = useState('0.28');
+  const [poExpectedAt, setPoExpectedAt] = useState(() => {
+    const d = new Date(Date.now() + 14 * 86400000);
+    return d.toISOString().slice(0, 10);
+  });
 
   // Receive Modal
   const [showReceiveModal, setShowReceiveModal] = useState<string | null>(null);
@@ -45,7 +49,7 @@ export const SuppliesView: React.FC = () => {
         type: 'purchase.create',
         payload: {
           supplier,
-          expectedAt: '2026-11-15',
+          expectedAt: poExpectedAt,
           lines: [{ dryGoodId: poGoodId, ordered: qty, unitCostCents: costCents }],
         },
       });
@@ -566,6 +570,17 @@ export const SuppliesView: React.FC = () => {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Date de livraison attendue</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={poExpectedAt}
+                  onChange={(e) => setPoExpectedAt(e.target.value)}
+                  required
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
