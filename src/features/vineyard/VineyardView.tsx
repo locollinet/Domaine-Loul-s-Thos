@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   MapPin,
-  Compass,
   Sun,
   BookOpen,
   Grape,
@@ -26,12 +25,13 @@ import { useStore } from '../../app/store-context';
 import { canRun } from '../../domain/commands';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { HarvestCount, Mission, MissionStatus, Parcel } from '../../domain/types';
+import { InteractiveVineyardMap, type ParcelMapItem } from './InteractiveVineyardMap';
 
 function normalizeAccents(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-// Enrichissement "Haute Bourgogne & Livret de Vendanges" (inspiré de Parcelles-vendanges / Olivier Leflaive)
+// Enrichissement "Haute Bourgogne & Livret de Vendanges" (exactement calé sur les 7 IDs de seed.ts)
 interface ClimatLivretMeta {
   classification: 'Grand Cru' | '1er Cru' | 'Village';
   appellation: string;
@@ -44,6 +44,7 @@ interface ClimatLivretMeta {
   lng: number;
   pinX: number;
   pinY: number;
+  polygon: [number, number][];
   terroir: string;
   altitude: string;
   defaultDaySlot: 'today' | 'tomorrow' | 'upcoming' | 'done';
@@ -53,18 +54,24 @@ interface ClimatLivretMeta {
 }
 
 const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
-  'parcel-hr': {
+  'origin-a': {
     classification: '1er Cru',
     appellation: 'Puligny-Montrachet 1er Cru',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AB n°0142 (Subdivision Rangs 1–42)',
+    sectionCadastrale: 'Section AB n°0142 (Rangs 1 à 42)',
     nbRangs: '42 rangs (28 Chardonnay / 14 Pinot)',
     pageLivret: 12,
     pastilleNum: 1,
-    lat: 46.94782,
-    lng: 4.73891,
+    lat: 46.94815,
+    lng: 4.73865,
     pinX: 24,
     pinY: 32,
+    polygon: [
+      [46.9486, 4.7376],
+      [46.9488, 4.7395],
+      [46.9477, 4.7398],
+      [46.9475, 4.7379],
+    ],
     terroir: 'Calcaire à entroques & marnes blanches',
     altitude: '265 m · Exposition Est-Sud-Est',
     defaultDaySlot: 'done',
@@ -72,7 +79,7 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     initialHl: 1.5,
     linkedLotIds: ['lot-2026-white', 'lot-2024-white', 'lot-2023-white'],
   },
-  'parcel-cc': {
+  'origin-b': {
     classification: '1er Cru',
     appellation: 'Chassagne-Montrachet 1er Cru',
     commune: 'Chassagne-Montrachet (INSEE 21150)',
@@ -80,10 +87,16 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     nbRangs: '34 rangs (Vignes franches)',
     pageLivret: 18,
     pastilleNum: 2,
-    lat: 46.93914,
-    lng: 4.72845,
+    lat: 46.94495,
+    lng: 4.73685,
     pinX: 54,
     pinY: 28,
+    polygon: [
+      [46.9455, 4.7359],
+      [46.9456, 4.7377],
+      [46.9444, 4.7379],
+      [46.9443, 4.7361],
+    ],
     terroir: 'Argilo-calcaire sur dalle rocheuse',
     altitude: '250 m · Coteau médian',
     defaultDaySlot: 'done',
@@ -91,18 +104,24 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     initialHl: 1.8,
     linkedLotIds: ['lot-2026-red', 'lot-2025-r1'],
   },
-  'parcel-cp': {
+  'parcel-c': {
     classification: 'Grand Cru',
     appellation: 'Bâtard-Montrachet Grand Cru (fictif)',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AC n°0019 (Clos cadastré)',
-    nbRangs: '19 rangs (Vieilles vignes)',
+    sectionCadastrale: 'Section AC n°0019 (Clos du Puits)',
+    nbRangs: '24 rangs (Rangs 1 à 24 · Priorité 05h00)',
     pageLivret: 7,
     pastilleNum: 3,
-    lat: 46.94465,
-    lng: 4.74218,
+    lat: 46.94625,
+    lng: 4.74215,
     pinX: 82,
     pinY: 34,
+    polygon: [
+      [46.9468, 4.7413],
+      [46.9469, 4.7431],
+      [46.9457, 4.7433],
+      [46.9456, 4.7415],
+    ],
     terroir: 'Terres brunes profondes & cailloutis calcaires',
     altitude: '240 m · Pied de coteau d’élite',
     defaultDaySlot: 'today',
@@ -110,18 +129,99 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     initialHl: 1.62,
     linkedLotIds: ['lot-2025-r2'],
   },
-  'parcel-vm': {
+  'parcel-d': {
+    classification: 'Village',
+    appellation: 'Puligny-Montrachet Village',
+    commune: 'Puligny-Montrachet (INSEE 21512)',
+    sectionCadastrale: 'Section AE n°0204 (Terrasses Basses)',
+    nbRangs: '26 rangs (Cépage blanc)',
+    pageLivret: 24,
+    pastilleNum: 4,
+    lat: 46.94345,
+    lng: 4.74455,
+    pinX: 26,
+    pinY: 68,
+    polygon: [
+      [46.944, 4.7437],
+      [46.9441, 4.7453],
+      [46.9429, 4.7455],
+      [46.9428, 4.7439],
+    ],
+    terroir: 'Limons argilo-calcaires de pied de combe',
+    altitude: '230 m · Plaine haute',
+    defaultDaySlot: 'upcoming',
+    defaultStatus: 'a_faire',
+    initialHl: 0,
+    linkedLotIds: [],
+  },
+  'parcel-e1': {
+    classification: '1er Cru',
+    appellation: 'Puligny-Montrachet 1er Cru',
+    commune: 'Puligny-Montrachet (INSEE 21512)',
+    sectionCadastrale: 'Section AB n°0175 (Pierres Plates Nord)',
+    nbRangs: '16 rangs (Propriété Domaine · Équipe B)',
+    pageLivret: 31,
+    pastilleNum: 5,
+    lat: 46.94935,
+    lng: 4.74145,
+    pinX: 50,
+    pinY: 60,
+    polygon: [
+      [46.9498, 4.7406],
+      [46.9499, 4.7422],
+      [46.9489, 4.7424],
+      [46.9488, 4.7408],
+    ],
+    terroir: 'Dalles calcaires affleurantes',
+    altitude: '275 m · Haut de coteau',
+    defaultDaySlot: 'today',
+    defaultStatus: 'a_faire',
+    initialHl: 0,
+    linkedLotIds: [],
+  },
+  'parcel-e2': {
+    classification: '1er Cru',
+    appellation: 'Puligny-Montrachet 1er Cru',
+    commune: 'Puligny-Montrachet (INSEE 21512)',
+    sectionCadastrale: 'Section AB n°0176 (Pierres Plates Fermage)',
+    nbRangs: '14 rangs (Fermage · Accès humide)',
+    pageLivret: 32,
+    pastilleNum: 6,
+    lat: 46.94825,
+    lng: 4.74425,
+    pinX: 50,
+    pinY: 82,
+    polygon: [
+      [46.9487, 4.7435],
+      [46.9488, 4.745],
+      [46.9478, 4.7452],
+      [46.9477, 4.7437],
+    ],
+    terroir: 'Éboulis calcaires fins',
+    altitude: '268 m',
+    defaultDaySlot: 'upcoming',
+    defaultStatus: 'a_faire',
+    initialHl: 0,
+    linkedLotIds: [],
+  },
+  'parcel-f': {
     classification: 'Village',
     appellation: 'Meursault Village',
     commune: 'Meursault (INSEE 21412)',
     sectionCadastrale: 'Section BE n°0214 (Lieu-dit du Moulin)',
-    nbRangs: '22 rangs (Vendange demain + projet 2027)',
+    nbRangs: '22 rangs (Vendange demain matin 06h30)',
     pageLivret: 38,
-    pastilleNum: 4,
-    lat: 46.97612,
-    lng: 4.76904,
+    pastilleNum: 7,
+    lat: 46.95115,
+    lng: 4.73985,
     pinX: 78,
     pinY: 74,
+    polygon: [
+      [46.9517, 4.7389],
+      [46.9518, 4.7407],
+      [46.9506, 4.7409],
+      [46.9505, 4.7391],
+    ],
     terroir: 'Marnes argilo-calcaires',
     altitude: '295 m',
     defaultDaySlot: 'tomorrow',
@@ -138,11 +238,17 @@ const DEFAULT_CLIMAT_META: ClimatLivretMeta = {
   sectionCadastrale: 'Section AB n°0105',
   nbRangs: '24 rangs',
   pageLivret: 10,
-  pastilleNum: 5,
-  lat: 46.9451,
+  pastilleNum: 8,
+  lat: 46.9462,
   lng: 4.7395,
   pinX: 50,
   pinY: 50,
+  polygon: [
+    [46.9466, 4.7389],
+    [46.9467, 4.7401],
+    [46.9458, 4.7402],
+    [46.9457, 4.739],
+  ],
   terroir: 'Coteau argilo-calcaire',
   altitude: '250 m',
   defaultDaySlot: 'upcoming',
@@ -244,13 +350,15 @@ function compressImageFile(file: File): Promise<string> {
   });
 }
 
-export const VineyardView: React.FC = () => {
+export const VineyardView: React.FC<{
+  restrictedFieldMode?: boolean;
+  onToggleRestrictedMode?: () => void;
+}> = ({ restrictedFieldMode = false, onToggleRestrictedMode }) => {
   const { state, dispatch, role } = useStore();
   // Navigation simple en 3 onglets clairs (Zéro surcharge à l'écran)
   const [subTab, setSubTab] = useState<'atlas' | 'harvest' | 'reception'>('atlas');
   const [fieldMode, setFieldMode] = useState(false);
-  const [mapLayer, setMapLayer] = useState<'satellite' | 'cadastre'>('satellite');
-  const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
+  const [selectedParcelId, setSelectedParcelId] = useState<string | null>('parcel-c');
   const [parcelSearch, setParcelSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<'all' | 'Grand Cru' | '1er Cru' | 'Village'>('all');
 
@@ -392,27 +500,54 @@ export const VineyardView: React.FC = () => {
     });
   };
 
-  const handleMapClickForCustomPin = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditingGpsPin || !selectedParcel) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xPct = Math.max(4, Math.min(96, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
-    const yPct = Math.max(6, Math.min(94, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
-    // Conversion fine vers GPS autour du climat (précision métrique d'entrée de rang)
-    const latOffset = (50 - yPct) * 0.00008;
-    const lngOffset = (xPct - 50) * 0.00011;
-    const newLat = parseFloat((selectedMeta.lat + latOffset).toFixed(5));
-    const newLng = parseFloat((selectedMeta.lng + lngOffset).toFixed(5));
-
-    const current = getParcelTrack(selectedParcel);
+  const handleSetCustomGpsFromMap = (parcelId: string, lat: number, lng: number) => {
+    const target = state.parcels[parcelId];
+    if (!target) return;
+    const current = getParcelTrack(target);
     persistParcelTracking((prev) => ({
       ...prev,
-      [selectedParcel.id]: {
+      [parcelId]: {
         ...current,
-        customPin: { xPct, yPct, lat: newLat, lng: newLng },
+        customPin: {
+          xPct: current.customPin?.xPct ?? 50,
+          yPct: current.customPin?.yPct ?? 50,
+          lat,
+          lng,
+        },
+        customGoogleMapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
       },
     }));
     setIsEditingGpsPin(false);
   };
+
+  const mapItems: ParcelMapItem[] = parcels.map((p) => {
+    const meta = CLIMAT_METADATA[p.id] ?? DEFAULT_CLIMAT_META;
+    const tr = getParcelTrack(p);
+    const lat = tr.customPin?.lat ?? meta.lat;
+    const lng = tr.customPin?.lng ?? meta.lng;
+    return {
+      parcel: p,
+      pastilleNum: tr.customPastilleNum ?? meta.pastilleNum,
+      pageLivret: tr.customPageLivret ?? meta.pageLivret,
+      classification: meta.classification,
+      appellation: meta.appellation,
+      commune: meta.commune,
+      nbRangs: tr.customNbRangs ?? meta.nbRangs,
+      status: tr.status,
+      daySlot: tr.daySlot,
+      lat,
+      lng,
+      isCustomGps: Boolean(tr.customPin),
+      googleMapsUrl:
+        tr.customGoogleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+      polygon: meta.polygon,
+    };
+  });
+
+  const todayPriorityItems = mapItems.filter(
+    (i) => i.daySlot === 'today' || i.status === 'en_cours'
+  );
+  const tomorrowItems = mapItems.filter((i) => i.daySlot === 'tomorrow');
 
   const updateParcelTrack = (parcel: Parcel, patch: Partial<CustomParcelTracking>) => {
     const current = getParcelTrack(parcel);
@@ -723,6 +858,22 @@ export const VineyardView: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {onToggleRestrictedMode && (
+            <button
+              type="button"
+              className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
+              onClick={onToggleRestrictedMode}
+              title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour un ouvrier ou un transporteur"
+            >
+              <Navigation size={14} />
+              <span>
+                {restrictedFieldMode
+                  ? '🔒 Vue Restreinte Active (Quitter)'
+                  : '🚜 Vue Terrain 5h00 (Ouvrier / Transporteur)'}
+              </span>
+            </button>
+          )}
+
           {/* Mode Soleil Terrain (Inspiré de Parcelles-vendanges) */}
           <button
             type="button"
@@ -742,7 +893,7 @@ export const VineyardView: React.FC = () => {
               onClick={() => setSubTab('atlas')}
             >
               <MapPin size={14} />
-              <span>1. Atlas, GPS & Livret ({parcels.length})</span>
+              <span>1. Carte GPS & Livret ({parcels.length})</span>
             </button>
             <button
               type="button"
@@ -752,24 +903,169 @@ export const VineyardView: React.FC = () => {
               <Calendar size={14} />
               <span>2. Planning & Vendanges ({counts.length})</span>
             </button>
-            <button
-              type="button"
-              className={`segmented-btn ${subTab === 'reception' ? 'active' : ''}`}
-              onClick={() => setSubTab('reception')}
-            >
-              <Scale size={14} />
-              <span>3. Quai & Pesées ({inTransitCount} en transit)</span>
-            </button>
+            {!restrictedFieldMode && (
+              <button
+                type="button"
+                className={`segmented-btn ${subTab === 'reception' ? 'active' : ''}`}
+                onClick={() => setSubTab('reception')}
+              >
+                <Scale size={14} />
+                <span>3. Quai & Pesées ({inTransitCount} en transit)</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
+      {/* BANDEAU 05h00 DU MATIN : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #19211A 0%, #243025 100%)',
+          color: '#FAF8F5',
+          borderRadius: 'var(--radius-md)',
+          padding: '16px 20px',
+          border: '1.5px solid #F97316',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                background: '#F97316',
+                color: '#FFFFFF',
+                fontWeight: 800,
+                fontSize: '11.5px',
+                padding: '4px 10px',
+                borderRadius: '999px',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              🌅 Briefing 05h00 · Priorités de Coupe du Jour
+            </span>
+            <span style={{ fontSize: '13px', color: '#E2C799', fontWeight: 600 }}>
+              Cliquez sur « Y ALLER (MAPS) » pour lancer le guidage routier jusqu’à l’entrée des rangs
+            </span>
+          </div>
+          {tomorrowItems.length > 0 && (
+            <span style={{ fontSize: '12px', color: 'rgba(250,248,245,0.75)' }}>
+              Demain matin :{' '}
+              <strong style={{ color: '#E2C799' }}>
+                {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Pastille n°${t.pastilleNum})`).join(', ')}
+              </strong>
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '12px' }}>
+          {todayPriorityItems.map((item) => {
+            const metrics = getParcelHarvestMetrics(item.parcel);
+            const isSelected = selectedParcel?.id === item.parcel.id;
+            return (
+              <div
+                key={item.parcel.id}
+                onClick={() => {
+                  setSelectedParcelId(item.parcel.id);
+                  setSubTab('atlas');
+                }}
+                style={{
+                  background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
+                  border: isSelected ? '2px solid #F97316' : '1px solid rgba(255,255,255,0.16)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                    <span
+                      style={{
+                        background: '#F97316',
+                        color: '#FFFFFF',
+                        fontWeight: 800,
+                        fontSize: '11px',
+                        padding: '1px 7px',
+                        borderRadius: '999px',
+                      }}
+                    >
+                      Pastille n°{item.pastilleNum} · Livret p.{item.pageLivret}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: '#E2C799', fontWeight: 700 }}>
+                      {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer ce matin'}
+                    </span>
+                  </div>
+                  <div className="serif-display" style={{ fontSize: '19px', fontWeight: 700, color: '#FFFFFF' }}>
+                    {item.parcel.name.replace(' — fictif', '')} ({item.parcel.code})
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(250,248,245,0.8)' }}>
+                    {item.nbRangs} · Cumul : <strong>{metrics.totalCaisses} caisses</strong> ({metrics.totalKg} kg)
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      adjustParcelUnit(item.parcel, 5);
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.14)',
+                      color: '#FFFFFF',
+                      border: '1px solid rgba(255,255,255,0.3)',
+                      borderRadius: '999px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    +5 Caisses
+                  </button>
+                  <a
+                    href={item.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(ev) => ev.stopPropagation()}
+                    style={{
+                      background: '#10B981',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '12.5px',
+                      padding: '9px 14px',
+                      borderRadius: '999px',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                    }}
+                  >
+                    <Navigation size={14} />
+                    <span>Y ALLER (MAPS)</span>
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* =====================================================================
-          SOUS-VUE 1 : ATLAS CADASTRAL CIBLÉ, POINTS GPS DOMAINE & LIVRET
+          SOUS-VUE 1 : VRAIE CARTE INTERACTIVE SATELLITE / CADASTRE IGN & LIVRET
          ===================================================================== */}
       {subTab === 'atlas' && (
         <div className="grid-2 animate-fade-in">
-          {/* Colonne Gauche : Carte Satellite / Cadastre + Point GPS Personnalisable + Suite Cuverie */}
+          {/* Colonne Gauche : Vraie Carte Interactive Navigable (Zoom / Pan / GPS Flottant / Plein Écran) */}
           <div
             className="card"
             style={{
@@ -778,7 +1074,7 @@ export const VineyardView: React.FC = () => {
               borderColor: fieldMode ? '#C4A47A' : 'var(--color-border)',
             }}
           >
-            <div className="card-header" style={{ borderColor: fieldMode ? 'rgba(255,255,255,0.12)' : undefined }}>
+            <div className="card-header" style={{ borderColor: fieldMode ? 'rgba(255,255,255,0.12)' : undefined, marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
@@ -796,222 +1092,24 @@ export const VineyardView: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="card-title" style={{ color: fieldMode ? '#FAF8F5' : undefined, fontSize: '18px' }}>
-                    Cadastre Communal & Point GPS Domaine
+                    Carte Satellite Interactive, Cadastre IGN & GPS Terrain
                   </h2>
                   <div style={{ fontSize: '11.5px', opacity: 0.78 }}>
-                    Chargement léger par commune INSEE (Puligny, Chassagne, Meursault) + Point GPS d’entrée de rang posé par le domaine
+                    Déplacez-vous et zoomez sur la carte · Cliquez sur « ME LOCALISER (GPS) » en bas à droite ou ouvrez en Plein Écran
                   </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${isEditingGpsPin ? 'btn-gold' : 'btn-secondary'}`}
-                  onClick={() => setIsEditingGpsPin((v) => !v)}
-                  title="Cliquer sur la carte pour poser un point GPS précis d'entrée de rang (prioritaire sur le cadastre)"
-                >
-                  <Crosshair size={13} />
-                  <span>{isEditingGpsPin ? 'Cliquez sur la carte...' : 'Poser Point GPS'}</span>
-                </button>
-
-                <div className="segmented-control">
-                  <button
-                    type="button"
-                    className={`segmented-btn ${mapLayer === 'satellite' ? 'active' : ''}`}
-                    onClick={() => setMapLayer('satellite')}
-                    style={{ fontSize: '11.5px', padding: '4px 10px' }}
-                  >
-                    Satellite + Livret
-                  </button>
-                  <button
-                    type="button"
-                    className={`segmented-btn ${mapLayer === 'cadastre' ? 'active' : ''}`}
-                    onClick={() => setMapLayer('cadastre')}
-                    style={{ fontSize: '11.5px', padding: '4px 10px' }}
-                  >
-                    Cadastre IGN
-                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Carte Interactive avec Texture Satellite / Cadastre + Anneau de Repérage Orange + Point GPS Domaine */}
-            <div
-              onClick={handleMapClickForCustomPin}
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '285px',
-                background:
-                  mapLayer === 'satellite'
-                    ? 'radial-gradient(circle at 35% 40%, #2C3B2B 0%, #1E291D 55%, #161F15 100%)'
-                    : 'linear-gradient(165deg, #F3EFE6 0%, #E6E0D2 100%)',
-                borderRadius: 'var(--radius-md)',
-                border: isEditingGpsPin ? '2px dashed #F97316' : '1px solid rgba(196, 164, 122, 0.4)',
-                overflow: 'hidden',
-                cursor: isEditingGpsPin ? 'crosshair' : 'default',
-                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)',
-              }}
-            >
-              {/* Trame de rangs de vigne & limites cadastrales en SVG */}
-              <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, opacity: mapLayer === 'satellite' ? 0.35 : 0.55, pointerEvents: 'none' }}>
-                <defs>
-                  <pattern id="vineRows" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(22)">
-                    <line x1="0" y1="0" x2="0" y2="8" stroke={mapLayer === 'satellite' ? '#8CA87C' : '#9C9480'} strokeWidth="1" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#vineRows)" />
-                <path d="M 0 135 Q 240 115, 480 145 T 800 120" fill="none" stroke={mapLayer === 'satellite' ? '#D6CFC2' : '#FFFFFF'} strokeWidth="5" opacity="0.7" />
-                <path d="M 290 0 L 265 300" fill="none" stroke={mapLayer === 'satellite' ? '#D6CFC2' : '#FFFFFF'} strokeWidth="3.5" opacity="0.55" strokeDasharray="6 3" />
-              </svg>
-
-              {/* Bandeau d'indication du Livret & Coordonnées GPS Exactes */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  left: '12px',
-                  right: '12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  pointerEvents: 'none',
-                  zIndex: 10,
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                }}
-              >
-                <div
-                  style={{
-                    background: 'rgba(20, 24, 20, 0.85)',
-                    backdropFilter: 'blur(6px)',
-                    color: '#FAF8F5',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-pill)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    border: '1px solid rgba(196, 164, 122, 0.35)',
-                  }}
-                >
-                  <Compass size={12} style={{ color: '#C4A47A' }} />
-                  <span>Livret p.{selectedMeta.pageLivret} · Pastille n°{selectedMeta.pastilleNum}</span>
-                </div>
-
-                <div
-                  className="tabular"
-                  style={{
-                    background: selectedTrack?.customPin ? 'rgba(249, 115, 22, 0.92)' : 'rgba(20, 24, 20, 0.85)',
-                    color: '#FFFFFF',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-pill)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                  }}
-                >
-                  GPS : {effectivePin.lat.toFixed(5)}° N, {effectivePin.lng.toFixed(5)}° E{' '}
-                  {selectedTrack?.customPin ? '★ Point Domaine' : '(Cadastre + Livret)'}
-                </div>
-              </div>
-
-              {/* Polygones des Climats */}
-              {parcels.map((p) => {
-                const isSelected = selectedParcel?.id === p.id;
-                const meta = CLIMAT_METADATA[p.id] ?? DEFAULT_CLIMAT_META;
-                const fillBg =
-                  meta.classification === 'Grand Cru'
-                    ? 'rgba(196, 164, 122, 0.82)'
-                    : meta.classification === '1er Cru'
-                    ? 'rgba(107, 33, 40, 0.82)'
-                    : 'rgba(45, 74, 54, 0.82)';
-
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={(ev) => {
-                      if (isEditingGpsPin) return;
-                      ev.stopPropagation();
-                      setSelectedParcelId(p.id);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: `${p.schematic.x}%`,
-                      top: `${p.schematic.y}%`,
-                      width: `${p.schematic.w}%`,
-                      height: `${p.schematic.h}%`,
-                      background: fillBg,
-                      color: meta.classification === 'Grand Cru' ? '#1E221E' : '#FFFFFF',
-                      border: isSelected ? '2.5px solid #FFFFFF' : '1px solid rgba(255,255,255,0.45)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '4px',
-                      cursor: isEditingGpsPin ? 'crosshair' : 'pointer',
-                      transition: 'all 160ms ease',
-                      transform: isSelected ? 'scale(1.04)' : 'scale(1)',
-                      zIndex: isSelected ? 6 : 2,
-                      boxShadow: isSelected ? '0 6px 18px rgba(0,0,0,0.35)' : '0 2px 5px rgba(0,0,0,0.15)',
-                    }}
-                    title={`${p.name} (${meta.appellation})`}
-                  >
-                    <span style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.02em' }}>{p.code}</span>
-                    <span style={{ fontSize: '9.5px', opacity: 0.9 }}>
-                      {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : 'Inconnu'}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Anneau de repérage Orange Pulsant sur le Point GPS Exact (Livret ou Point Domaine posé au clic) */}
-              {selectedParcel && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: `${effectivePin.xPct}%`,
-                    top: `${effectivePin.yPct}%`,
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'none',
-                    zIndex: 15,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <div
-                    className="pin-orange-ring"
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      border: '3px solid #F97316',
-                      background: 'rgba(249, 115, 22, 0.22)',
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-22px',
-                      background: '#F97316',
-                      color: '#FFFFFF',
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      padding: '1px 7px',
-                      borderRadius: '999px',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-                    }}
-                  >
-                    n°{selectedMeta.pastilleNum} {selectedTrack?.customPin ? '· GPS Domaine' : ''}
-                  </div>
-                </div>
-              )}
-            </div>
+            <InteractiveVineyardMap
+              items={mapItems}
+              selectedParcelId={selectedParcel?.id ?? 'parcel-c'}
+              onSelectParcel={(id) => setSelectedParcelId(id)}
+              isEditingGpsPin={isEditingGpsPin}
+              onToggleEditGpsPin={() => setIsEditingGpsPin((v) => !v)}
+              onSetCustomGps={handleSetCustomGpsFromMap}
+              fieldMode={fieldMode || restrictedFieldMode}
+            />
 
             {/* Fiche du Climat Sélectionné + Continuité Post-Vendange ("Ce qu'il se passe par la suite") */}
             {selectedParcel && selectedMetrics && (

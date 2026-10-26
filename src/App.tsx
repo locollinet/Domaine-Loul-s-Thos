@@ -15,6 +15,8 @@ import {
   RotateCcw,
   UserCheck,
   ChevronRight,
+  Navigation,
+  Lock,
 } from 'lucide-react';
 import { useStore } from './app/store-context';
 import { ROLE_LABELS } from './domain/selectors';
@@ -43,6 +45,7 @@ const ROLE_PRIMARY_TABS: Record<RoleId, string[]> = {
 export const App: React.FC = () => {
   const { state, role, setRole, resetDemo, feedback, clearFeedback, isReady } = useStore();
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [restrictedFieldMode, setRestrictedFieldMode] = useState<boolean>(false);
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState<boolean>(false);
@@ -120,185 +123,244 @@ export const App: React.FC = () => {
   return (
     <div className="app-shell">
       <div className="app-body">
-        {/* Left Sidebar — Noir Cyprès & Or Patiné (ADN Premnord / Haute Bourgogne) */}
-        <aside className="app-sidebar" aria-label="Menu latéral du domaine">
-          <div>
-            <div className="brand-block">
-              <div className="brand-crest">
-                <div className="brand-emblem">TC</div>
-                <div>
-                  <div className="brand-title">Trois Coteaux</div>
-                  <div className="brand-subtitle">Haute Bourgogne · Démo</div>
-                </div>
-              </div>
-            </div>
-
-            <nav aria-label="Navigation principale">
-              {navGroups.map((group) => (
-                <div key={group.groupLabel} style={{ marginBottom: '8px' }}>
-                  <div className="sidebar-section-label">{group.groupLabel}</div>
-                  <div className="sidebar-nav">
-                    {group.items.map((item) => {
-                      const IconComp = item.icon;
-                      const isRecommended = recommendedTabs.includes(item.id);
-                      return (
-                        <button
-                          key={item.id}
-                          className={`nav-tab ${activeTab === item.id ? 'active' : ''} ${
-                            isRecommended ? 'role-recommended' : ''
-                          }`}
-                          onClick={() => setActiveTab(item.id)}
-                          title={
-                            isRecommended
-                              ? `${item.label} — Écran clé pour ${ROLE_LABELS[role]}`
-                              : item.label
-                          }
-                        >
-                          <span className="nav-tab-left">
-                            <IconComp className="nav-icon" size={16} strokeWidth={1.85} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
+        {/* Left Sidebar — Masquée en Mode Restreint Ouvrier / Transporteur 5h00 */}
+        {!restrictedFieldMode && (
+          <aside className="app-sidebar" aria-label="Menu latéral du domaine">
+            <div>
+              <div className="brand-block">
+                <div className="brand-crest">
+                  <div className="brand-emblem">TC</div>
+                  <div>
+                    <div className="brand-title">Trois Coteaux</div>
+                    <div className="brand-subtitle">Haute Bourgogne · Démo</div>
                   </div>
                 </div>
-              ))}
-            </nav>
-          </div>
+              </div>
 
-          <div
-            className="sidebar-footer-info"
-            style={{
-              padding: '12px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid rgba(196, 164, 122, 0.18)',
-              fontSize: '11px',
-              color: 'rgba(250, 248, 245, 0.65)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontWeight: 600, color: '#C4A47A' }}>24 Octobre 2026</span>
-              <span style={{ fontSize: '10px', opacity: 0.75 }}>5 Millésimes</span>
+              <nav aria-label="Navigation principale">
+                {navGroups.map((group) => (
+                  <div key={group.groupLabel} style={{ marginBottom: '8px' }}>
+                    <div className="sidebar-section-label">{group.groupLabel}</div>
+                    <div className="sidebar-nav">
+                      {group.items.map((item) => {
+                        const IconComp = item.icon;
+                        const isRecommended = recommendedTabs.includes(item.id);
+                        return (
+                          <button
+                            key={item.id}
+                            className={`nav-tab ${activeTab === item.id ? 'active' : ''} ${
+                              isRecommended ? 'role-recommended' : ''
+                            }`}
+                            onClick={() => setActiveTab(item.id)}
+                            title={
+                              isRecommended
+                                ? `${item.label} — Écran clé pour ${ROLE_LABELS[role]}`
+                                : item.label
+                            }
+                          >
+                            <span className="nav-tab-left">
+                              <IconComp className="nav-icon" size={16} strokeWidth={1.85} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
             </div>
-            <div style={{ fontSize: '10.5px', opacity: 0.7 }}>
-              ● Pastille or = focus persona actif
+
+            <div
+              className="sidebar-footer-info"
+              style={{
+                padding: '12px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(196, 164, 122, 0.18)',
+                fontSize: '11px',
+                color: 'rgba(250, 248, 245, 0.65)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 600, color: '#C4A47A' }}>24 Octobre 2026</span>
+                <span style={{ fontSize: '10px', opacity: 0.75 }}>5 Millésimes</span>
+              </div>
+              <div style={{ fontSize: '10.5px', opacity: 0.7 }}>
+                ● Pastille or = focus persona actif
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
         {/* Right Workspace */}
         <div className="app-workspace">
-          {/* UN SEUL En-tête Aérien & Iconique (Zéro empilement de bandeaux) */}
-          <header className="workspace-header" aria-label="Bandeau de démonstration">
-            {/* Search Pill */}
-            <button
-              type="button"
-              className="search-trigger-btn"
-              onClick={() => setShowGlobalSearch(true)}
-              aria-label="Rechercher dans tout le domaine"
+          {restrictedFieldMode ? (
+            <header
+              style={{
+                background: '#141814',
+                color: '#FAF8F5',
+                padding: '10px 24px',
+                borderBottom: '2px solid #F97316',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Search size={14} style={{ color: 'var(--color-gold-dark)' }} />
-                <span>Climat, lot, fût, client...</span>
-              </span>
-              <span className="kbd-shortcut">⌘K</span>
-            </button>
-
-            {/* Compact End-to-End Iconic Breadcrumb */}
-            <div className="compact-e2e-pills" aria-label="Chaîne de valeur de bout en bout">
-              {compactSteps.map((st, idx) => {
-                const StepIcon = st.icon;
-                const isActive = activeTab === st.id;
-                return (
-                  <React.Fragment key={st.id}>
-                    <button
-                      type="button"
-                      className={`compact-step-pill ${isActive ? 'active' : ''}`}
-                      onClick={() => setActiveTab(st.id)}
-                      title={`Accéder à l’étape ${st.short}`}
-                    >
-                      <StepIcon size={13} style={{ color: isActive ? 'var(--color-gold-dark)' : 'currentColor' }} />
-                      <span>{st.short}</span>
-                    </button>
-                    {idx < compactSteps.length - 1 && (
-                      <ChevronRight size={11} style={{ color: 'var(--color-ink-light)', flexShrink: 0 }} />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-
-            {/* Persona Selector + Iconic Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border-strong)',
-                  borderRadius: 'var(--radius-pill)',
-                  padding: '3px 10px',
-                }}
-              >
-                <UserCheck size={13} style={{ color: 'var(--color-gold-dark)' }} />
-                <label htmlFor="role-select" style={{ fontSize: '11px', color: 'var(--color-ink-muted)', fontWeight: 600 }}>
-                  Persona :
-                </label>
-                <select
-                  id="role-select"
-                  aria-label="Rôle prévisualisé"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as RoleId)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
                   style={{
-                    background: 'transparent',
-                    color: 'var(--color-ink)',
-                    border: 'none',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    outline: 'none',
+                    background: '#F97316',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: '11px',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
                   }}
                 >
-                  {Object.entries(ROLE_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  <Lock size={12} /> ACCÈS RESTREINT TERRAIN 05h00
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                  Profil Ouvrier / Vendangeur / Transporteur — Accès ERP complet verrouillé (Seuls le GPS et les priorités de coupe sont actifs)
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-gold"
+                onClick={() => setRestrictedFieldMode(false)}
+              >
+                Quitter la vue restreinte (Retour ERP)
+              </button>
+            </header>
+          ) : (
+            /* UN SEUL En-tête Aérien & Iconique (Zéro empilement de bandeaux) */
+            <header className="workspace-header" aria-label="Bandeau de démonstration">
+              {/* Search Pill */}
+              <button
+                type="button"
+                className="search-trigger-btn"
+                onClick={() => setShowGlobalSearch(true)}
+                aria-label="Rechercher dans tout le domaine"
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Search size={14} style={{ color: 'var(--color-gold-dark)' }} />
+                  <span>Climat, lot, fût, client...</span>
+                </span>
+                <span className="kbd-shortcut">⌘K</span>
+              </button>
+
+              {/* Compact End-to-End Iconic Breadcrumb */}
+              <div className="compact-e2e-pills" aria-label="Chaîne de valeur de bout en bout">
+                {compactSteps.map((st, idx) => {
+                  const StepIcon = st.icon;
+                  const isActive = activeTab === st.id;
+                  return (
+                    <React.Fragment key={st.id}>
+                      <button
+                        type="button"
+                        className={`compact-step-pill ${isActive ? 'active' : ''}`}
+                        onClick={() => setActiveTab(st.id)}
+                        title={`Accéder à l’étape ${st.short}`}
+                      >
+                        <StepIcon size={13} style={{ color: isActive ? 'var(--color-gold-dark)' : 'currentColor' }} />
+                        <span>{st.short}</span>
+                      </button>
+                      {idx < compactSteps.length - 1 && (
+                        <ChevronRight size={11} style={{ color: 'var(--color-ink-light)', flexShrink: 0 }} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </div>
 
-              <button
-                className="btn btn-sm btn-gold"
-                onClick={() => setShowDemoGuide(true)}
-                title="Lancer le scénario guidé de bout en bout (10 étapes)"
-              >
-                <Play size={12} fill="currentColor" />
-                <span>Scénario Démo</span>
-              </button>
+              {/* Persona Selector + Iconic Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border-strong)',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '3px 10px',
+                  }}
+                >
+                  <UserCheck size={13} style={{ color: 'var(--color-gold-dark)' }} />
+                  <label htmlFor="role-select" style={{ fontSize: '11px', color: 'var(--color-ink-muted)', fontWeight: 600 }}>
+                    Persona :
+                  </label>
+                  <select
+                    id="role-select"
+                    aria-label="Rôle prévisualisé"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as RoleId)}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--color-ink)',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    {Object.entries(ROLE_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => setShowAiCopilot(true)}
-                title="Ouvrir le Copilote IA Œnologique"
-              >
-                <Sparkles size={13} style={{ color: '#C4A47A' }} />
-                <span>Copilote IA</span>
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => {
+                    setActiveTab('vineyard');
+                    setRestrictedFieldMode(true);
+                  }}
+                  title="Verrouiller l'interface en mode Ouvrier / Transporteur 5h00 (uniquement GPS & priorités vendange)"
+                >
+                  <Navigation size={12} style={{ color: '#F97316' }} />
+                  <span>Vue Terrain 5h</span>
+                </button>
 
-              <button
-                className="btn btn-sm btn-secondary"
-                onClick={() => setConfirmReset(true)}
-                title="Réinitialiser les données de démonstration"
-                aria-label="Réinitialiser démo"
-                style={{ padding: '5px 8px' }}
-              >
-                <RotateCcw size={13} />
-              </button>
-            </div>
-          </header>
+                <button
+                  className="btn btn-sm btn-gold"
+                  onClick={() => setShowDemoGuide(true)}
+                  title="Lancer le scénario guidé de bout en bout (10 étapes)"
+                >
+                  <Play size={12} fill="currentColor" />
+                  <span>Scénario Démo</span>
+                </button>
+
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setShowAiCopilot(true)}
+                  title="Ouvrir le Copilote IA Œnologique"
+                >
+                  <Sparkles size={13} style={{ color: '#C4A47A' }} />
+                  <span>Copilote IA</span>
+                </button>
+
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => setConfirmReset(true)}
+                  title="Réinitialiser les données de démonstration"
+                  aria-label="Réinitialiser démo"
+                  style={{ padding: '5px 8px' }}
+                >
+                  <RotateCcw size={13} />
+                </button>
+              </div>
+            </header>
+          )}
 
           {/* Main Content Area */}
           <main className="app-main animate-fade-in">
@@ -314,15 +376,29 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'overview' && <OverviewView onNavigate={setActiveTab} />}
-            {activeTab === 'vineyard' && <VineyardView />}
-            {activeTab === 'cellar' && <CellarView />}
-            {activeTab === 'aging' && <AgingView />}
-            {activeTab === 'bottling' && <BottlingView />}
-            {activeTab === 'supplies' && <SuppliesView />}
-            {activeTab === 'sales' && <SalesView />}
-            {activeTab === 'finance' && <FinanceView />}
-            {activeTab === 'traceability' && <TraceabilityView />}
+            {restrictedFieldMode ? (
+              <VineyardView
+                restrictedFieldMode={true}
+                onToggleRestrictedMode={() => setRestrictedFieldMode(false)}
+              />
+            ) : (
+              <>
+                {activeTab === 'overview' && <OverviewView onNavigate={setActiveTab} />}
+                {activeTab === 'vineyard' && (
+                  <VineyardView
+                    restrictedFieldMode={false}
+                    onToggleRestrictedMode={() => setRestrictedFieldMode(true)}
+                  />
+                )}
+                {activeTab === 'cellar' && <CellarView />}
+                {activeTab === 'aging' && <AgingView />}
+                {activeTab === 'bottling' && <BottlingView />}
+                {activeTab === 'supplies' && <SuppliesView />}
+                {activeTab === 'sales' && <SalesView />}
+                {activeTab === 'finance' && <FinanceView />}
+                {activeTab === 'traceability' && <TraceabilityView />}
+              </>
+            )}
           </main>
         </div>
       </div>
