@@ -1,4 +1,15 @@
 import React, { useState } from 'react';
+import {
+  Wine,
+  Activity,
+  ListChecks,
+  MessageSquare,
+  Plus,
+  ShieldAlert,
+  CheckCircle2,
+  LayoutGrid,
+  Table as TableIcon,
+} from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { PARAMETERS } from '../../domain/commands/cellar';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
@@ -8,6 +19,8 @@ export const CellarView: React.FC = () => {
   const { state, dispatch } = useStore();
   const [selectedLotId, setSelectedLotId] = useState<string>('lot-2026-white');
   const [viewMode, setViewMode] = useState<'plan' | 'table'>('plan');
+  // Progressive disclosure inside the Lot Inspector to eliminate vertical clutter
+  const [lotTab, setLotTab] = useState<'analytics' | 'itinerary' | 'journal'>('analytics');
 
   // Measurement Modal
   const [showMeasModal, setShowMeasModal] = useState(false);
@@ -188,12 +201,16 @@ export const CellarView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div className="page-header" style={{ marginBottom: '2px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      <div className="page-header" style={{ marginBottom: '0' }}>
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span className="badge badge-gold">Chai de Vinification</span>
+            <span className="badge badge-grape">Vins Tranquilles Blancs & Rouges</span>
+          </div>
           <h1 className="page-title">Chai & Vinification</h1>
           <p className="page-subtitle">
-            Plan de cuverie interactif avec jauges de niveau, suivi analytique réel, itinéraires œnologiques et contrôle qualité.
+            Plan de cuverie synoptique avec jauges de niveau, suivi analytique réel et itinéraires œnologiques.
           </p>
         </div>
         <div className="segmented-control">
@@ -201,13 +218,13 @@ export const CellarView: React.FC = () => {
             className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
             onClick={() => setViewMode('plan')}
           >
-            Plan de cave visuel
+            <LayoutGrid size={14} /> Plan de cave visuel
           </button>
           <button
             className={`segmented-btn ${viewMode === 'table' ? 'active' : ''}`}
             onClick={() => setViewMode('table')}
           >
-            Table des contenants
+            <TableIcon size={14} /> Table des contenants
           </button>
         </div>
       </div>
@@ -218,7 +235,7 @@ export const CellarView: React.FC = () => {
           <div>
             <h2 className="card-title">Occupation des contenants</h2>
             <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-              Cliquez sur une cuve ou une barrique occupée pour inspecter le lot de vin contenu
+              Cliquez sur une cuve inox ou une pièce bourguignonne occupée pour inspecter son lot
             </div>
           </div>
           <span className="badge badge-muted">
@@ -227,7 +244,7 @@ export const CellarView: React.FC = () => {
         </div>
 
         {viewMode === 'plan' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: '12px' }}>
             {containers.map((c) => {
               const occ = state.occupancies[c.id];
               const lot = occ ? state.lots[occ.lotId] : null;
@@ -247,8 +264,8 @@ export const CellarView: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{c.code}</span>
-                    <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-amber' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-                      {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? 'Barrique' : 'Cuve Inox'}
+                    <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-gold' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                      {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? 'Pièce 228L' : 'Cuve Inox'}
                     </span>
                   </div>
 
@@ -359,7 +376,7 @@ export const CellarView: React.FC = () => {
         )}
       </div>
 
-      {/* Lot selector and comprehensive winemaking inspector */}
+      {/* Lot selector and Progressive Disclosure Winemaking Inspector */}
       <div className="grid-2">
         {/* Left: Lots list */}
         <div className="card">
@@ -367,10 +384,10 @@ export const CellarView: React.FC = () => {
             <div>
               <h2 className="card-title">Lots de vinification</h2>
               <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-                Sélectionnez un lot pour ouvrir sa fiche technique, ses courbes et ses contrôles
+                Sélectionnez une cuvée en cours pour inspecter ses analyses ou son itinéraire
               </div>
             </div>
-            <span className="badge badge-muted">{lots.length} lots actifs</span>
+            <span className="badge badge-gold">{lots.length} lots actifs</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {lots.map((l) => {
@@ -390,20 +407,23 @@ export const CellarView: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '14.5px' }}>{l.name}</span>
+                    <span className="serif-display" style={{ fontWeight: 700, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Wine size={15} color={l.color === 'red' ? 'var(--color-grape)' : '#B89551'} />
+                      {l.name}
+                    </span>
                     <span className={`badge ${l.quality === 'held' ? 'badge-amber' : 'badge-green'}`}>
-                      {l.quality === 'held' ? '🔒 Bloqué qualité' : '✓ Libéré'}
+                      {l.quality === 'held' ? '🔒 Retenue' : '✓ Libéré'}
                     </span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '3px' }}>
-                    Code : <strong>{l.code}</strong> · Millésime {l.vintage} · {l.color === 'white' ? 'Blanc' : 'Rouge'}
-                    {l.grapesReceivedG > 0 && ` · Raisins reçus : ${(l.grapesReceivedG / 1000).toLocaleString('fr-FR')} kg`}
+                    <code>{l.code}</code> · Millésime {l.vintage} · {l.color === 'white' ? 'Blanc' : 'Rouge'}
+                    {l.grapesReceivedG > 0 && ` · Vendange : ${(l.grapesReceivedG / 1000).toLocaleString('fr-FR')} kg`}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                     <span style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-forest)' }} className="tabular">
-                      Volume actuel : {volL} L
+                      Volume : {volL} L
                     </span>
-                    <span className="badge badge-muted" style={{ fontSize: '11px' }}>
+                    <span className="badge badge-muted" style={{ fontSize: '10.5px' }}>
                       Stade : {l.stage}
                     </span>
                   </div>
@@ -413,16 +433,16 @@ export const CellarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Selected lot details */}
+        {/* Right: Selected lot details with 3 clean sub-tabs */}
         {selectedLot && (
           <div className="card">
-            <div className="card-header">
+            <div className="card-header" style={{ marginBottom: '12px' }}>
               <div>
-                <h2 className="serif-display" style={{ fontSize: '20px', fontWeight: 700 }}>
+                <h2 className="serif-display" style={{ fontSize: '21px', fontWeight: 700 }}>
                   {selectedLot.name} ({selectedLot.code})
                 </h2>
                 <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-                  Millésime {selectedLot.vintage} · {selectedLot.color === 'white' ? 'Vin blanc tranquille' : 'Vin rouge tranquille'} · Mention : {selectedLot.mention}
+                  Millésime {selectedLot.vintage} · {selectedLot.color === 'white' ? 'Vin blanc tranquille' : 'Vin rouge tranquille'} · {selectedLot.mention}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -431,7 +451,7 @@ export const CellarView: React.FC = () => {
                     className="btn btn-sm btn-accent"
                     onClick={() => setShowDeclareVolModal(true)}
                   >
-                    + Déclarer volume écoulé (L)
+                    <Plus size={13} /> Déclarer volume écoulé (L)
                   </button>
                 )}
                 {selectedLot.quality === 'held' ? (
@@ -442,7 +462,7 @@ export const CellarView: React.FC = () => {
                       setQualityReason('Analyses et dégustation conformes pour mise ou commercialisation');
                     }}
                   >
-                    Libérer le lot
+                    <CheckCircle2 size={13} /> Libérer le lot
                   </button>
                 ) : (
                   <button
@@ -452,18 +472,26 @@ export const CellarView: React.FC = () => {
                       setQualityReason('Mise en retenue préventive pour contrôle analytique');
                     }}
                   >
-                    Bloquer qualité
+                    <ShieldAlert size={13} /> Bloquer qualité
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Stage progression switcher */}
-            <div style={{ marginBottom: '16px', padding: '10px 12px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>
-                Stade œnologique actuel : <strong style={{ color: 'var(--color-ink)' }}>{selectedLot.stage}</strong>
-              </span>
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {/* Compact Stage & Vessel Summary Pill Bar */}
+            <div style={{ marginBottom: '14px', padding: '10px 12px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>
+                  Contenant(s) :
+                </span>
+                {lotOccupancies(state, selectedLot.id).map((o) => (
+                  <span key={o.containerId} className="badge badge-gold tabular">
+                    {state.containers[o.containerId]?.code ?? o.containerId} · {o.volumeMl / 1000} L
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)', marginRight: '4px' }}>Stade :</span>
                 {(['fermenting', 'aging', 'ready'] as const).map((st) => (
                   <button
                     key={st}
@@ -478,205 +506,220 @@ export const CellarView: React.FC = () => {
               </div>
             </div>
 
-            {/* Occupancies */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Répartition dans les contenants
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {lotOccupancies(state, selectedLot.id).map((o) => (
-                  <div
-                    key={o.containerId}
-                    style={{
-                      background: 'var(--color-surface-soft)',
-                      border: '1px solid var(--color-border)',
-                      padding: '6px 12px',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '13px',
-                    }}
-                    className="tabular"
-                  >
-                    <strong>{state.containers[o.containerId]?.code ?? o.containerId}</strong> : {o.volumeMl / 1000} L
-                  </div>
-                ))}
-              </div>
+            {/* 3-Tab Sub-Navigation inside the Lot Inspector to prevent vertical wall of text */}
+            <div className="segmented-control" style={{ width: '100%', marginBottom: '16px', display: 'flex' }}>
+              <button
+                type="button"
+                className={`segmented-btn ${lotTab === 'analytics' ? 'active' : ''}`}
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => setLotTab('analytics')}
+              >
+                <Activity size={13} /> Analyses ({lotMeas.length})
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${lotTab === 'itinerary' ? 'active' : ''}`}
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => setLotTab('itinerary')}
+              >
+                <ListChecks size={13} /> Itinéraire ({selectedLot.itinerary.length})
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${lotTab === 'journal' ? 'active' : ''}`}
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => setLotTab('journal')}
+              >
+                <MessageSquare size={13} /> Dégustations ({lotTastings.length})
+              </button>
             </div>
 
-            {/* Itinerary */}
-            {selectedLot.itinerary.length > 0 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Itinéraire œnologique (Sans conseil de dose ni décision automatique)
+            {/* TAB 1: ANALYSES & CINETIQUE */}
+            {lotTab === 'analytics' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase' }}>
+                    Suivi des mesures réelles ({lotMeas.length})
+                  </span>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => setShowMeasModal(true)}
+                  >
+                    <Plus size={13} /> Nouveau relevé
+                  </button>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {selectedLot.itinerary.map((step) => (
-                    <div
-                      key={step.key}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '8px 10px',
-                        background: step.status === 'done' ? 'var(--color-forest-soft)' : 'var(--color-surface-soft)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '12.5px',
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontWeight: 600 }}>{step.label}</span>
-                        {step.doneAt && (
-                          <span style={{ color: 'var(--color-ink-muted)', marginLeft: '6px' }}>
-                            (validé le {step.doneAt})
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        className={`badge ${step.status === 'done' ? 'badge-green' : 'badge-muted'}`}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleItineraryStep(step.key, step.status)}
-                      >
-                        {step.status === 'done' ? '✓ Fait' : 'Marquer fait'}
-                      </button>
+
+                {/* Pure SVG Density Curve */}
+                {densityPoints.length > 1 && (
+                  <div style={{ background: '#FAF8F5', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--color-ink)' }}>
+                        Cinétique fermentaire réelle — Densité (g/L)
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                        Sans interpolation artificielle
+                      </span>
                     </div>
-                  ))}
+                    <svg width="100%" height="100" viewBox="0 0 320 90">
+                      {(() => {
+                        const minD = 990;
+                        const maxD = 1100;
+                        const pts = densityPoints.map((p, idx) => {
+                          const x = 28 + (idx / (densityPoints.length - 1)) * 264;
+                          const y = 74 - ((p.value - minD) / (maxD - minD)) * 56;
+                          return { x, y, val: p.value, date: p.sampledAt.slice(5, 10) };
+                        });
+                        const polyline = pts.map((p) => `${p.x},${p.y}`).join(' ');
+                        return (
+                          <>
+                            <line x1="24" y1="74" x2="300" y2="74" stroke="#D5D2C8" strokeWidth="1" />
+                            <line x1="24" y1="18" x2="300" y2="18" stroke="#D5D2C8" strokeWidth="1" strokeDasharray="3" />
+                            <polyline fill="none" stroke="var(--color-forest)" strokeWidth="2.5" points={polyline} />
+                            {pts.map((p, i) => (
+                              <g key={i}>
+                                <circle cx={p.x} cy={p.y} r="4" fill="var(--color-forest)" />
+                                <text x={p.x} y={p.y - 7} fontSize="9.5" fontWeight="700" textAnchor="middle" fill="var(--color-ink)">
+                                  {p.val}
+                                </text>
+                                <text x={p.x} y={86} fontSize="8.5" textAnchor="middle" fill="var(--color-ink-muted)">
+                                  {p.date}
+                                </text>
+                              </g>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </svg>
+                  </div>
+                )}
+
+                <div className="table-wrap" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                  <table style={{ fontSize: '12.5px' }}>
+                    <thead>
+                      <tr>
+                        <th>Paramètre</th>
+                        <th>Valeur</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lotMeas.slice(-8).map((m) => (
+                        <tr key={m.id}>
+                          <td style={{ fontWeight: 600 }}>{PARAMETERS[m.parameter]?.label ?? m.parameter}</td>
+                          <td className="tabular" style={{ fontWeight: 700, color: 'var(--color-forest)' }}>
+                            {m.value} {m.unit}
+                          </td>
+                          <td className="tabular">{m.sampledAt.slice(0, 10)}</td>
+                          <td>
+                            <button
+                              className="badge badge-muted"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => {
+                                setShowCorrectMeas(m);
+                                setCorrectMeasVal(String(m.value));
+                              }}
+                            >
+                              Corriger
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
 
-            {/* Measurements & Real SVG Density Curve */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase' }}>
-                  Suivi des mesures réelles ({lotMeas.length})
-                </span>
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setShowMeasModal(true)}
-                >
-                  + Nouveau relevé
-                </button>
-              </div>
-
-              {/* Pure SVG Density Curve */}
-              {densityPoints.length > 1 && (
-                <div style={{ background: '#FAF9F5', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--color-ink)' }}>
-                      Cinétique fermentaire réelle — Densité (g/L)
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                      Aucune interpolation artificielle
-                    </span>
-                  </div>
-                  <svg width="100%" height="100" viewBox="0 0 320 90">
-                    {(() => {
-                      const minD = 990;
-                      const maxD = 1100;
-                      const pts = densityPoints.map((p, idx) => {
-                        const x = 28 + (idx / (densityPoints.length - 1)) * 264;
-                        const y = 74 - ((p.value - minD) / (maxD - minD)) * 56;
-                        return { x, y, val: p.value, date: p.sampledAt.slice(5, 10) };
-                      });
-                      const polyline = pts.map((p) => `${p.x},${p.y}`).join(' ');
-                      return (
-                        <>
-                          <line x1="24" y1="74" x2="300" y2="74" stroke="#D5D2C8" strokeWidth="1" />
-                          <line x1="24" y1="18" x2="300" y2="18" stroke="#D5D2C8" strokeWidth="1" strokeDasharray="3" />
-                          <polyline fill="none" stroke="var(--color-forest)" strokeWidth="2.5" points={polyline} />
-                          {pts.map((p, i) => (
-                            <g key={i}>
-                              <circle cx={p.x} cy={p.y} r="4" fill="var(--color-forest)" />
-                              <text x={p.x} y={p.y - 7} fontSize="9.5" fontWeight="700" textAnchor="middle" fill="var(--color-ink)">
-                                {p.val}
-                              </text>
-                              <text x={p.x} y={86} fontSize="8.5" textAnchor="middle" fill="var(--color-ink-muted)">
-                                {p.date}
-                              </text>
-                            </g>
-                          ))}
-                        </>
-                      );
-                    })()}
-                  </svg>
+            {/* TAB 2: ITINERAIRE OENOLOGIQUE */}
+            {lotTab === 'itinerary' && (
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Itinéraire œnologique (Sans conseil de dose ni décision automatique)
                 </div>
-              )}
-
-              <div className="table-wrap" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                <table style={{ fontSize: '12.5px' }}>
-                  <thead>
-                    <tr>
-                      <th>Paramètre</th>
-                      <th>Valeur</th>
-                      <th>Date</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lotMeas.slice(-8).map((m) => (
-                      <tr key={m.id}>
-                        <td style={{ fontWeight: 600 }}>{PARAMETERS[m.parameter]?.label ?? m.parameter}</td>
-                        <td className="tabular" style={{ fontWeight: 700, color: 'var(--color-forest)' }}>
-                          {m.value} {m.unit}
-                        </td>
-                        <td className="tabular">{m.sampledAt.slice(0, 10)}</td>
-                        <td>
-                          <button
-                            className="badge badge-muted"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => {
-                              setShowCorrectMeas(m);
-                              setCorrectMeasVal(String(m.value));
-                            }}
-                          >
-                            Corriger
-                          </button>
-                        </td>
-                      </tr>
+                {selectedLot.itinerary.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {selectedLot.itinerary.map((step) => (
+                      <div
+                        key={step.key}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '10px 12px',
+                          background: step.status === 'done' ? 'var(--color-forest-soft)' : 'var(--color-surface-soft)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '13px',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: 600 }}>{step.label}</span>
+                          {step.doneAt && (
+                            <span style={{ color: 'var(--color-ink-muted)', marginLeft: '6px', fontSize: '11.5px' }}>
+                              (validé le {step.doneAt})
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          className={`badge ${step.status === 'done' ? 'badge-green' : 'badge-muted'}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => handleItineraryStep(step.key, step.status)}
+                        >
+                          {step.status === 'done' ? '✓ Fait' : 'Marquer fait'}
+                        </button>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Tastings & Operations */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase' }}>
-                  Observations & Dégustations ({lotTastings.length})
-                </span>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => setShowTastingModal(true)}
-                >
-                  + Dégustation
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {lotTastings.map((t) => (
-                  <div key={t.id} style={{ padding: '8px 10px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{t.notes}</div>
-                    <div style={{ color: 'var(--color-ink-light)', marginTop: '2px', fontSize: '11px' }}>
-                      {t.tastedAt.slice(0, 10)} · {t.author}
-                    </div>
                   </div>
-                ))}
+                ) : (
+                  <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)' }}>
+                    Aucun itinéraire spécifique défini pour ce lot.
+                  </p>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Operations journal */}
-            <div>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Journal des opérations du lot ({lotOps.length})
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '140px', overflowY: 'auto' }}>
-                {lotOps.map((op) => (
-                  <div key={op.id} style={{ padding: '6px 10px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 600 }}>{op.label}</span> — {op.details}
-                    <span style={{ color: 'var(--color-ink-light)', marginLeft: '6px' }}>({op.at.slice(0, 10)})</span>
+            {/* TAB 3: DEGUSTATIONS & JOURNAL */}
+            {lotTab === 'journal' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-ink-muted)', textTransform: 'uppercase' }}>
+                      Notes de dégustation ({lotTastings.length})
+                    </span>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => setShowTastingModal(true)}
+                    >
+                      <Plus size={13} /> Dégustation
+                    </button>
                   </div>
-                ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {lotTastings.map((t) => (
+                      <div key={t.id} style={{ padding: '10px 12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{t.notes}</div>
+                        <div style={{ color: 'var(--color-ink-light)', marginTop: '2px', fontSize: '11px' }}>
+                          {t.tastedAt.slice(0, 10)} · {t.author}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-ink-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Journal des opérations du lot ({lotOps.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '160px', overflowY: 'auto' }}>
+                    {lotOps.map((op) => (
+                      <div key={op.id} style={{ padding: '8px 10px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
+                        <span style={{ fontWeight: 600 }}>{op.label}</span> — {op.details}
+                        <span style={{ color: 'var(--color-ink-light)', marginLeft: '6px' }}>({op.at.slice(0, 10)})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
