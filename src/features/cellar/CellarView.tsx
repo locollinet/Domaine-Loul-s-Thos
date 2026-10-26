@@ -9,6 +9,9 @@ import {
   CheckCircle2,
   LayoutGrid,
   Table as TableIcon,
+  Thermometer,
+  Droplets,
+  ArrowRight,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { PARAMETERS } from '../../domain/commands/cellar';
@@ -16,6 +19,14 @@ import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { Container, ContainerKind, Measurement, MeasurementParameter } from '../../domain/types';
 
 const CUSTOM_CONTAINERS_KEY = 'domaine-erp-custom-containers-v1';
+
+const STAGE_LABELS_FR: Record<string, string> = {
+  fermenting: 'En fermentation',
+  aging: 'En élevage',
+  ready: 'Prêt pour mise',
+  blended: 'Assemblé',
+  bottled: 'Mis en bouteilles',
+};
 
 export const CellarView: React.FC = () => {
   const { state, dispatch } = useStore();
@@ -244,30 +255,77 @@ export const CellarView: React.FC = () => {
     setShowAddContainerModal(false);
   };
 
+  // Synthèse du chai pour jauges visuelles
+  const totalWineLitres = Math.round(
+    lots.reduce((sum, l) => sum + lotVolumeMl(state, l.id), 0) / 1000
+  );
+  const totalCapacityLitres = Math.round(
+    containers
+      .filter((c) => c.state === 'available')
+      .reduce((sum, c) => sum + c.capacityMl, 0) / 1000
+  );
+  const cellarFillPct =
+    totalCapacityLitres > 0 ? Math.min(100, Math.round((totalWineLitres / totalCapacityLitres) * 100)) : 0;
+  const occupiedCount = Object.values(state.occupancies).filter((o) => o.volumeMl > 0).length;
+  const fermentingCount = lots.filter((l) => l.stage === 'fermenting').length;
+  const totalMeasCount = Object.values(state.measurements).filter((m) => m.supersededBy === null).length;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      <div className="page-header" style={{ marginBottom: '0' }}>
+    <div className="ds-overview">
+      {/* 1. BANNIÈRE CHAI & VINIFICATION */}
+      <section className="ds-hero ds-rise">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span className="badge badge-gold">Chai de Vinification ({containers.length} contenants)</span>
-            <span className="badge badge-grape">Vins Tranquilles Blancs & Rouges</span>
+          <div className="ds-eyebrow">
+            <span className="ds-pulse" aria-hidden="true" />
+            <span>Cuverie Inox & Pièces Bourguignonnes · {containers.length} contenants configurés</span>
           </div>
-          <h1 className="page-title">Chai & Vinification</h1>
-          <p className="page-subtitle">
-            Plan de cuverie synoptique avec jauges de niveau, suivi analytique réel et itinéraires œnologiques.
+          <h1 className="ds-hero-title">Chai & Vinification</h1>
+          <p className="ds-hero-sub">
+            Visualisez le niveau réel de chaque cuve ou barrique, saisissez vos relevés quotidiens
+            de densité et température, et cochez les étapes de vinification sans aucun jargon.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn btn-sm btn-gold"
-            onClick={() => setShowAddContainerModal(true)}
-            title="Ajouter une cuve inox, un œuf béton, un foudre, un demi-muid 600L ou une pièce 228L au plan du chai"
-          >
-            <Plus size={14} />
-            <span>+ Configurer un contenant</span>
-          </button>
 
+        <div className="ds-next">
+          <div>
+            <div className="ds-next-label">Action recommandée sur {selectedLot?.code ?? 'la cuve'}</div>
+            <div className="ds-next-title">
+              {selectedLot && selectedLot.grapesReceivedG > 0 && lotVolumeMl(state, selectedLot.id) === 0
+                ? `Déclarer le jus écoulé après pressurage (${selectedLot.name})`
+                : `Saisir le relevé quotidien sur ${selectedLot?.name ?? 'le lot actif'}`}
+            </div>
+            <p className="ds-next-desc">
+              {selectedLot && selectedLot.grapesReceivedG > 0 && lotVolumeMl(state, selectedLot.id) === 0
+                ? `${(selectedLot.grapesReceivedG / 1000).toLocaleString('fr-FR')} kg de raisin reçus : indiquez le volume réel en litres mesuré à l’entonnage.`
+                : 'Enregistrez la densité (g/L) et la température (°C) pour tracer la courbe de fermentation.'}
+            </p>
+          </div>
+          {selectedLot && selectedLot.grapesReceivedG > 0 && lotVolumeMl(state, selectedLot.id) === 0 ? (
+            <button
+              type="button"
+              className="ds-cta"
+              onClick={() => setShowDeclareVolModal(true)}
+            >
+              <span>Déclarer le volume en litres</span>
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ds-cta"
+              onClick={() => setShowMeasModal(true)}
+            >
+              <span>+ Nouveau relevé densité / T°</span>
+              <ArrowRight size={16} />
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* 2. GESTES QUOTIDIENS DU MAÎTRE DE CHAI (4 TUILES TACTILES) */}
+      <section className="ds-rise ds-rise-1" aria-label="Gestes rapides au chai">
+        <div className="ds-section-head">
+          <h2 className="ds-section-title">Que souhaitez-vous faire au chai ?</h2>
           <div className="segmented-control">
             <button
               className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
@@ -283,16 +341,170 @@ export const CellarView: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+
+        <div className="ds-quick-grid-4">
+          <button
+            type="button"
+            className="ds-tile is-recommended"
+            onClick={() => setShowMeasModal(true)}
+          >
+            <span className="ds-tile-badge">Quotidien</span>
+            <div className="ds-icon-bubble ds-tone-grape">
+              <Thermometer size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">Saisir densité ou T°</div>
+              <div className="ds-tile-sub">
+                Ajouter une mesure sur {selectedLot?.code ?? 'la cuve active'}
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="ds-tile"
+            onClick={() => setShowDeclareVolModal(true)}
+          >
+            <div className="ds-icon-bubble ds-tone-forest">
+              <Droplets size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">Déclarer le jus écoulé</div>
+              <div className="ds-tile-sub">
+                Entonner en litres après pressurage ou décuvage
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="ds-tile"
+            onClick={() => {
+              setLotTab('journal');
+              setShowTastingModal(true);
+            }}
+          >
+            <div className="ds-icon-bubble ds-tone-gold">
+              <MessageSquare size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">Noter une dégustation</div>
+              <div className="ds-tile-sub">
+                Consigner le nez, la bouche et l’évolution du lot
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="ds-tile"
+            onClick={() => setShowAddContainerModal(true)}
+          >
+            <div className="ds-icon-bubble ds-tone-ink">
+              <Plus size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">+ Ajouter cuve ou fût</div>
+              <div className="ds-tile-sub">
+                Cuve inox, œuf béton, foudre, demi-muid ou pièce 228 L
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      {/* 3. JAUGES VISUELLES DE CUVERIE */}
+      <section className="ds-stats ds-rise ds-rise-2" aria-label="Repères de cuverie">
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-grape">
+              <Wine size={16} />
+            </span>
+            <span>Volume logé au chai</span>
+          </div>
+          <div className="ds-stat-value">
+            {totalWineLitres.toLocaleString('fr-FR')}
+            <span className="ds-stat-unit">L</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: `${cellarFillPct}%`, background: 'var(--color-grape)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            {cellarFillPct}% de la capacité disponible ({totalCapacityLitres.toLocaleString('fr-FR')} L)
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-gold">
+              <LayoutGrid size={16} />
+            </span>
+            <span>Contenants en service</span>
+          </div>
+          <div className="ds-stat-value">
+            {occupiedCount}
+            <span className="ds-stat-unit">/ {containers.length}</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span
+              style={{
+                width: `${containers.length > 0 ? Math.round((occupiedCount / containers.length) * 100) : 0}%`,
+                background: 'var(--color-gold-dark)',
+              }}
+            />
+          </div>
+          <div className="ds-stat-foot">
+            1 lot unique par contenant (aucun mélange accidentel)
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-amber">
+              <Activity size={16} />
+            </span>
+            <span>Lots en fermentation active</span>
+          </div>
+          <div className="ds-stat-value">
+            {fermentingCount}
+            <span className="ds-stat-unit">cuvée(s)</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: fermentingCount > 0 ? '65%' : '100%', background: 'var(--color-amber)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            Surveillance quotidienne densité & température
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-forest">
+              <CheckCircle2 size={16} />
+            </span>
+            <span>Mesures analytiques tracées</span>
+          </div>
+          <div className="ds-stat-value">
+            {totalMeasCount}
+            <span className="ds-stat-unit">relevés</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: '100%', background: 'var(--color-forest)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            Courbes réelles sans interpolation ni conseil de dose
+          </div>
+        </div>
+      </section>
 
       {/* Plan de cave visuel avec jauges cylindriques ou Table alternative */}
-      <div className="card">
-        <div className="card-header">
+      <div className="ds-panel ds-rise ds-rise-3">
+        <div className="ds-section-head">
           <div>
-            <h2 className="card-title">Occupation des contenants</h2>
-            <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+            <h2 className="ds-section-title">Occupation des contenants</h2>
+            <span className="ds-section-meta">
               Cliquez sur une cuve inox ou une pièce bourguignonne occupée pour inspecter son lot
-            </div>
+            </span>
           </div>
           <span className="badge badge-muted">
             Lot ≠ Contenant · 1 lot actif par contenant
@@ -480,7 +692,7 @@ export const CellarView: React.FC = () => {
                       Volume : {volL} L
                     </span>
                     <span className="badge badge-muted" style={{ fontSize: '10.5px' }}>
-                      Stade : {l.stage}
+                      {STAGE_LABELS_FR[l.stage] ?? l.stage}
                     </span>
                   </div>
                 </div>
@@ -556,7 +768,7 @@ export const CellarView: React.FC = () => {
                     style={{ cursor: 'pointer' }}
                     onClick={() => handleSetStage(st)}
                   >
-                    {st}
+                    {STAGE_LABELS_FR[st] ?? st}
                   </button>
                 ))}
               </div>

@@ -1094,6 +1094,62 @@ tr:hover td {
   gap: 12px;
 }
 
+.ds-quick-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ds-quick-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ds-barrel-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(155deg, #FFFFFF 0%, #F7F1E5 100%);
+  border: 1px solid var(--color-gold-border);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ds-barrel-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-count-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(250, 248, 245, 0.78);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-tab.active .nav-count-pill {
+  background: rgba(196, 164, 122, 0.25);
+  color: #E5C89E;
+}
+
+.nav-count-pill.is-alert {
+  background: rgba(245, 158, 11, 0.22);
+  color: #FCD34D;
+}
+
 .ds-tile {
   position: relative;
   display: flex;
@@ -1519,17 +1575,21 @@ tr:hover td {
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
   .ds-quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ds-quick-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 960px) {
   .ds-hero { grid-template-columns: 1fr; padding: 22px; }
   .ds-split { grid-template-columns: 1fr; }
   .ds-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ds-quick-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
   .ds-hero-title { font-size: 30px; }
-  .ds-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ds-quick-grid,
+  .ds-quick-grid-4,
+  .ds-quick-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ds-tile { min-height: 104px; }
   .ds-journey {
     grid-template-columns: repeat(5, minmax(84px, 1fr));

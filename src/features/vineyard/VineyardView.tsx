@@ -20,6 +20,7 @@ import {
   Camera,
   ExternalLink,
   Trash2,
+  ArrowRight,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { canRun } from '../../domain/commands';
@@ -1055,103 +1056,300 @@ export const VineyardView: React.FC<{
     return 'badge-green';
   };
 
+  const totalAreaHa = parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0) / 10000, 0);
+  const donePct = parcels.length > 0 ? Math.round((globalHarvestStats.doneCount / parcels.length) * 100) : 0;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      {/* En-tête épuré avec Switcher simple en 3 vues métier */}
-      <div className="page-header" style={{ marginBottom: '0' }}>
+    <div className="ds-overview">
+      {/* 1. BANNIÈRE VIGNOBLE & RÉCOLTE (Design System v2) */}
+      <section className="ds-hero ds-rise">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-            <span className="badge badge-gold">Cadastre Communal Ciblé (IGN)</span>
-            <span className="badge badge-green">Points GPS Domaine ±1m</span>
-            <span className="badge badge-grape">Suivi Caisses · kg · hL</span>
+          <div className="ds-eyebrow">
+            <span className="ds-pulse" aria-hidden="true" />
+            <span>
+              Cadastre IGN Puligny-Montrachet · {parcels.length} climats ({totalAreaHa.toFixed(2)} ha)
+            </span>
           </div>
-          <h1 className="page-title">Vignoble & Récolte</h1>
-          <p className="page-subtitle">
-            Atlas cadastral et points GPS du domaine, planning des vendanges (Aujourd’hui / Demain / À venir) et continuité directe vers la cuverie.
+          <h1 className="ds-hero-title">Vignoble & Récolte</h1>
+          <p className="ds-hero-sub">
+            Repérez chaque parcelle au mètre près pour guider vos coupeurs dès 5 h du matin,
+            comptez les caisses au rang, déclenchez les bennes et pesez la vendange à l’arrivée au pressoir.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {!restrictedFieldMode && (
+        <div className="ds-next">
+          <div>
+            <div className="ds-next-label">Priorité dans les vignes</div>
+            <div className="ds-next-title">
+              {untransportedCounts.length > 0
+                ? `${untransportedCounts.reduce((s, c) => s + c.quantity, 0)} cagettes coupées attendent au bout du rang`
+                : inTransitCount > 0
+                  ? `${inTransitCount} benne(s) en route vers le quai de réception`
+                  : 'Consulter la carte GPS et le planning de coupe'}
+            </div>
+            <p className="ds-next-desc">
+              {untransportedCounts.length > 0
+                ? 'Groupez ces cagettes dans un transport pour les envoyer au pressoir avant que le raisin ne chauffe.'
+                : 'Utilisez le guidage GPS ±1 m ou importez votre livret parcellaire / CVI.'}
+            </p>
+          </div>
+          {untransportedCounts.length > 0 && !restrictedFieldMode ? (
             <button
               type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => setShowLivretImportModal(true)}
-              title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
-            >
-              <BookOpen size={14} />
-              <span>📖 Importer Livret / CVI</span>
-            </button>
-          )}
-
-          {onToggleRestrictedMode && (
-            <button
-              type="button"
-              className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
-              onClick={onToggleRestrictedMode}
-              title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour un ouvrier ou un transporteur"
-            >
-              <Navigation size={14} />
-              <span>
-                {restrictedFieldMode
-                  ? '🔒 Vue Restreinte Active (Quitter)'
-                  : '🚜 Vue Terrain 5h00 (Ouvrier / Transporteur)'}
-              </span>
-            </button>
-          )}
-
-          {/* Mode Soleil Terrain (Inspiré de Parcelles-vendanges) */}
-          <button
-            type="button"
-            className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
-            onClick={() => setFieldMode((v) => !v)}
-            title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
-          >
-            <Sun size={14} />
-            <span>{fieldMode ? 'Mode Soleil Actif' : 'Mode Soleil'}</span>
-          </button>
-
-          {/* 3 Vues Ciblées simples et lisibles */}
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={`segmented-btn ${subTab === 'atlas' ? 'active' : ''}`}
-              onClick={() => setSubTab('atlas')}
-            >
-              <MapPin size={14} />
-              <span>1. Carte GPS & Livret ({parcels.length})</span>
-            </button>
-            <button
-              type="button"
-              className={`segmented-btn ${subTab === 'harvest' ? 'active' : ''}`}
+              className="ds-cta"
               onClick={() => setSubTab('harvest')}
             >
-              <Calendar size={14} />
-              <span>2. Planning & Vendanges ({counts.length})</span>
+              <span>Envoyer la vendange au pressoir</span>
+              <ArrowRight size={16} />
             </button>
+          ) : (
+            <button
+              type="button"
+              className="ds-cta"
+              onClick={() => setSubTab('atlas')}
+            >
+              <span>Ouvrir la carte GPS des climats</span>
+              <ArrowRight size={16} />
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* 2. GESTES TERRAIN EN 1 CLIC (4 TUILES VERBES) */}
+      <section className="ds-rise ds-rise-1" aria-label="Actions rapides vignoble">
+        <div className="ds-section-head">
+          <h2 className="ds-section-title">Que voulez-vous faire sur le terrain ?</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {!restrictedFieldMode && (
               <button
                 type="button"
-                className={`segmented-btn ${subTab === 'reception' ? 'active' : ''}`}
-                onClick={() => setSubTab('reception')}
+                className="btn btn-sm btn-primary"
+                onClick={() => setShowLivretImportModal(true)}
+                title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
               >
-                <Scale size={14} />
-                <span>3. Quai & Pesées ({inTransitCount} en transit)</span>
+                <BookOpen size={14} />
+                <span>📖 Importer Livret / CVI</span>
               </button>
             )}
-            {!restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
+
+            {onToggleRestrictedMode && (
               <button
                 type="button"
-                className={`segmented-btn ${subTab === 'phyto_tesa' ? 'active' : ''}`}
-                onClick={() => setSubTab('phyto_tesa')}
+                className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
+                onClick={onToggleRestrictedMode}
+                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour un ouvrier ou un transporteur"
               >
-                <CheckCircle2 size={14} />
-                <span>4. Phyto Bio/HVE & TESA</span>
+                <Navigation size={14} />
+                <span>
+                  {restrictedFieldMode
+                    ? '🔒 Vue Restreinte Active (Quitter)'
+                    : '🚜 Vue Terrain 5h00 (Ouvrier / Transporteur)'}
+                </span>
               </button>
             )}
+
+            <button
+              type="button"
+              className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
+              onClick={() => setFieldMode((v) => !v)}
+              title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
+            >
+              <Sun size={14} />
+              <span>{fieldMode ? 'Mode Soleil Actif' : 'Mode Soleil'}</span>
+            </button>
           </div>
         </div>
-      </div>
+
+        <div className="ds-quick-grid-4">
+          <button
+            type="button"
+            className={`ds-tile ${subTab === 'atlas' ? 'is-recommended' : ''}`}
+            onClick={() => setSubTab('atlas')}
+          >
+            <span className="ds-tile-badge">Cadastre & GPS</span>
+            <div className="ds-icon-bubble ds-tone-forest">
+              <MapPin size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">1. Carte GPS & Livret ({parcels.length})</div>
+              <div className="ds-tile-sub">
+                Polygones cadastraux IGN, photos d’accès et navigation Waze/Maps
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className={`ds-tile ${subTab === 'harvest' ? 'is-recommended' : ''}`}
+            onClick={() => setSubTab('harvest')}
+          >
+            <span className="ds-tile-badge">Coupe & Bennes</span>
+            <div className="ds-icon-bubble ds-tone-gold">
+              <Calendar size={20} strokeWidth={1.9} />
+            </div>
+            <div>
+              <div className="ds-tile-label">2. Planning & Vendanges ({counts.length})</div>
+              <div className="ds-tile-sub">
+                Compter les caisses (+1/+5/+10), planifier Aujourd’hui / Demain
+              </div>
+            </div>
+          </button>
+
+          {!restrictedFieldMode ? (
+            <button
+              type="button"
+              className={`ds-tile ${subTab === 'reception' ? 'is-recommended' : ''}`}
+              onClick={() => setSubTab('reception')}
+            >
+              <span className="ds-tile-badge">Quai pressoir</span>
+              <div className="ds-icon-bubble ds-tone-grape">
+                <Scale size={20} strokeWidth={1.9} />
+              </div>
+              <div>
+                <div className="ds-tile-label">3. Quai & Pesées ({inTransitCount} en transit)</div>
+                <div className="ds-tile-sub">
+                  Peser Brut/Tare/Net et affecter les raisins à une cuve du chai
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ds-tile"
+              onClick={() => setFieldMode((v) => !v)}
+            >
+              <div className="ds-icon-bubble ds-tone-amber">
+                <Sun size={20} strokeWidth={1.9} />
+              </div>
+              <div>
+                <div className="ds-tile-label">Contraste Plein Soleil</div>
+                <div className="ds-tile-sub">
+                  {fieldMode ? 'Mode extérieur activé' : 'Renforcer la lisibilité au soleil'}
+                </div>
+              </div>
+            </button>
+          )}
+
+          {!restrictedFieldMode && isAddonEnabled('phyto_tesa') ? (
+            <button
+              type="button"
+              className={`ds-tile ${subTab === 'phyto_tesa' ? 'is-recommended' : ''}`}
+              onClick={() => setSubTab('phyto_tesa')}
+            >
+              <span className="ds-tile-badge">Bio / HVE & MSA</span>
+              <div className="ds-icon-bubble ds-tone-amber">
+                <CheckCircle2 size={20} strokeWidth={1.9} />
+              </div>
+              <div>
+                <div className="ds-tile-label">4. Phyto Bio/HVE & TESA</div>
+                <div className="ds-tile-sub">
+                  Délai avant récolte (DAR), plafond cuivre 4 kg/ha et contrats saisonniers
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ds-tile"
+              onClick={() => setShowLivretImportModal(true)}
+            >
+              <div className="ds-icon-bubble ds-tone-ink">
+                <BookOpen size={20} strokeWidth={1.9} />
+              </div>
+              <div>
+                <div className="ds-tile-label">Importer un Livret / CVI</div>
+                <div className="ds-tile-sub">
+                  Traduire automatiquement PDF, CSV Douanes ou GeoJSON en parcelles
+                </div>
+              </div>
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* 3. JAUGES VISUELLES DE RÉCOLTE */}
+      <section className="ds-stats ds-rise ds-rise-2" aria-label="Repères de vendange">
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-forest">
+              <CheckCircle2 size={16} />
+            </span>
+            <span>Climats vendangés</span>
+          </div>
+          <div className="ds-stat-value">
+            {globalHarvestStats.doneCount}
+            <span className="ds-stat-unit">/ {parcels.length}</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: `${donePct}%`, background: 'var(--color-forest)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            {globalHarvestStats.inProgressCount} en cours · {globalHarvestStats.todoCount} à venir
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-gold">
+              <Grape size={16} />
+            </span>
+            <span>Vendange coupée cumulée</span>
+          </div>
+          <div className="ds-stat-value">
+            {globalHarvestStats.kg.toLocaleString('fr-FR')}
+            <span className="ds-stat-unit">kg</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: '68%', background: 'var(--color-gold-dark)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            Soit {globalHarvestStats.caisses} cagettes (~{globalHarvestStats.hl} hL potentiels)
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-amber">
+              <Truck size={16} />
+            </span>
+            <span>Logistique vers le pressoir</span>
+          </div>
+          <div className="ds-stat-value">
+            {untransportedCounts.length}
+            <span className="ds-stat-unit">lot(s) au rang</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span
+              style={{
+                width: untransportedCounts.length > 0 ? '45%' : '100%',
+                background: untransportedCounts.length > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
+              }}
+            />
+          </div>
+          <div className="ds-stat-foot">
+            {inTransitCount} transport(s) actuellement en transit
+          </div>
+        </div>
+
+        <div className="ds-stat">
+          <div className="ds-stat-top">
+            <span className="ds-icon-bubble ds-tone-grape">
+              <Wine size={16} />
+            </span>
+            <span>Surface cadastrale suivie</span>
+          </div>
+          <div className="ds-stat-value">
+            {totalAreaHa.toFixed(2)}
+            <span className="ds-stat-unit">ha</span>
+          </div>
+          <div className="ds-bar" aria-hidden="true">
+            <span style={{ width: '100%', background: 'var(--color-grape)' }} />
+          </div>
+          <div className="ds-stat-foot">
+            Grand Cru, 1er Cru & Village · Puligny-Montrachet
+          </div>
+        </div>
+      </section>
 
       {/* BANDEAU 05h00 DU MATIN : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
       {importedBannerMsg && (

@@ -94,9 +94,35 @@ const AppInner: React.FC = () => {
 
   const recommendedTabs = ROLE_PRIMARY_TABS[role] ?? [];
 
+  // Compteurs vivants dans la barre latérale (pour guider l'œil sans jargon)
+  const untransportedCrates = Object.values(state.harvestCounts).filter((c) => c.transportId === null && c.quantity > 0).length;
+  const activeLotsCount = Object.values(state.lots).length;
+  const agingLotsCount = Object.values(state.lots).filter((l) => l.stage === 'aging' || l.stage === 'ready').length;
+  const batchesCount = Object.values(state.batches).length;
+  const lowDryGoodsCount = Object.values(state.dryGoods).filter((g) => g.onHand <= g.reorderPoint).length;
+  const pendingOrdersCount = Object.values(state.orders).filter((o) => o.status === 'confirmed' || o.status === 'quote' || o.status === 'partially_shipped').length;
+  const unInvoicedCount = Object.values(state.shipments).filter((s) => s.invoiceId === null).length;
+
+  const navCounts: Record<string, { label: string; alert?: boolean }> = {
+    vineyard: untransportedCrates > 0
+      ? { label: `${untransportedCrates} à enlever`, alert: true }
+      : { label: `${Object.keys(state.parcels).length}` },
+    cellar: { label: `${activeLotsCount} lots` },
+    aging: { label: `${agingLotsCount}` },
+    bottling: { label: `${batchesCount} mises` },
+    supplies: lowDryGoodsCount > 0
+      ? { label: `${lowDryGoodsCount} bas`, alert: true }
+      : { label: `${Object.keys(state.dryGoods).length}` },
+    sales: { label: `${pendingOrdersCount}` },
+    finance: unInvoicedCount > 0
+      ? { label: `${unInvoicedCount} BL`, alert: true }
+      : { label: `${Object.keys(state.invoices).length}` },
+    traceability: { label: `${Object.keys(state.cellarOps).length}` },
+  };
+
   const navGroups = [
     {
-      groupLabel: 'Cockpit',
+      groupLabel: 'Tableau de bord',
       items: [{ id: 'overview', label: 'Vue d’ensemble', icon: LayoutDashboard }],
     },
     {
@@ -110,7 +136,7 @@ const AppInner: React.FC = () => {
       ].filter((item) => isMainEnabled(item.id as MainModuleId)),
     },
     {
-      groupLabel: 'Allocations & Maison',
+      groupLabel: 'Clients, Cave & Maison',
       items: [
         { id: 'sales', label: 'Ventes & Commerce', icon: Award },
         { id: 'traceability', label: 'Traçabilité', icon: GitBranch },
@@ -167,9 +193,17 @@ const AppInner: React.FC = () => {
                                 : item.label
                             }
                           >
-                            <span className="nav-tab-left">
+                            <span className="nav-tab-left" style={{ width: '100%' }}>
                               <IconComp className="nav-icon" size={16} strokeWidth={1.85} />
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                              {navCounts[item.id] && (
+                                <span
+                                  aria-hidden="true"
+                                  className={`nav-count-pill ${navCounts[item.id]?.alert ? 'is-alert' : ''}`}
+                                >
+                                  {navCounts[item.id]?.label}
+                                </span>
+                              )}
                             </span>
                           </button>
                         );
