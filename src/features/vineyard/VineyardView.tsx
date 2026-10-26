@@ -1056,6 +1056,24 @@ export const VineyardView: React.FC<{
     return 'badge-green';
   };
 
+  const scrollToSection = (elementId: string) => {
+    setTimeout(() => {
+      try {
+        const el = document.getElementById(elementId);
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } catch {
+        // Ignore in test environment
+      }
+    }, 60);
+  };
+
+  const selectSubTabAndScroll = (nextTab: 'atlas' | 'harvest' | 'reception' | 'phyto_tesa') => {
+    setSubTab(nextTab);
+    scrollToSection('vineyard-workspace-anchor');
+  };
+
   const totalAreaHa = parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0) / 10000, 0);
   const donePct = parcels.length > 0 ? Math.round((globalHarvestStats.doneCount / parcels.length) * 100) : 0;
 
@@ -1097,7 +1115,7 @@ export const VineyardView: React.FC<{
             <button
               type="button"
               className="ds-cta"
-              onClick={() => setSubTab('harvest')}
+              onClick={() => selectSubTabAndScroll('harvest')}
             >
               <span>Envoyer la vendange au pressoir</span>
               <ArrowRight size={16} />
@@ -1106,7 +1124,7 @@ export const VineyardView: React.FC<{
             <button
               type="button"
               className="ds-cta"
-              onClick={() => setSubTab('atlas')}
+              onClick={() => selectSubTabAndScroll('atlas')}
             >
               <span>Ouvrir la carte GPS des climats</span>
               <ArrowRight size={16} />
@@ -1164,7 +1182,7 @@ export const VineyardView: React.FC<{
           <button
             type="button"
             className={`ds-tile ${subTab === 'atlas' ? 'is-recommended' : ''}`}
-            onClick={() => setSubTab('atlas')}
+            onClick={() => selectSubTabAndScroll('atlas')}
           >
             <span className="ds-tile-badge">Cadastre & GPS</span>
             <div className="ds-icon-bubble ds-tone-forest">
@@ -1181,7 +1199,7 @@ export const VineyardView: React.FC<{
           <button
             type="button"
             className={`ds-tile ${subTab === 'harvest' ? 'is-recommended' : ''}`}
-            onClick={() => setSubTab('harvest')}
+            onClick={() => selectSubTabAndScroll('harvest')}
           >
             <span className="ds-tile-badge">Coupe & Bennes</span>
             <div className="ds-icon-bubble ds-tone-gold">
@@ -1199,7 +1217,7 @@ export const VineyardView: React.FC<{
             <button
               type="button"
               className={`ds-tile ${subTab === 'reception' ? 'is-recommended' : ''}`}
-              onClick={() => setSubTab('reception')}
+              onClick={() => selectSubTabAndScroll('reception')}
             >
               <span className="ds-tile-badge">Quai pressoir</span>
               <div className="ds-icon-bubble ds-tone-grape">
@@ -1234,7 +1252,7 @@ export const VineyardView: React.FC<{
             <button
               type="button"
               className={`ds-tile ${subTab === 'phyto_tesa' ? 'is-recommended' : ''}`}
-              onClick={() => setSubTab('phyto_tesa')}
+              onClick={() => selectSubTabAndScroll('phyto_tesa')}
             >
               <span className="ds-tile-badge">Bio / HVE & MSA</span>
               <div className="ds-icon-bubble ds-tone-amber">
@@ -1431,6 +1449,7 @@ export const VineyardView: React.FC<{
                 onClick={() => {
                   setSelectedParcelId(item.parcel.id);
                   setSubTab('atlas');
+                  scrollToSection('climat-inspector-card');
                 }}
                 style={{
                   background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
@@ -1520,6 +1539,8 @@ export const VineyardView: React.FC<{
         </div>
       </div>
 
+      <div id="vineyard-workspace-anchor" />
+
       {/* =====================================================================
           SOUS-VUE 1 : VRAIE CARTE INTERACTIVE SATELLITE / CADASTRE IGN & LIVRET
          ===================================================================== */}
@@ -1527,6 +1548,7 @@ export const VineyardView: React.FC<{
         <div className="grid-2 animate-fade-in">
           {/* Colonne Gauche : Vraie Carte Interactive Navigable (Zoom / Pan / GPS Flottant / Plein Écran) */}
           <div
+            id="vineyard-map-card"
             className="card"
             style={{
               background: fieldMode ? '#141814' : 'var(--color-surface)',
@@ -1574,6 +1596,7 @@ export const VineyardView: React.FC<{
             {/* Fiche du Climat Sélectionné + Continuité Post-Vendange ("Ce qu'il se passe par la suite") */}
             {selectedParcel && selectedMetrics && (
               <div
+                id="climat-inspector-card"
                 style={{
                   marginTop: '14px',
                   padding: '16px',
@@ -1643,7 +1666,7 @@ export const VineyardView: React.FC<{
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
-                      onClick={() => setSubTab('harvest')}
+                      onClick={() => selectSubTabAndScroll('harvest')}
                     >
                       <Grape size={13} />
                       <span>Pilotage Vendange</span>
@@ -1870,7 +1893,10 @@ export const VineyardView: React.FC<{
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedParcelId(p.id)}
+                    onClick={() => {
+                      setSelectedParcelId(p.id);
+                      scrollToSection('climat-inspector-card');
+                    }}
                     style={{
                       padding: '12px 14px',
                       borderRadius: 'var(--radius-sm)',

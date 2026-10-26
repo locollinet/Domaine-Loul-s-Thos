@@ -522,7 +522,17 @@ export const CellarView: React.FC = () => {
               return (
                 <div
                   key={c.id}
-                  onClick={() => lot && setSelectedLotId(lot.id)}
+                  onClick={() => {
+                    if (lot) {
+                      setSelectedLotId(lot.id);
+                      setTimeout(() => {
+                        const el = document.getElementById('cellar-lot-inspector');
+                        if (el && typeof el.scrollIntoView === 'function') {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                      }, 40);
+                    }
+                  }}
                   className="vessel-visual-card"
                   style={{
                     border: isSelected ? '2px solid var(--color-forest)' : '1px solid var(--color-border)',
@@ -703,7 +713,7 @@ export const CellarView: React.FC = () => {
 
         {/* Right: Selected lot details with 3 clean sub-tabs */}
         {selectedLot && (
-          <div className="card">
+          <div id="cellar-lot-inspector" className="card">
             <div className="card-header" style={{ marginBottom: '12px' }}>
               <div>
                 <h2 className="serif-display" style={{ fontSize: '21px', fontWeight: 700 }}>

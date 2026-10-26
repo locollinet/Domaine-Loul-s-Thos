@@ -554,7 +554,15 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                       <button
                         key={slot.id}
                         type="button"
-                        onClick={() => setSelectedSlotId(slot.id)}
+                        onClick={() => {
+                          setSelectedSlotId(slot.id);
+                          setTimeout(() => {
+                            const el = document.getElementById('bottle-slot-inspector');
+                            if (el && typeof el.scrollIntoView === 'function') {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
+                          }, 40);
+                        }}
                         style={{
                           textAlign: 'left',
                           padding: '10px',
@@ -616,7 +624,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
 
         {/* Fiche d'Inspection Sommelier & Gestion de l'Emplacement Sélectionné */}
         {activeSlot && (
-          <div className="card">
+          <div id="bottle-slot-inspector" className="card">
             <div
               style={{
                 display: 'flex',

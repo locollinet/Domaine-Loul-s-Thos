@@ -60,7 +60,14 @@ const AppInner: React.FC = () => {
   const [showModuleConfigurator, setShowModuleConfigurator] = useState<boolean>(false);
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
-  // Raccourci clavier Cmd+K / Ctrl+K
+  // Remonter automatiquement en haut de l'écran lors d'un changement d'onglet principal
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      // Ignore in test environment
+    }
+  }, [activeTab]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -105,17 +112,17 @@ const AppInner: React.FC = () => {
 
   const navCounts: Record<string, { label: string; alert?: boolean }> = {
     vineyard: untransportedCrates > 0
-      ? { label: `${untransportedCrates} à enlever`, alert: true }
+      ? { label: `${untransportedCrates} !`, alert: true }
       : { label: `${Object.keys(state.parcels).length}` },
-    cellar: { label: `${activeLotsCount} lots` },
+    cellar: { label: `${activeLotsCount}` },
     aging: { label: `${agingLotsCount}` },
-    bottling: { label: `${batchesCount} mises` },
+    bottling: { label: `${batchesCount}` },
     supplies: lowDryGoodsCount > 0
-      ? { label: `${lowDryGoodsCount} bas`, alert: true }
+      ? { label: `${lowDryGoodsCount} !`, alert: true }
       : { label: `${Object.keys(state.dryGoods).length}` },
     sales: { label: `${pendingOrdersCount}` },
     finance: unInvoicedCount > 0
-      ? { label: `${unInvoicedCount} BL`, alert: true }
+      ? { label: `${unInvoicedCount} !`, alert: true }
       : { label: `${Object.keys(state.invoices).length}` },
     traceability: { label: `${Object.keys(state.cellarOps).length}` },
   };

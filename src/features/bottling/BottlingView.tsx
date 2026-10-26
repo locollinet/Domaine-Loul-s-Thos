@@ -82,6 +82,16 @@ export const BottlingView: React.FC = () => {
   const showElabelAddon = isAddonEnabled('elabel_qr');
   const effectiveSubTab = !showElabelAddon && subTab === 'elabel' ? 'stocks' : subTab;
 
+  const selectSubTabAndScroll = (next: 'stocks' | 'cellar_map' | 'elabel') => {
+    setSubTab(next);
+    setTimeout(() => {
+      const el = document.getElementById('bottling-workspace-anchor');
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 40);
+  };
+
   // Synthèse globale des bouteilles
   const totals = batches.reduce(
     (acc, b) => {
@@ -181,7 +191,7 @@ export const BottlingView: React.FC = () => {
           <button
             type="button"
             className={`ds-tile ${effectiveSubTab === 'stocks' ? 'is-recommended' : ''}`}
-            onClick={() => setSubTab('stocks')}
+            onClick={() => selectSubTabAndScroll('stocks')}
           >
             <span className="ds-tile-badge">Stock commercial</span>
             <div className="ds-icon-bubble ds-tone-forest">
@@ -198,7 +208,7 @@ export const BottlingView: React.FC = () => {
           <button
             type="button"
             className={`ds-tile ${effectiveSubTab === 'cellar_map' ? 'is-recommended' : ''}`}
-            onClick={() => setSubTab('cellar_map')}
+            onClick={() => selectSubTabAndScroll('cellar_map')}
           >
             <span className="ds-tile-badge">Plan & Urgences</span>
             <div className="ds-icon-bubble ds-tone-amber">
@@ -216,7 +226,7 @@ export const BottlingView: React.FC = () => {
             <button
               type="button"
               className={`ds-tile ${effectiveSubTab === 'elabel' ? 'is-recommended' : ''}`}
-              onClick={() => setSubTab('elabel')}
+              onClick={() => selectSubTabAndScroll('elabel')}
             >
               <span className="ds-tile-badge">Conformité UE</span>
               <div className="ds-icon-bubble ds-tone-gold">
@@ -248,6 +258,8 @@ export const BottlingView: React.FC = () => {
           )}
         </div>
       </section>
+
+      <div id="bottling-workspace-anchor" style={{ scrollMarginTop: '76px' }} />
 
       {effectiveSubTab === 'cellar_map' ? (
         <CellarBottleMapPanel state={state} batches={batches} skus={state.skus} />

@@ -121,11 +121,9 @@ button {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -145,7 +143,7 @@ button {
 }
 
 .animate-fade-in {
-  animation: fadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 180ms ease-out;
 }
 
 .pin-orange-ring {
@@ -171,7 +169,7 @@ button {
 
 /* Dark Prestige Sidebar (Inspirée de Premnord #1E221E & Or #C4A47A) */
 .app-sidebar {
-  width: 256px;
+  width: 266px;
   flex-shrink: 0;
   background: #1E221E;
   color: #FAF8F5;
@@ -251,12 +249,13 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   width: 100%;
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
-  color: rgba(250, 248, 245, 0.68);
+  color: rgba(250, 248, 245, 0.72);
   text-align: left;
   transition: all var(--transition-fast);
   position: relative;
@@ -265,8 +264,9 @@ button {
 .nav-tab-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
+  flex: 1;
 }
 
 .nav-tab:hover {
@@ -285,14 +285,8 @@ button {
   color: #C4A47A;
 }
 
-.nav-tab.role-recommended::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #C4A47A;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px rgba(196, 164, 122, 0.6);
+.nav-tab.role-recommended .nav-count-pill {
+  border: 1px solid rgba(196, 164, 122, 0.45);
 }
 
 /* Workspace Right Area */
@@ -731,17 +725,23 @@ tr:hover td {
   background: linear-gradient(180deg, #E8CA78 0%, #C9A449 100%);
 }
 
-/* Modals */
+/* Modals — toujours centrées dans le viewport visible (z-index > Leaflet 1000) */
 .modal-backdrop {
   position: fixed;
-  inset: 0;
-  background: rgba(20, 24, 20, 0.55);
-  backdrop-filter: blur(4px);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(20, 24, 20, 0.62);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
-  padding: 16px;
+  z-index: 9999;
+  padding: 20px;
+  overflow-y: auto;
 }
 
 .modal-content {
@@ -750,11 +750,12 @@ tr:hover td {
   border-radius: var(--radius-lg);
   max-width: 640px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 88vh;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   padding: 24px;
   position: relative;
+  margin: auto;
 }
 
 /* Alerts */
@@ -924,19 +925,21 @@ tr:hover td {
   --ds-ring: 0 0 0 3px rgba(196, 164, 122, 0.45);
 }
 
+.ds-overview,
 .ds-page {
   display: flex;
   flex-direction: column;
-  gap: 26px;
-  max-width: 1280px;
+  gap: 24px;
+  width: 100%;
 }
 
 .ds-section-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .ds-section-title {
@@ -947,9 +950,28 @@ tr:hover td {
   letter-spacing: -0.01em;
 }
 
+.ds-section-meta,
 .ds-section-hint {
+  display: block;
   font-size: 12.5px;
-  color: var(--color-ink-light);
+  color: var(--color-ink-muted);
+}
+
+.ds-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-gold-dark);
+  box-shadow: 0 0 0 3px rgba(196, 164, 122, 0.25);
+  flex-shrink: 0;
+}
+
+.ds-next-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #C4A47A;
 }
 
 /* ---------- Hero d'accueil ---------- */
@@ -1129,14 +1151,17 @@ tr:hover td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 19px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(250, 248, 245, 0.78);
+  color: rgba(250, 248, 245, 0.82);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1148,6 +1173,7 @@ tr:hover td {
 .nav-count-pill.is-alert {
   background: rgba(245, 158, 11, 0.22);
   color: #FCD34D;
+  border: 1px solid rgba(245, 158, 11, 0.45);
 }
 
 .ds-tile {
@@ -1552,14 +1578,14 @@ tr:hover td {
   font-size: 13px;
 }
 
-/* Apparition douce en cascade */
+/* Apparition douce en cascade (sans transform persistant pour ne jamais casser position: fixed) */
 @keyframes dsRise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .ds-rise {
-  animation: dsRise 420ms var(--ds-ease) both;
+  animation: dsRise 280ms ease-out;
 }
 
 .ds-rise-1 { animation-delay: 40ms; }
