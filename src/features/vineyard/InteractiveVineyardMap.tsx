@@ -9,6 +9,7 @@ import {
   Compass,
   Layers,
   MapPin,
+  BookOpen,
 } from 'lucide-react';
 import type { Parcel } from '../../domain/types';
 
@@ -37,6 +38,7 @@ interface InteractiveVineyardMapProps {
   isEditingGpsPin: boolean;
   onToggleEditGpsPin: () => void;
   onSetCustomGps: (parcelId: string, lat: number, lng: number) => void;
+  onOpenLivret?: () => void;
   fieldMode?: boolean;
 }
 
@@ -47,6 +49,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   isEditingGpsPin,
   onToggleEditGpsPin,
   onSetCustomGps,
+  onOpenLivret,
   fieldMode = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -56,7 +59,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   const cadastreLayerRef = useRef<L.TileLayer | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
-  const [mapStyle, setMapStyle] = useState<'satellite' | 'cadastre' | 'livret'>('satellite');
+  const [mapStyle, setMapStyle] = useState<'satellite' | 'cadastre'>('satellite');
   const [showCadastreOverlay, setShowCadastreOverlay] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [gpsState, setGpsState] = useState<{
@@ -118,7 +121,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   // Handle map style & cadastre overlay changes
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || mapStyle === 'livret') return;
+    if (!map) return;
 
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current);
@@ -256,11 +259,11 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   // Smoothly fly to selected parcel when selection changes
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !selectedItem || mapStyle === 'livret') return;
+    if (!map || !selectedItem) return;
     map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 17), {
       animate: true,
     });
-  }, [selectedParcelId, selectedItem, mapStyle]);
+  }, [selectedParcelId, selectedItem]);
 
   // Invalidate map size when toggling fullscreen
   useEffect(() => {
@@ -270,7 +273,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
       map.invalidateSize();
     }, 150);
     return () => clearTimeout(timer);
-  }, [isFullscreen, mapStyle]);
+  }, [isFullscreen]);
 
   // Handle Floating GPS Button ("Me localiser sur le terrain")
   const handleLocateMe = () => {
@@ -392,27 +395,30 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
               onClick={() => setMapStyle('cadastre')}
               style={{ fontSize: '12px', padding: '5px 10px' }}
             >
-              📐 Plan & Cadastre IGN
-            </button>
-            <button
-              type="button"
-              className={`segmented-btn ${mapStyle === 'livret' ? 'active' : ''}`}
-              onClick={() => setMapStyle('livret')}
-              style={{ fontSize: '12px', padding: '5px 10px' }}
-            >
-              📖 Schéma Livret Papier
+              📐 Plan Cadastral IGN
             </button>
           </div>
 
-          {mapStyle !== 'livret' && (
+          <button
+            type="button"
+            className={`btn btn-sm ${showCadastreOverlay ? 'btn-gold' : 'btn-secondary'}`}
+            onClick={() => setShowCadastreOverlay((v) => !v)}
+            title="Activer/désactiver les limites cadastrales officielles IGN en surimpression"
+          >
+            <Layers size={13} />
+            <span>Limites Cadastre IGN {showCadastreOverlay ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {onOpenLivret && (
             <button
               type="button"
-              className={`btn btn-sm ${showCadastreOverlay ? 'btn-gold' : 'btn-secondary'}`}
-              onClick={() => setShowCadastreOverlay((v) => !v)}
-              title="Activer/désactiver les limites cadastrales officielles IGN en surimpression"
+              className="btn btn-sm btn-secondary"
+              onClick={onOpenLivret}
+              title="Consulter le Livret Parcellaire complet avec caractéristiques et vendanges"
+              style={{ fontWeight: 600 }}
             >
-              <Layers size={13} />
-              <span>Limites Cadastre IGN {showCadastreOverlay ? 'ON' : 'OFF'}</span>
+              <BookOpen size={13} />
+              <span>📖 Ouvrir le Livret Parcellaire</span>
             </button>
           )}
         </div>
@@ -468,60 +474,10 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            display: mapStyle === 'livret' ? 'none' : 'block',
+            display: 'block',
             cursor: isEditingGpsPin ? 'crosshair' : 'grab',
           }}
         />
-
-        {/* VUE ALTERNATIVE : SCHÉMA DU LIVRET PAPIER HISTORIQUE */}
-        {mapStyle === 'livret' && (
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-              background: 'radial-gradient(circle at 35% 40%, #2C3B2B 0%, #1E291D 55%, #161F15 100%)',
-            }}
-          >
-            {items.map((item) => {
-              const p = item.parcel;
-              const isSelected = p.id === selectedParcelId;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onSelectParcel(p.id)}
-                  style={{
-                    position: 'absolute',
-                    left: `${p.schematic.x}%`,
-                    top: `${p.schematic.y}%`,
-                    width: `${p.schematic.w}%`,
-                    height: `${p.schematic.h}%`,
-                    background:
-                      item.daySlot === 'today'
-                        ? 'rgba(249, 115, 22, 0.85)'
-                        : item.status === 'vendange'
-                        ? 'rgba(16, 185, 129, 0.8)'
-                        : 'rgba(196, 164, 122, 0.82)',
-                    color: '#FFFFFF',
-                    border: isSelected ? '3px solid #FFFFFF' : '1px solid rgba(255,255,255,0.5)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <span style={{ fontWeight: 800, fontSize: '12px' }}>
-                    Pastille n°{item.pastilleNum} · {p.code}
-                  </span>
-                  <span style={{ fontSize: '10px' }}>{p.name.replace(' — fictif', '')}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* Légende Flottante Haut-Droite (Codes Couleurs Vendanges) */}
         <div

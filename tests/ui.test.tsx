@@ -29,6 +29,22 @@ describe('App & UI Navigation (L0 - L7)', () => {
     expect(screen.getByText(/Millésime 2026/i)).toBeInTheDocument();
     expect(screen.getByText(/Horizon 2027/i)).toBeInTheDocument();
 
+    // Navigate to Vignoble & Récolte
+    fireEvent.click(screen.getByRole('button', { name: /Vignoble & Récolte/i }));
+    expect(screen.getByText(/Carte Satellite Interactive, Cadastre IGN & GPS Terrain/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /🗺️ Vue Carte & GPS/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /📖 Vue Livret & Vendanges/i })).toBeInTheDocument();
+
+    // Switch to Livret Parcellaire Numérique
+    fireEvent.click(screen.getByRole('button', { name: /📖 Vue Livret & Vendanges/i }));
+    expect(screen.getByText(/Livret Parcellaire Numérique du Domaine/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Données Dynamiques Vendanges/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Localiser sur Cadastre & GPS/i })[0]).toBeInTheDocument();
+
+    // Cross-navigate back to Cadastre & GPS
+    fireEvent.click(screen.getAllByRole('button', { name: /Localiser sur Cadastre & GPS/i })[0]!);
+    expect(screen.getByText(/Carte Satellite Interactive, Cadastre IGN & GPS Terrain/i)).toBeInTheDocument();
+
     // Navigate to Chai & Vinification
     fireEvent.click(screen.getByRole('button', { name: /Chai & Vinification/i }));
     expect(screen.getByText(/Occupation des contenants/i)).toBeInTheDocument();

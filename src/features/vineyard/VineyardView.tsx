@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Trash2,
   ArrowRight,
+  Upload,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { canRun } from '../../domain/commands';
@@ -420,6 +421,8 @@ export const VineyardView: React.FC<{
   const { isAddonEnabled } = useModuleConfig();
   // Navigation simple par onglets clairs (Zéro surcharge à l'écran)
   const [subTab, setSubTab] = useState<'atlas' | 'harvest' | 'reception' | 'phyto_tesa'>('atlas');
+  const [atlasViewMode, setAtlasViewMode] = useState<'map' | 'livret'>('map');
+  const [livretStatusFilter, setLivretStatusFilter] = useState<'all' | 'vendange' | 'en_cours' | 'a_faire'>('all');
   const [fieldMode, setFieldMode] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>('parcel-c');
   const [parcelSearch, setParcelSearch] = useState('');
@@ -1545,7 +1548,71 @@ export const VineyardView: React.FC<{
           SOUS-VUE 1 : VRAIE CARTE INTERACTIVE SATELLITE / CADASTRE IGN & LIVRET
          ===================================================================== */}
       {subTab === 'atlas' && (
-        <div className="grid-2 animate-fade-in">
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Sélecteur de Niveau : Carte Satellite & Cadastre IGN (GPS) vs Livret Parcellaire & Vendanges */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 16px',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span className="serif-display" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-ink)' }}>
+                  {atlasViewMode === 'map' ? '🗺️ Carte Satellite, Cadastre IGN & Pointage GPS' : '📖 Livret Parcellaire Numérique & Suivi Vendanges'}
+                </span>
+                <span className="badge badge-gold">
+                  {parcels.length} Climats répertoriés
+                </span>
+              </div>
+              <div style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                {atlasViewMode === 'map'
+                  ? 'Visualisation spatiale sur terrain : limites parcellaires IGN officielles, calage satellite et repères GPS.'
+                  : 'Répertoire agronomique officiel : fiches climat, sections cadastrales, caractéristiques dynamiques de vendange et filiation chai.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segmented-btn ${atlasViewMode === 'map' ? 'active' : ''}`}
+                  onClick={() => setAtlasViewMode('map')}
+                  style={{ fontSize: '13px', padding: '6px 14px', fontWeight: 600 }}
+                >
+                  🗺️ Vue Carte & GPS
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-btn ${atlasViewMode === 'livret' ? 'active' : ''}`}
+                  onClick={() => setAtlasViewMode('livret')}
+                  style={{ fontSize: '13px', padding: '6px 14px', fontWeight: 600 }}
+                >
+                  📖 Vue Livret & Vendanges
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowLivretImportModal(true)}
+                title="Importer un fichier Excel/CSV ou recalculer les parcelles depuis l'API Cadastre IGN"
+              >
+                <Upload size={13} />
+                <span>Importer Livret (Excel/IGN)</span>
+              </button>
+            </div>
+          </div>
+
+          {atlasViewMode === 'map' ? (
+            <div className="grid-2">
           {/* Colonne Gauche : Vraie Carte Interactive Navigable (Zoom / Pan / GPS Flottant / Plein Écran) */}
           <div
             id="vineyard-map-card"
@@ -1590,6 +1657,7 @@ export const VineyardView: React.FC<{
               isEditingGpsPin={isEditingGpsPin}
               onToggleEditGpsPin={() => setIsEditingGpsPin((v) => !v)}
               onSetCustomGps={handleSetCustomGpsFromMap}
+              onOpenLivret={() => setAtlasViewMode('livret')}
               fieldMode={fieldMode || restrictedFieldMode}
             />
 
@@ -1654,6 +1722,15 @@ export const VineyardView: React.FC<{
                     >
                       <Settings size={13} />
                       <span>Paramétrer & Photos</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => setAtlasViewMode('livret')}
+                      title="Consulter la fiche complète de ce Climat dans le Livret Parcellaire"
+                    >
+                      <BookOpen size={13} />
+                      <span>Fiche Livret</span>
                     </button>
                     <button
                       type="button"
@@ -1979,7 +2056,392 @@ export const VineyardView: React.FC<{
             </div>
           </div>
         </div>
+      ) : (
+        /* =====================================================================
+           NIVEAU 2 : LIVRET PARCELLAIRE NUMÉRIQUE & SUIVI DYNAMIQUE DES VENDANGES
+           ===================================================================== */
+        <div className="card animate-fade-in" style={{ padding: '20px' }}>
+          {/* Header Livret */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'var(--color-gold)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BookOpen size={18} />
+                </div>
+                <div>
+                  <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>
+                    Livret Parcellaire Numérique du Domaine
+                  </h2>
+                  <div style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                    Répertoire agronomique officiel, identification cadastrale IGN et caractéristiques dynamiques de vendange
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowLivretImportModal(true)}
+                title="Importer un fichier Excel, CSV ou recalculer depuis l'API Cadastre IGN"
+              >
+                <Upload size={13} />
+                <span>Importer Livret (Excel/IGN)</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => setAtlasViewMode('map')}
+              >
+                <MapPin size={13} />
+                <span>Voir la Carte GPS & Cadastre</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bandeau KPI Livret */}
+          <div className="ds-overview" style={{ marginBottom: '16px' }}>
+            <div className="ds-tile">
+              <div className="ds-label">Climats répertoriés</div>
+              <div className="ds-val serif-display">{parcels.length}</div>
+              <div className="ds-sub">
+                {(parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0), 0) / 10000).toFixed(2)} ha au total
+              </div>
+            </div>
+            <div className="ds-tile">
+              <div className="ds-label">Caisses récoltées</div>
+              <div className="ds-val serif-display" style={{ color: 'var(--color-forest)' }}>
+                {globalHarvestStats.caisses}
+              </div>
+              <div className="ds-sub">Cumul terrain parcelles</div>
+            </div>
+            <div className="ds-tile">
+              <div className="ds-label">Vendange pesée</div>
+              <div className="ds-val serif-display">
+                {globalHarvestStats.kg.toLocaleString('fr-FR')} kg
+              </div>
+              <div className="ds-sub">Réception quai démo</div>
+            </div>
+            <div className="ds-tile">
+              <div className="ds-label">Volume en cuverie</div>
+              <div className="ds-val serif-display" style={{ color: 'var(--color-grape)' }}>
+                {globalHarvestStats.hl} hL
+              </div>
+              <div className="ds-sub">Moût & vin entonné</div>
+            </div>
+          </div>
+
+          {/* Barre de Recherche et Filtres */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <input
+              type="search"
+              className="form-input"
+              placeholder="Rechercher par nom de climat, référence cadastrale, cépage, commune..."
+              value={parcelSearch}
+              onChange={(e) => setParcelSearch(e.target.value)}
+              style={{ flex: 1, minWidth: '240px' }}
+            />
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div className="segmented-control">
+                {(['all', 'Grand Cru', '1er Cru', 'Village'] as const).map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    className={`segmented-btn ${levelFilter === lvl ? 'active' : ''}`}
+                    onClick={() => setLevelFilter(lvl)}
+                    style={{ fontSize: '11.5px', padding: '5px 10px' }}
+                  >
+                    {lvl === 'all' ? 'Tous niveaux' : lvl}
+                  </button>
+                ))}
+              </div>
+
+              <div className="segmented-control">
+                {(
+                  [
+                    { id: 'all', label: 'Tous statuts' },
+                    { id: 'vendange', label: '✓ Vendangés' },
+                    { id: 'en_cours', label: '● En cours' },
+                    { id: 'a_faire', label: 'À venir' },
+                  ] as const
+                ).map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    className={`segmented-btn ${livretStatusFilter === st.id ? 'active' : ''}`}
+                    onClick={() => setLivretStatusFilter(st.id)}
+                    style={{ fontSize: '11.5px', padding: '5px 10px' }}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Grille des Fiches du Livret */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+            {filteredParcels
+              .filter((p) => {
+                if (livretStatusFilter === 'all') return true;
+                const tr = getParcelTrack(p);
+                return tr.status === livretStatusFilter;
+              })
+              .map((p) => {
+                const meta = CLIMAT_METADATA[p.id] ?? DEFAULT_CLIMAT_META;
+                const track = getParcelTrack(p);
+                const metrics = getParcelHarvestMetrics(p);
+                const pin = track.customPin ?? { lat: meta.lat, lng: meta.lng };
+                const statusBadge =
+                  track.status === 'vendange'
+                    ? { label: '✓ Vendangé', cls: 'badge-green', bg: '#10B981' }
+                    : track.status === 'en_cours'
+                    ? { label: '● En cours (Aujourd’hui)', cls: 'badge-amber', bg: '#F97316' }
+                    : { label: 'Demain / À planifier', cls: 'badge-muted', bg: '#C4A47A' };
+
+                const photos = track.photos ?? [];
+
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--color-surface)',
+                      boxShadow: 'var(--shadow-sm)',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '14px',
+                      transition: 'transform 120ms ease, box-shadow 120ms ease',
+                    }}
+                  >
+                    <div>
+                      {/* En-tête Fiche Parcelle : Pastille Livret + Nom + Classification */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: statusBadge.bg,
+                              color: '#FFFFFF',
+                              fontWeight: 800,
+                              fontSize: '14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                            }}
+                            title={`Pastille n°${track.customPastilleNum ?? meta.pastilleNum} du Livret`}
+                          >
+                            {track.customPastilleNum ?? meta.pastilleNum}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <h3 className="serif-display" style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
+                                {p.name}
+                              </h3>
+                              <span className={`badge ${getLevelBadgeClass(track.customClassification ?? meta.classification)}`}>
+                                {track.customClassification ?? meta.classification}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                              {track.customAppellation ?? meta.appellation} · {track.customCommune ?? meta.commune}
+                              {(track.customPageLivret ?? meta.pageLivret) ? ` · Page ${track.customPageLivret ?? meta.pageLivret}` : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`badge ${statusBadge.cls}`} style={{ flexShrink: 0 }}>
+                          {statusBadge.label}
+                        </span>
+                      </div>
+
+                      {/* Bloc Référence Cadastrale IGN & GPS */}
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          padding: '8px 10px',
+                          background: 'var(--color-surface-soft)',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border-subtle)',
+                          fontSize: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: 600 }}>Cadastre IGN :</span>{' '}
+                          <span className="badge badge-muted" style={{ fontWeight: 700 }}>
+                            {track.customSectionCadastrale ?? meta.sectionCadastrale}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--color-ink-light)', fontSize: '11px' }} className="tabular">
+                          GPS : {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+                        </div>
+                      </div>
+
+                      {/* Grille Caractéristiques Agronomiques & Terroir */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
+                        <div style={{ fontSize: '12px', padding: '6px 8px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                          <div style={{ color: 'var(--color-ink-light)', fontSize: '10.5px', textTransform: 'uppercase' }}>Cépage & Surface</div>
+                          <div style={{ fontWeight: 600, color: 'var(--color-ink)', marginTop: '2px' }}>
+                            {p.grape} · {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : '—'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '12px', padding: '6px 8px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                          <div style={{ color: 'var(--color-ink-light)', fontSize: '10.5px', textTransform: 'uppercase' }}>Rangs & Exposition</div>
+                          <div style={{ fontWeight: 600, color: 'var(--color-ink)', marginTop: '2px' }}>
+                            {track.customNbRangs ?? meta.nbRangs}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '12px', padding: '6px 8px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', gridColumn: 'span 2' }}>
+                          <div style={{ color: 'var(--color-ink-light)', fontSize: '10.5px', textTransform: 'uppercase' }}>Terroir & Accès</div>
+                          <div style={{ fontWeight: 600, color: 'var(--color-forest)', marginTop: '2px' }}>
+                            {track.customAccessNotes ?? p.access ?? 'Accès véhicule par chemin communal haut'}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '1px' }}>
+                            {track.customContextNotes ?? `${meta.terroir} · ${meta.altitude}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bloc Dynamique Vendanges (Caisses / kg / hL / Filiation chai) */}
+                      <div
+                        style={{
+                          marginTop: '10px',
+                          padding: '10px 12px',
+                          background: 'var(--color-forest-soft)',
+                          border: '1px solid var(--color-forest-border)',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-forest)', textTransform: 'uppercase' }}>
+                            Données Dynamiques Vendanges
+                          </span>
+                          <span className="tabular" style={{ fontWeight: 700, fontSize: '12.5px', color: 'var(--color-forest)' }}>
+                            {metrics.totalCaisses} caisses · {metrics.totalKg.toLocaleString('fr-FR')} kg
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginTop: '4px' }}>
+                          <span>Volume vinifié : <strong>{metrics.totalHl} hL</strong></span>
+                          <span style={{ color: 'var(--color-ink-muted)' }}>
+                            Rendement : {(metrics.totalHl / Math.max(0.01, (p.areaM2?.value ?? 5000) / 10000)).toFixed(1)} hL/ha
+                          </span>
+                        </div>
+
+                        {metrics.linkedLots.length > 0 && (
+                          <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed var(--color-forest-border)', fontSize: '11.5px', color: 'var(--color-forest)' }}>
+                            <span>Filiation chai : </span>
+                            {metrics.linkedLots.map((lot) => {
+                              if (!lot) return null;
+                              const occs = lotOccupancies(state, lot.id)
+                                .map((o) => state.containers[o.containerId]?.code ?? o.containerId)
+                                .join(', ');
+                              return (
+                                <strong key={lot.id} style={{ marginRight: '6px' }}>
+                                  {lot.code} ({occs ? `Cuve ${occs}` : 'En cave'})
+                                </strong>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Photos Terrain si existantes */}
+                      {photos.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+                          {photos.slice(0, 3).map((ph) => (
+                            <img
+                              key={ph.id}
+                              src={ph.dataUrl}
+                              alt={ph.caption}
+                              onClick={() => setPreviewPhoto(ph)}
+                              style={{ width: '48px', height: '34px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer', border: '1px solid var(--color-border)' }}
+                              title={ph.caption}
+                            />
+                          ))}
+                          <span style={{ fontSize: '11px', color: 'var(--color-ink-light)' }}>
+                            {photos.length} photo(s) terrain
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Boutons d'Action de la Fiche Livret */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '12px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        style={{ flex: 1, minWidth: '160px' }}
+                        onClick={() => {
+                          setSelectedParcelId(p.id);
+                          setAtlasViewMode('map');
+                          setTimeout(() => {
+                            const el = document.getElementById('vineyard-map-card');
+                            if (el && typeof el.scrollIntoView === 'function') {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
+                          }, 50);
+                        }}
+                      >
+                        <MapPin size={13} />
+                        <span>Localiser sur Cadastre & GPS</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => openParcelConfigModal(p)}
+                        title="Paramétrer les repères, le cadastre, les coordonnées GPS et les photos"
+                      >
+                        <Settings size={13} />
+                        <span>Paramétrer</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => {
+                          setSelectedParcelId(p.id);
+                          selectSubTabAndScroll('harvest');
+                        }}
+                        title="Accéder au pilotage vendange de cette parcelle"
+                      >
+                        <Grape size={13} />
+                        <span>Vendange</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
       )}
+    </div>
+  )}
 
       {/* =====================================================================
           SOUS-VUE 2 : PLANNING VENDANGES (AUJOURD'HUI / DEMAIN / À VENIR) & TRI-UNITÉS (CAISSES / KG / HL)
