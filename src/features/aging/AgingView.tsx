@@ -533,17 +533,35 @@ export const AgingView: React.FC = () => {
 
             <div className="form-group">
               <label className="form-label">Contenant de destination (cuve vide disponible)</label>
-              <select
-                className="form-select"
-                value={destContainerId}
-                onChange={(e) => setDestContainerId(e.target.value)}
-              >
-                {availableContainers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} · {c.location} (Capacité {c.capacityMl / 1000} L)
-                  </option>
-                ))}
-              </select>
+              {availableContainers.length <= 1 ? (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: 'var(--color-surface-soft)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    color: 'var(--color-ink)',
+                  }}
+                >
+                  {availableContainers[0]
+                    ? `${availableContainers[0].code} · ${availableContainers[0].location} (Capacité ${availableContainers[0].capacityMl / 1000} L)`
+                    : 'Aucune cuve disponible'}
+                </div>
+              ) : (
+                <select
+                  className="form-select"
+                  value={destContainerId}
+                  onChange={(e) => setDestContainerId(e.target.value)}
+                >
+                  {availableContainers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} · {c.location} (Capacité {c.capacityMl / 1000} L)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '14px', marginBottom: '16px', background: 'var(--color-surface-soft)' }}>
@@ -662,34 +680,80 @@ export const AgingView: React.FC = () => {
               <div className="grid-2">
                 <div className="form-group">
                   <label className="form-label">Contenant source</label>
-                  <select
-                    className="form-select"
-                    value={transferFromCont}
-                    onChange={(e) => setTransferFromCont(e.target.value)}
-                  >
-                    {lotOccupancies(state, transferLotId).map((o) => (
-                      <option key={o.containerId} value={o.containerId}>
-                        {state.containers[o.containerId]?.code} ({o.volumeMl / 1000} L dispo)
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const occs = lotOccupancies(state, transferLotId);
+                    if (occs.length <= 1) {
+                      const o = occs[0];
+                      const cont = o ? state.containers[o.containerId] : null;
+                      return (
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            background: 'var(--color-surface-soft)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            color: 'var(--color-ink)',
+                          }}
+                        >
+                          {cont && o ? `${cont.code} (${o.volumeMl / 1000} L disponibles)` : 'Aucun contenant source'}
+                        </div>
+                      );
+                    }
+                    return (
+                      <select
+                        className="form-select"
+                        value={transferFromCont}
+                        onChange={(e) => setTransferFromCont(e.target.value)}
+                      >
+                        {occs.map((o) => (
+                          <option key={o.containerId} value={o.containerId}>
+                            {state.containers[o.containerId]?.code} ({o.volumeMl / 1000} L dispo)
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Contenant destination</label>
-                  <select
-                    className="form-select"
-                    value={transferToCont}
-                    onChange={(e) => setTransferToCont(e.target.value)}
-                  >
-                    {Object.values(state.containers)
-                      .filter((c) => c.id !== transferFromCont && c.state === 'available')
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} ({c.capacityMl / 1000} L cap.)
-                        </option>
-                      ))}
-                  </select>
+                  {(() => {
+                    const destConts = Object.values(state.containers).filter(
+                      (c) => c.id !== transferFromCont && c.state === 'available'
+                    );
+                    if (destConts.length <= 1) {
+                      return (
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            background: 'var(--color-surface-soft)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            color: 'var(--color-ink)',
+                          }}
+                        >
+                          {destConts[0] ? `${destConts[0].code} (${destConts[0].capacityMl / 1000} L cap.)` : 'Aucun contenant disponible'}
+                        </div>
+                      );
+                    }
+                    return (
+                      <select
+                        className="form-select"
+                        value={transferToCont}
+                        onChange={(e) => setTransferToCont(e.target.value)}
+                      >
+                        {destConts.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.code} ({c.capacityMl / 1000} L cap.)
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
 

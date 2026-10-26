@@ -34,6 +34,30 @@ describe('App & UI Navigation (L0 - L7)', () => {
     expect(screen.getByText(/Occupation des contenants/i)).toBeInTheDocument();
     expect(screen.getByText(/C-01/i)).toBeInTheDocument();
 
+    // Verify Add Container button is present and opens modal
+    const addContainerBtn = screen.getByRole('button', { name: /\+ Ajouter une cuve \/ fût/i });
+    expect(addContainerBtn).toBeInTheDocument();
+    fireEvent.click(addContainerBtn);
+    expect(screen.getByText(/Ajouter un contenant sur-mesure au plan de cuverie/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Annuler/i }));
+
+    // Click on empty container C-01 to open action bar & edit modal
+    fireEvent.click(screen.getByText('C-01'));
+    const editBtn = screen.getByRole('button', { name: /Modifier caractéristiques/i });
+    expect(editBtn).toBeInTheDocument();
+    fireEvent.click(editBtn);
+    expect(screen.getByText(/Modifier C-01/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Annuler/i }));
+
+    // Click on occupied container C-02 to open measurement modal
+    fireEvent.click(screen.getByText('C-02'));
+    const measBtn = screen.getByRole('button', { name: /\+ Relevé sur C-02/i });
+    expect(measBtn).toBeInTheDocument();
+    fireEvent.click(measBtn);
+    expect(screen.getByText(/Nouveau relevé analytique/i)).toBeInTheDocument();
+    expect(screen.getByText(/Unité standard contrainte pour Masse volumique/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Annuler/i }));
+
     // Navigate to Élevage & Assemblage
     fireEvent.click(screen.getByRole('button', { name: /Élevage & Assemblage/i }));
     expect(screen.getByText(/Parc à barriques/i)).toBeInTheDocument();

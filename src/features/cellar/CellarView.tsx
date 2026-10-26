@@ -12,6 +12,8 @@ import {
   Thermometer,
   Droplets,
   ArrowRight,
+  Settings,
+  Trash2,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { PARAMETERS } from '../../domain/commands/cellar';
@@ -27,6 +29,19 @@ const STAGE_LABELS_FR: Record<string, string> = {
   ready: 'Prêt pour mise',
   blended: 'Assemblé',
   bottled: 'Mis en bouteilles',
+};
+
+// Dictionnaires de valeurs par défaut selon le paramètre sélectionné
+const DEFAULT_PARAM_VALUES: Record<MeasurementParameter, string> = {
+  density: '1010',
+  temperature: '18',
+  sugar: '220',
+  tav: '12.5',
+  ph: '3.4',
+  ta: '4.5',
+  va: '0.35',
+  free_so2: '25',
+  malic: '1.8',
 };
 
 export const CellarView: React.FC = () => {
@@ -76,6 +91,14 @@ export const CellarView: React.FC = () => {
       return [];
     }
   });
+  // Edit Container Modal (Modifier caractéristiques d'une cuve / fût existant)
+  const [showEditContainerModal, setShowEditContainerModal] = useState<Container | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editKind, setEditKind] = useState<ContainerKind>('tank');
+  const [editCapHl, setEditCapHl] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editState, setEditState] = useState<'available' | 'maintenance'>('available');
+
   const [containerOverrides, setContainerOverrides] = useState<Record<string, Partial<Container>>>(() => {
     try {
       const raw = localStorage.getItem(CONTAINER_OVERRIDES_KEY);
@@ -288,6 +311,56 @@ export const CellarView: React.FC = () => {
       // Ignore quota
     }
     setShowAddContainerModal(false);
+  };
+
+  const handleOpenEditContainer = (c: Container) => {
+    setShowEditContainerModal(c);
+    setEditCode(c.code);
+    setEditKind(c.kind);
+    setEditCapHl((c.capacityMl / 100_000).toFixed(2).replace(/\.00$/, ''));
+    setEditLocation(c.location);
+    setEditState(c.state);
+  };
+
+  const handleSaveEditContainer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showEditContainerModal) return;
+    const capHl = Math.max(0.1, parseFloat(editCapHl || '1'));
+    const patch: Partial<Container> = {
+      code: editCode.trim().toUpperCase() || showEditContainerModal.code,
+      kind: editKind,
+      capacityMl: Math.round(capHl * 100_000),
+      location: editLocation.trim() || showEditContainerModal.location,
+      state: editState,
+    };
+    updateContainerOverride(showEditContainerModal.id, patch);
+
+    setCustomContainers((prev) => {
+      const next = prev.map((cc) => (cc.id === showEditContainerModal.id ? { ...cc, ...patch } : cc));
+      try {
+        localStorage.setItem(CUSTOM_CONTAINERS_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore quota
+      }
+      return next;
+    });
+
+    setShowEditContainerModal(null);
+  };
+
+  const handleDeleteCustomContainer = (id: string) => {
+    if ((state.occupancies[id]?.volumeMl ?? 0) > 0) return;
+    setCustomContainers((prev) => {
+      const next = prev.filter((cc) => cc.id !== id);
+      try {
+        localStorage.setItem(CUSTOM_CONTAINERS_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore quota
+      }
+      return next;
+    });
+    if (selectedContainerId === id) setSelectedContainerId('');
+    setShowEditContainerModal(null);
   };
 
   // Synthèse du chai pour jauges visuelles
@@ -536,14 +609,23 @@ export const CellarView: React.FC = () => {
       <div className="ds-panel ds-rise ds-rise-3">
         <div className="ds-section-head">
           <div>
-            <h2 className="ds-section-title">Occupation des contenants</h2>
+            <h2 className="ds-section-title">Occupation des contenants ({containers.length})</h2>
             <span className="ds-section-meta">
-              Cliquez sur une cuve inox ou une pièce bourguignonne occupée pour inspecter son lot
+              Cliquez sur une cuve ou un fût pour voir son lot, enregistrer un relevé ou modifier ses caractéristiques
             </span>
           </div>
-          <span className="badge badge-muted">
-            Lot ≠ Contenant · 1 lot actif par contenant
-          </span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowAddContainerModal(true)}
+            >
+              <Plus size={13} /> + Ajouter une cuve / fût
+            </button>
+            <span className="badge badge-muted">
+              Lot ≠ Contenant · 1 lot actif par contenant
+            </span>
+          </div>
         </div>
 
         {viewMode === 'plan' ? (
@@ -578,9 +660,31 @@ export const CellarView: React.FC = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{c.code}</span>
-                    <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-gold' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-                      {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? `Fût ${c.capacityMl / 1000}L` : 'Cuve Inox'}
-                    </span>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-gold' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                        {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? `Fût ${c.capacityMl / 1000}L` : 'Cuve Inox'}
+                      </span>
+                      <button
+                        type="button"
+                        title={`Modifier les caractéristiques de ${c.code}`}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px',
+                          cursor: 'pointer',
+                          color: 'var(--color-ink-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditContainer(c);
+                        }}
+                      >
+                        <Settings size={12} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Jauge visuelle de cuve / fût */}
@@ -701,6 +805,17 @@ export const CellarView: React.FC = () => {
                               + Entonner ici
                             </button>
                           )}
+                          <button
+                            type="button"
+                            className="ds-action-chip"
+                            title="Modifier les caractéristiques du contenant"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditContainer(c);
+                            }}
+                          >
+                            <Settings size={11} /> Paramètres
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -739,6 +854,14 @@ export const CellarView: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => handleOpenEditContainer(selectedContainer)}
+                  title="Modifier le code, type, capacité ou emplacement"
+                >
+                  <Settings size={13} /> Modifier caractéristiques
+                </button>
                 {selLot ? (
                   <>
                     <button
@@ -1162,6 +1285,9 @@ export const CellarView: React.FC = () => {
                     const k = e.target.value as MeasurementParameter;
                     setParamKey(k);
                     setParamUnit(PARAMETERS[k].units[0]!);
+                    if (DEFAULT_PARAM_VALUES[k]) {
+                      setParamVal(DEFAULT_PARAM_VALUES[k]);
+                    }
                   }}
                 >
                   {Object.entries(PARAMETERS).map(([k, def]) => (
@@ -1169,30 +1295,56 @@ export const CellarView: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Valeur mesurée</label>
+              <div className="form-group">
+                <label className="form-label">Valeur mesurée & Unité</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="number"
                     step="any"
-                    className="form-input"
+                    className="form-input tabular"
+                    style={{ flex: 1, fontSize: '15px', fontWeight: 600 }}
                     value={paramVal}
                     onChange={(e) => setParamVal(e.target.value)}
                     required
                   />
+                  {PARAMETERS[paramKey].units.length > 1 ? (
+                    <select
+                      className="form-select"
+                      style={{ width: '160px', flexShrink: 0 }}
+                      value={paramUnit}
+                      onChange={(e) => setParamUnit(e.target.value)}
+                    >
+                      {PARAMETERS[paramKey].units.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '8px 16px',
+                        background: 'var(--color-surface-soft)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        color: 'var(--color-forest)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '85px',
+                        userSelect: 'none',
+                      }}
+                      title="Unité fixe déterminée par le paramètre"
+                    >
+                      {paramUnit || PARAMETERS[paramKey].units[0]}
+                    </div>
+                  )}
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Unité</label>
-                  <select
-                    className="form-select"
-                    value={paramUnit}
-                    onChange={(e) => setParamUnit(e.target.value)}
-                  >
-                    {PARAMETERS[paramKey].units.map((u) => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
-                </div>
+                {PARAMETERS[paramKey].units.length === 1 && (
+                  <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '4px', display: 'block' }}>
+                    Unité standard contrainte pour {PARAMETERS[paramKey].label} : <strong>{paramUnit || PARAMETERS[paramKey].units[0]}</strong>
+                  </span>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Date du prélèvement</label>
@@ -1444,6 +1596,138 @@ export const CellarView: React.FC = () => {
                 <button type="submit" className="btn btn-primary">
                   Ajouter au plan de cave
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Modifier Contenant (Cuve, Fût, Foudre) */}
+      {showEditContainerModal && (
+        <div className="modal-backdrop" onClick={() => setShowEditContainerModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div>
+                <h2 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
+                  Modifier {showEditContainerModal.code}
+                </h2>
+                <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginTop: '4px', marginBottom: 0 }}>
+                  Ajustez les caractéristiques physiques, l’emplacement ou l’état opérationnel de ce contenant.
+                </p>
+              </div>
+              <span className={`badge ${showEditContainerModal.state === 'maintenance' ? 'badge-crimson' : 'badge-green'}`}>
+                {showEditContainerModal.state === 'maintenance' ? 'En maintenance' : 'Opérationnel'}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveEditContainer}>
+              <div className="form-group">
+                <label className="form-label">Identifiant / Code contenant</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editCode}
+                  onChange={(e) => setEditCode(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Famille de contenant</label>
+                  <select
+                    className="form-select"
+                    value={editKind}
+                    onChange={(e) => setEditKind(e.target.value as ContainerKind)}
+                  >
+                    <option value="tank">Cuve Inox / Béton (tank)</option>
+                    <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
+                    <option value="barrel">Pièce / Barrique / Demi-muid (barrel)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Capacité nominale (hL)
+                    {editCapHl && !isNaN(parseFloat(editCapHl)) && (
+                      <span style={{ fontWeight: 400, color: 'var(--color-ink-muted)', marginLeft: '6px' }}>
+                        ({Math.round(parseFloat(editCapHl) * 100).toLocaleString('fr-FR')} L)
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.1"
+                    className="form-input tabular"
+                    value={editCapHl}
+                    onChange={(e) => setEditCapHl(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Localisation / Salle de chai</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Statut opérationnel</label>
+                  <select
+                    className="form-select"
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value as 'available' | 'maintenance')}
+                  >
+                    <option value="available">✓ Disponible / En service</option>
+                    <option value="maintenance">🔧 En maintenance / Nettoyage</option>
+                  </select>
+                </div>
+              </div>
+
+              {(() => {
+                const occ = state.occupancies[showEditContainerModal.id];
+                if (!occ) return null;
+                const occLot = state.lots[occ.lotId];
+                return (
+                  <div style={{ padding: '10px 12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', fontSize: '12.5px', marginBottom: '14px', color: 'var(--color-ink)' }}>
+                    ⚠️ Ce contenant héberge actuellement {occ.volumeMl / 1000} L du lot <strong>{occLot?.code ?? occ.lotId}</strong>.
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                <div>
+                  {customContainers.some((cc) => cc.id === showEditContainerModal.id) && !state.occupancies[showEditContainerModal.id] && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDeleteCustomContainer(showEditContainerModal.id)}
+                      title="Supprimer ce contenant personnalisé vide"
+                    >
+                      <Trash2 size={13} /> Supprimer
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowEditContainerModal(null)}
+                  >
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Enregistrer les modifications
+                  </button>
+                </div>
               </div>
             </form>
           </div>
