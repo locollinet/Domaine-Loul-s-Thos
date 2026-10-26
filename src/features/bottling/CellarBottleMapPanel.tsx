@@ -118,7 +118,7 @@ const DEFAULT_EXTRA_SLOTS: BottleSlotRecord[] = [
     urgency: 'oenotheque',
     prioritySellByDate: '2028-12-31',
     urgencyReason:
-      'Réserve Œnotèque du Domaine : déblocage au compte-gouttes pour tables étoilées Michelin.',
+      'Réserve Œnothèque & Allocations Rares : déblocage sélectif pour restauration gastronomique, cavistes et clients fidèles.',
     sommelierPeakWindow: '2026 – 2036 · Complexité briochée & pierre à fusil',
     unitTargetPriceHtEur: 135,
   },

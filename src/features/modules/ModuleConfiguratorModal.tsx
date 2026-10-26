@@ -122,7 +122,7 @@ const ADDON_DESCRIPTIONS: Array<{
     title: 'Allocations Grands Crus, Quotas Clients & Grilles Multi-Formats',
     badge: 'Domaines de Prestige',
     subtitle:
-      'Répartition annuelle des cuvées rares par client/importateur/étoilé Michelin, suivi des quotas (75cl, Magnum, Jéroboam) et conversion en commande.',
+      'Répartition annuelle des cuvées rares par client, importateur ou caviste, suivi des quotas (75cl, Magnum, Jéroboam) et conversion en commande.',
     parentModule: 'Logé dans : Ventes & Commerce',
     icon: Crown,
   },

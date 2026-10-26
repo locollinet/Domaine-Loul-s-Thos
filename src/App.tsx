@@ -273,10 +273,10 @@ const AppInner: React.FC = () => {
                     gap: '5px',
                   }}
                 >
-                  <Lock size={12} /> ACCÈS RESTREINT TERRAIN 05h00
+                  <Lock size={12} /> MODE TERRAIN RESTREINT (VENDANGEURS)
                 </span>
                 <span style={{ fontSize: '13px', fontWeight: 600 }}>
-                  Profil Ouvrier / Vendangeur / Transporteur — Accès ERP complet verrouillé (Seuls le GPS et les priorités de coupe sont actifs)
+                  Profil Vendangeur / Chauffeur — Seuls la feuille de route du jour, les repères parcellaires et le guidage GPS sont actifs
                 </span>
               </div>
               <button

@@ -579,7 +579,7 @@ export const CellarView: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{c.code}</span>
                     <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-gold' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-                      {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? 'Pièce 228L' : 'Cuve Inox'}
+                      {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? `Fût ${c.capacityMl / 1000}L` : 'Cuve Inox'}
                     </span>
                   </div>
 
@@ -723,7 +723,7 @@ export const CellarView: React.FC = () => {
                     Contenant sélectionné : {selectedContainer.code}
                   </span>
                   <span className="badge badge-muted">
-                    {selectedContainer.kind === 'barrel' ? 'Pièce 228 L' : 'Cuve Inox'} · Capacité {selectedContainer.capacityMl / 1000} L · {selectedContainer.location}
+                    {selectedContainer.kind === 'barrel' ? `Fût ${selectedContainer.capacityMl / 1000} L` : 'Cuve Inox'} · Capacité {selectedContainer.capacityMl / 1000} L · {selectedContainer.location}
                   </span>
                   <span className={`badge ${selectedContainer.state === 'maintenance' ? 'badge-crimson' : 'badge-green'}`}>
                     {selectedContainer.state === 'maintenance' ? '🔧 En maintenance' : '✓ En service'}

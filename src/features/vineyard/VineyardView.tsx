@@ -133,7 +133,7 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     appellation: 'Bâtard-Montrachet Grand Cru (fictif)',
     commune: 'Puligny-Montrachet (INSEE 21512)',
     sectionCadastrale: 'Section AI n°0131 (46,02 ares · Clos du Puits)',
-    nbRangs: '24 rangs (Rangs 1 à 24 · Priorité 05h00)',
+    nbRangs: '24 rangs (Rangs 1 à 24 · Priorité Matin)',
     pageLivret: 7,
     pastilleNum: 3,
     lat: 46.94642,
@@ -1423,7 +1423,7 @@ export const VineyardView: React.FC<{
                 textTransform: 'uppercase',
               }}
             >
-              🌅 Briefing 05h00 · Priorités de Coupe du Jour
+              🌅 Feuille de Route · Ordre de Coupe du Jour
             </span>
             <span style={{ fontSize: '13px', color: '#E2C799', fontWeight: 600 }}>
               Cliquez sur « Y ALLER (MAPS) » pour lancer le guidage routier jusqu’à l’entrée des rangs
@@ -1431,9 +1431,9 @@ export const VineyardView: React.FC<{
           </div>
           {tomorrowItems.length > 0 && (
             <span style={{ fontSize: '12px', color: 'rgba(250,248,245,0.75)' }}>
-              Demain matin :{' '}
+              Prévu ensuite :{' '}
               <strong style={{ color: '#E2C799' }}>
-                {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Pastille n°${t.pastilleNum})`).join(', ')}
+                {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Réf. #${t.pastilleNum})`).join(', ')}
               </strong>
             </span>
           )}
@@ -1476,10 +1476,10 @@ export const VineyardView: React.FC<{
                         borderRadius: '999px',
                       }}
                     >
-                      Pastille n°{item.pastilleNum} · Livret p.{item.pageLivret}
+                      Réf. #{item.pastilleNum} {item.pageLivret ? `· Livret p.${item.pageLivret}` : ''}
                     </span>
                     <span style={{ fontSize: '11.5px', color: '#E2C799', fontWeight: 700 }}>
-                      {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer ce matin'}
+                      {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer en premier'}
                     </span>
                   </div>
                   <div className="serif-display" style={{ fontSize: '19px', fontWeight: 700, color: '#FFFFFF' }}>
@@ -1495,7 +1495,7 @@ export const VineyardView: React.FC<{
                     type="button"
                     onClick={(ev) => {
                       ev.stopPropagation();
-                      adjustParcelUnit(item.parcel, 5);
+                      adjustParcelUnit(item.parcel, unitMode === 'kg' ? 100 : unitMode === 'hl' ? 1 : 5);
                     }}
                     style={{
                       background: 'rgba(255,255,255,0.14)',
@@ -1508,7 +1508,7 @@ export const VineyardView: React.FC<{
                       cursor: 'pointer',
                     }}
                   >
-                    +5 Caisses
+                    {unitMode === 'kg' ? '+100 kg' : unitMode === 'hl' ? '+1 hL' : '+5 Caisses'}
                   </button>
                   <a
                     href={item.googleMapsUrl}
@@ -1618,8 +1618,8 @@ export const VineyardView: React.FC<{
                         {selectedTrack?.customSectionCadastrale ?? selectedMeta.sectionCadastrale}
                       </span>
                       <span className="badge badge-amber">
-                        Livret p.{selectedTrack?.customPageLivret ?? selectedMeta.pageLivret} · Pastille n°
-                        {selectedTrack?.customPastilleNum ?? selectedMeta.pastilleNum}
+                        Réf. #{selectedTrack?.customPastilleNum ?? selectedMeta.pastilleNum}
+                        {(selectedTrack?.customPageLivret ?? selectedMeta.pageLivret) ? ` · Livret p.${selectedTrack?.customPageLivret ?? selectedMeta.pageLivret}` : ''}
                       </span>
                     </div>
                     <h3 className="serif-display" style={{ fontSize: '22px', fontWeight: 600 }}>
@@ -2091,14 +2091,14 @@ export const VineyardView: React.FC<{
                   className={`segmented-btn ${scheduleFilter === 'today' ? 'active' : ''}`}
                   onClick={() => setScheduleFilter('today')}
                 >
-                  Aujourd’hui (24 oct.)
+                  Aujourd’hui
                 </button>
                 <button
                   type="button"
                   className={`segmented-btn ${scheduleFilter === 'tomorrow' ? 'active' : ''}`}
                   onClick={() => setScheduleFilter('tomorrow')}
                 >
-                  Demain (25 oct.)
+                  Demain
                 </button>
                 <button
                   type="button"
@@ -2159,8 +2159,8 @@ export const VineyardView: React.FC<{
                               fontWeight: 600,
                             }}
                           >
-                            <option value="today">📅 Aujourd’hui (24 oct.)</option>
-                            <option value="tomorrow">📅 Demain (25 oct.)</option>
+                            <option value="today">📅 Aujourd’hui</option>
+                            <option value="tomorrow">📅 Demain</option>
                             <option value="upcoming">📅 Jours à venir</option>
                             <option value="done">✓ Récolte terminée</option>
                           </select>

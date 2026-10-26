@@ -592,7 +592,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
                     borderRadius: '999px',
                   }}
                 >
-                  Pastille n°{selectedItem.pastilleNum} · Livret p.{selectedItem.pageLivret}
+                  Réf. #{selectedItem.pastilleNum} {selectedItem.pageLivret ? `· Livret p.${selectedItem.pageLivret}` : ''}
                 </span>
                 <span style={{ fontWeight: 700, fontSize: '14px' }}>
                   {selectedItem.parcel.name.replace(' — fictif', '')} ({selectedItem.parcel.code})
