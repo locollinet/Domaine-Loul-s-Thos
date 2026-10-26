@@ -17,6 +17,10 @@ import {
   Wine,
   Droplets,
   Layers,
+  Settings,
+  Camera,
+  ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
 import { canRun } from '../../domain/commands';
@@ -147,6 +151,13 @@ const DEFAULT_CLIMAT_META: ClimatLivretMeta = {
   linkedLotIds: [],
 };
 
+export interface ParcelFieldPhoto {
+  id: string;
+  dataUrl: string;
+  caption: string;
+  date: string;
+}
+
 interface CustomParcelTracking {
   daySlot: 'today' | 'tomorrow' | 'upcoming' | 'done';
   status: 'a_faire' | 'en_cours' | 'vendange';
@@ -154,6 +165,83 @@ interface CustomParcelTracking {
   extraKg: number;
   extraHl: number;
   customPin?: { xPct: number; yPct: number; lat: number; lng: number };
+  customGoogleMapsUrl?: string;
+  customNbRangs?: string;
+  customAccessNotes?: string;
+  customContextNotes?: string;
+  customPageLivret?: number;
+  customPastilleNum?: number;
+  customSectionCadastrale?: string;
+  photos?: ParcelFieldPhoto[];
+}
+
+const PARCEL_STORAGE_KEY = 'domaine-erp-parcel-configs-v1';
+
+// Photo terrain par défaut (repère visuel d'entrée de rangs et murger en Bourgogne)
+const DEFAULT_FIELD_PHOTO_SVG =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#D9E2DC"/>
+          <stop offset="100%" stop-color="#F4EFE6"/>
+        </linearGradient>
+      </defs>
+      <rect width="480" height="130" fill="url(#sky)"/>
+      <path d="M0 115 Q160 85 320 105 T480 95 L480 270 L0 270 Z" fill="#3B523E"/>
+      <path d="M0 140 L480 125 L480 270 L0 270 Z" fill="#2A3E2D"/>
+      <g stroke="#8CA87C" stroke-width="3" opacity="0.65">
+        <line x1="40" y1="270" x2="210" y2="130"/>
+        <line x1="120" y1="270" x2="235" y2="130"/>
+        <line x1="200" y1="270" x2="260" y2="130"/>
+        <line x1="280" y1="270" x2="285" y2="130"/>
+        <line x1="360" y1="270" x2="310" y2="130"/>
+        <line x1="440" y1="270" x2="335" y2="130"/>
+      </g>
+      <rect x="18" y="185" width="95" height="38" rx="4" fill="#C4B9A5" stroke="#6E6555" stroke-width="2"/>
+      <circle cx="240" cy="185" r="18" fill="rgba(249,115,22,0.28)" stroke="#F97316" stroke-width="3"/>
+      <circle cx="240" cy="185" r="5" fill="#F97316"/>
+      <rect x="145" y="16" width="190" height="28" rx="14" fill="rgba(20,24,20,0.82)"/>
+      <text x="240" y="34" font-family="sans-serif" font-size="12" font-weight="bold" fill="#FAF8F5" text-anchor="middle">Repère Entrée de Rang &amp; Murger</text>
+    </svg>`
+  );
+
+function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(String(ev.target?.result ?? ''));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      img.onerror = reject;
+      img.src = String(ev.target?.result ?? '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export const VineyardView: React.FC = () => {
@@ -168,7 +256,29 @@ export const VineyardView: React.FC = () => {
 
   // Mode "Repositionnement Point GPS Domaine" (On-top du cadastre et du livret)
   const [isEditingGpsPin, setIsEditingGpsPin] = useState(false);
-  const [parcelTracking, setParcelTracking] = useState<Record<string, CustomParcelTracking>>({});
+  const [parcelTracking, setParcelTracking] = useState<Record<string, CustomParcelTracking>>(() => {
+    try {
+      const raw = localStorage.getItem(PARCEL_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, CustomParcelTracking>) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Modale de Paramétrage Complet & Photos Terrain d'une parcelle
+  const [configParcel, setConfigParcel] = useState<Parcel | null>(null);
+  const [cfgLat, setCfgLat] = useState('');
+  const [cfgLng, setCfgLng] = useState('');
+  const [cfgGoogleMapsUrl, setCfgGoogleMapsUrl] = useState('');
+  const [cfgNbRangs, setCfgNbRangs] = useState('');
+  const [cfgSectionCadastrale, setCfgSectionCadastrale] = useState('');
+  const [cfgPageLivret, setCfgPageLivret] = useState('');
+  const [cfgPastilleNum, setCfgPastilleNum] = useState('');
+  const [cfgAccessNotes, setCfgAccessNotes] = useState('');
+  const [cfgContextNotes, setCfgContextNotes] = useState('');
+  const [newPhotoCaption, setNewPhotoCaption] = useState('Entrée des rangs & repère fourgon');
+  const [previewPhoto, setPreviewPhoto] = useState<ParcelFieldPhoto | null>(null);
+  const [gpsStatusMsg, setGpsStatusMsg] = useState<string | null>(null);
 
   // Pilotage Vendanges : Horizon (Aujourd'hui / Demain / Jours à venir / Toutes) & Unité (Caisses / kg / hL)
   const [scheduleFilter, setScheduleFilter] = useState<'all' | 'today' | 'tomorrow' | 'upcoming' | 'done'>('all');
@@ -270,19 +380,31 @@ export const VineyardView: React.FC = () => {
       }
     : { xPct: 50, yPct: 50, lat: 46.9478, lng: 4.7389 };
 
+  const persistParcelTracking = (updater: (prev: Record<string, CustomParcelTracking>) => Record<string, CustomParcelTracking>) => {
+    setParcelTracking((prev) => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem(PARCEL_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage quota errors
+      }
+      return next;
+    });
+  };
+
   const handleMapClickForCustomPin = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isEditingGpsPin || !selectedParcel) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const xPct = Math.max(4, Math.min(96, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
     const yPct = Math.max(6, Math.min(94, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
     // Conversion fine vers GPS autour du climat (précision métrique d'entrée de rang)
-    const latOffset = ((50 - yPct) * 0.00008);
-    const lngOffset = ((xPct - 50) * 0.00011);
+    const latOffset = (50 - yPct) * 0.00008;
+    const lngOffset = (xPct - 50) * 0.00011;
     const newLat = parseFloat((selectedMeta.lat + latOffset).toFixed(5));
     const newLng = parseFloat((selectedMeta.lng + lngOffset).toFixed(5));
 
     const current = getParcelTrack(selectedParcel);
-    setParcelTracking((prev) => ({
+    persistParcelTracking((prev) => ({
       ...prev,
       [selectedParcel.id]: {
         ...current,
@@ -294,13 +416,128 @@ export const VineyardView: React.FC = () => {
 
   const updateParcelTrack = (parcel: Parcel, patch: Partial<CustomParcelTracking>) => {
     const current = getParcelTrack(parcel);
-    setParcelTracking((prev) => ({
+    persistParcelTracking((prev) => ({
       ...prev,
       [parcel.id]: {
         ...current,
         ...patch,
       },
     }));
+  };
+
+  const openParcelConfigModal = (parcel: Parcel) => {
+    const meta = CLIMAT_METADATA[parcel.id] ?? DEFAULT_CLIMAT_META;
+    const track = getParcelTrack(parcel);
+    const pin = track.customPin ?? {
+      xPct: parcel.schematic.x + parcel.schematic.w / 2,
+      yPct: parcel.schematic.y + parcel.schematic.h / 2,
+      lat: meta.lat,
+      lng: meta.lng,
+    };
+    setConfigParcel(parcel);
+    setCfgLat(String(pin.lat));
+    setCfgLng(String(pin.lng));
+    setCfgGoogleMapsUrl(
+      track.customGoogleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${pin.lat},${pin.lng}`
+    );
+    setCfgNbRangs(track.customNbRangs ?? meta.nbRangs);
+    setCfgSectionCadastrale(track.customSectionCadastrale ?? meta.sectionCadastrale);
+    setCfgPageLivret(String(track.customPageLivret ?? meta.pageLivret));
+    setCfgPastilleNum(String(track.customPastilleNum ?? meta.pastilleNum));
+    setCfgAccessNotes(track.customAccessNotes ?? parcel.access ?? 'Accès fourgon par le chemin communal haut');
+    setCfgContextNotes(track.customContextNotes ?? `${meta.terroir} · ${meta.altitude}`);
+    setGpsStatusMsg(null);
+  };
+
+  const handleCaptureDeviceGps = () => {
+    if (!navigator.geolocation) {
+      setGpsStatusMsg('Géolocalisation non disponible sur ce navigateur.');
+      return;
+    }
+    setGpsStatusMsg('Acquisition GPS en cours...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(5);
+        const lng = pos.coords.longitude.toFixed(5);
+        setCfgLat(lat);
+        setCfgLng(lng);
+        setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+        setGpsStatusMsg(`Position GPS acquise (±${Math.round(pos.coords.accuracy)}m)`);
+      },
+      () => {
+        setGpsStatusMsg('Permission GPS refusée ou signal indisponible — saisie manuelle active.');
+      },
+      { enableHighAccuracy: true, timeout: 6000 }
+    );
+  };
+
+  const handleSaveParcelConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configParcel) return;
+    const current = getParcelTrack(configParcel);
+    const parsedLat = parseFloat(cfgLat);
+    const parsedLng = parseFloat(cfgLng);
+    const basePin = current.customPin ?? {
+      xPct: configParcel.schematic.x + configParcel.schematic.w / 2,
+      yPct: configParcel.schematic.y + configParcel.schematic.h / 2,
+      lat: selectedMeta.lat,
+      lng: selectedMeta.lng,
+    };
+
+    updateParcelTrack(configParcel, {
+      customPin: {
+        xPct: basePin.xPct,
+        yPct: basePin.yPct,
+        lat: Number.isFinite(parsedLat) ? parsedLat : basePin.lat,
+        lng: Number.isFinite(parsedLng) ? parsedLng : basePin.lng,
+      },
+      customGoogleMapsUrl: cfgGoogleMapsUrl.trim() || undefined,
+      customNbRangs: cfgNbRangs.trim() || undefined,
+      customSectionCadastrale: cfgSectionCadastrale.trim() || undefined,
+      customPageLivret: parseInt(cfgPageLivret, 10) || selectedMeta.pageLivret,
+      customPastilleNum: parseInt(cfgPastilleNum, 10) || selectedMeta.pastilleNum,
+      customAccessNotes: cfgAccessNotes.trim() || undefined,
+      customContextNotes: cfgContextNotes.trim() || undefined,
+    });
+    setConfigParcel(null);
+  };
+
+  const handleAddParcelPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const targetParcel = configParcel ?? selectedParcel;
+    if (!file || !targetParcel) return;
+    try {
+      const dataUrl = await compressImageFile(file);
+      const current = getParcelTrack(targetParcel);
+      const existingPhotos = current.photos ?? [
+        {
+          id: 'default-photo-1',
+          dataUrl: DEFAULT_FIELD_PHOTO_SVG,
+          caption: 'Repère entrée des rangs & murger (Livret Domaine)',
+          date: '2026-10-20',
+        },
+      ];
+      const newPhoto: ParcelFieldPhoto = {
+        id: `photo-${Date.now()}`,
+        dataUrl,
+        caption: newPhotoCaption.trim() || file.name,
+        date: new Date().toISOString().slice(0, 10),
+      };
+      updateParcelTrack(targetParcel, {
+        photos: [newPhoto, ...existingPhotos],
+      });
+    } catch {
+      // Ignore compression error
+    }
+    e.target.value = '';
+  };
+
+  const handleRemoveParcelPhoto = (parcel: Parcel, photoId: string) => {
+    const current = getParcelTrack(parcel);
+    const existingPhotos = current.photos ?? [];
+    updateParcelTrack(parcel, {
+      photos: existingPhotos.filter((ph) => ph.id !== photoId),
+    });
   };
 
   const adjustParcelUnit = (parcel: Parcel, delta: number) => {
@@ -796,8 +1033,13 @@ export const VineyardView: React.FC = () => {
                       <span className={`badge ${getLevelBadgeClass(selectedMeta.classification)}`}>
                         ★ {selectedMeta.classification}
                       </span>
-                      <span className="badge badge-muted">{selectedMeta.sectionCadastrale}</span>
-                      <span className="badge badge-amber">Pastille n°{selectedMeta.pastilleNum}</span>
+                      <span className="badge badge-muted">
+                        {selectedTrack?.customSectionCadastrale ?? selectedMeta.sectionCadastrale}
+                      </span>
+                      <span className="badge badge-amber">
+                        Livret p.{selectedTrack?.customPageLivret ?? selectedMeta.pageLivret} · Pastille n°
+                        {selectedTrack?.customPastilleNum ?? selectedMeta.pastilleNum}
+                      </span>
                     </div>
                     <h3 className="serif-display" style={{ fontSize: '22px', fontWeight: 600 }}>
                       {selectedParcel.name} ({selectedParcel.code})
@@ -809,16 +1051,29 @@ export const VineyardView: React.FC = () => {
 
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${effectivePin.lat},${effectivePin.lng}`}
+                      href={
+                        selectedTrack?.customGoogleMapsUrl ||
+                        `https://www.google.com/maps/dir/?api=1&destination=${effectivePin.lat},${effectivePin.lng}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-sm btn-secondary"
                       style={{ textDecoration: 'none' }}
-                      title="Ouvrir le guidage GPS direct vers le point d'entrée du rang"
+                      title="Ouvrir l’itinéraire Google Maps vers cette parcelle"
                     >
                       <Navigation size={13} />
-                      <span>Guidage GPS</span>
+                      <span>Google Maps</span>
+                      <ExternalLink size={11} />
                     </a>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => openParcelConfigModal(selectedParcel)}
+                      title="Paramétrer les coordonnées GPS, le lien Google Maps, les consignes d’accès et les photos terrain"
+                    >
+                      <Settings size={13} />
+                      <span>Paramétrer & Photos</span>
+                    </button>
                     <button
                       type="button"
                       className="btn btn-sm btn-secondary"
@@ -838,14 +1093,14 @@ export const VineyardView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3 Infos Terrain Essentielles */}
+                {/* 3 Infos Terrain Essentielles (Paramétrables) */}
                 <div className="grid-3" style={{ gap: '10px' }}>
                   <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
                     <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
                       Subdivision & Rangs
                     </div>
                     <div style={{ fontSize: '12.5px', fontWeight: 600, marginTop: '2px' }}>
-                      {selectedMeta.nbRangs}
+                      {selectedTrack?.customNbRangs ?? selectedMeta.nbRangs}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-ink-light)' }} className="tabular">
                       {selectedParcel.areaM2 ? `${(selectedParcel.areaM2.value / 10000).toFixed(2)} ha (${selectedParcel.areaM2.status === 'measured' ? 'mesurée' : 'estimée'})` : 'Surface inconnue (≠ 0)'}
@@ -854,28 +1109,96 @@ export const VineyardView: React.FC = () => {
 
                   <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
                     <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Bilan Récolte Parcelle
+                      Accès & Contexte Terrain
                     </div>
-                    <div style={{ fontSize: '12.5px', fontWeight: 700, marginTop: '2px', color: 'var(--color-forest)' }} className="tabular">
-                      {selectedMetrics.totalCaisses} caisses · {selectedMetrics.totalKg} kg · {selectedMetrics.totalHl} hL
+                    <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px', color: 'var(--color-forest)' }}>
+                      {selectedTrack?.customAccessNotes ?? selectedParcel.access ?? 'Accès fourgon chemin haut'}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-ink-light)' }}>
-                      {selectedMetrics.weighedKg > 0 ? `Pesé bascule : ${selectedMetrics.weighedKg} kg` : 'Estimation terrain avant pesée'}
+                      {selectedTrack?.customContextNotes ?? `${selectedMeta.terroir} · ${selectedMeta.altitude}`}
                     </div>
                   </div>
 
                   <div style={{ padding: '8px 10px', background: fieldMode ? '#141814' : 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)' }}>
                     <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Point GPS d’Entrée de Rang
+                      Point GPS & Lien Maps
                     </div>
                     <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px' }} className="tabular">
                       {effectivePin.lat.toFixed(5)}, {effectivePin.lng.toFixed(5)}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--color-forest)' }}>
-                      {selectedTrack?.customPin ? 'Ajusté manuellement par le domaine' : 'Calé sur Pastille Livret'}
+                      {selectedTrack?.customPin ? '★ Coordonnées Domaine personnalisées' : 'Calé sur Pastille Livret'}
                     </div>
                   </div>
                 </div>
+
+                {/* Bandeau Photos du Terrain (Repères visuels d'entrée de rangs, portail, murger, état sanitaire) */}
+                {(() => {
+                  const photos = selectedTrack?.photos ?? [
+                    {
+                      id: 'default-photo-1',
+                      dataUrl: DEFAULT_FIELD_PHOTO_SVG,
+                      caption: `Entrée de rang Pastille n°${selectedTrack?.customPastilleNum ?? selectedMeta.pastilleNum} (${selectedParcel.name})`,
+                      date: '2026-10-20',
+                    },
+                  ];
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        background: fieldMode ? '#141814' : 'var(--color-surface)',
+                        border: '1px solid var(--color-border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {photos.slice(0, 3).map((ph) => (
+                          <div
+                            key={ph.id}
+                            onClick={() => setPreviewPhoto(ph)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '4px 8px 4px 4px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--color-border)',
+                              background: 'var(--color-bg-elevated)',
+                              cursor: 'pointer',
+                            }}
+                            title="Cliquer pour agrandir la photo terrain"
+                          >
+                            <img
+                              src={ph.dataUrl}
+                              alt={ph.caption}
+                              style={{ width: '44px', height: '30px', objectFit: 'cover', borderRadius: '4px' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '11.5px', fontWeight: 600, maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {ph.caption}
+                              </div>
+                              <div style={{ fontSize: '10px', color: 'var(--color-ink-light)' }}>{ph.date}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => openParcelConfigModal(selectedParcel)}
+                      >
+                        <Camera size={13} />
+                        <span>+ Photo terrain ({photos.length})</span>
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* CONTINUITÉ POST-VENDANGE : Suivre ce qu'il se passe par la suite (De la Parcelle à la Cuve / Fût / Bouteille) */}
                 <div
@@ -1878,6 +2201,296 @@ export const VineyardView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Paramétrage Complet & Photos Terrain de la Parcelle */}
+      {configParcel && (
+        <div className="modal-backdrop" onClick={() => setConfigParcel(null)}>
+          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+              <div>
+                <span className="badge badge-gold" style={{ marginBottom: '4px' }}>
+                  Paramétrage Parcellaire & Terrain
+                </span>
+                <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 700 }}>
+                  {configParcel.name} ({configParcel.code})
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={handleCaptureDeviceGps}
+                title="Utiliser le GPS du téléphone/tablette pour capturer les coordonnées exactes sur le terrain"
+              >
+                <Crosshair size={13} />
+                <span>Capturer ma position GPS actuelle</span>
+              </button>
+            </div>
+
+            {gpsStatusMsg && (
+              <div
+                style={{
+                  marginBottom: '12px',
+                  padding: '8px 12px',
+                  background: 'var(--color-forest-soft)',
+                  border: '1px solid var(--color-forest-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--color-forest)',
+                }}
+              >
+                {gpsStatusMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveParcelConfig}>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Latitude GPS exacte (Entrée de rang)</label>
+                  <input
+                    type="number"
+                    step="0.00001"
+                    className="form-input tabular"
+                    value={cfgLat}
+                    onChange={(e) => {
+                      setCfgLat(e.target.value);
+                      setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${e.target.value},${cfgLng}`);
+                    }}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Longitude GPS exacte (Entrée de rang)</label>
+                  <input
+                    type="number"
+                    step="0.00001"
+                    className="form-input tabular"
+                    value={cfgLng}
+                    onChange={(e) => {
+                      setCfgLng(e.target.value);
+                      setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${cfgLat},${e.target.value}`);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Lien Google Maps direct (Itinéraire fourgon / tracteur ou épingle partagée)</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="url"
+                    className="form-input"
+                    value={cfgGoogleMapsUrl}
+                    onChange={(e) => setCfgGoogleMapsUrl(e.target.value)}
+                    placeholder="https://www.google.com/maps/dir/?api=1&destination=..."
+                    style={{ flex: 1 }}
+                  />
+                  <a
+                    href={cfgGoogleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Navigation size={14} /> Tester Maps
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid-3">
+                <div className="form-group">
+                  <label className="form-label">Référence Cadastrale</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cfgSectionCadastrale}
+                    onChange={(e) => setCfgSectionCadastrale(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Page du Livret</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={cfgPageLivret}
+                    onChange={(e) => setCfgPageLivret(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Pastille n° (Repère carte)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={cfgPastilleNum}
+                    onChange={(e) => setCfgPastilleNum(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Subdivision & Nombre de rangs</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cfgNbRangs}
+                    onChange={(e) => setCfgNbRangs(e.target.value)}
+                    placeholder="Ex : 42 rangs (Rangs 1 à 28 Chardonnay)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Consignes d’accès (Fourgon / Tracteur / Équipe)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cfgAccessNotes}
+                    onChange={(e) => setCfgAccessNotes(e.target.value)}
+                    placeholder="Ex : Entrée par le portail vert chemin haut"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Infos contextuelles (Terroir, pente, vigilance météo / sanitaire)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={cfgContextNotes}
+                  onChange={(e) => setCfgContextNotes(e.target.value)}
+                />
+              </div>
+
+              {/* Section Photos prises du terrain */}
+              <div
+                style={{
+                  padding: '12px',
+                  background: 'var(--color-bg-elevated)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  marginBottom: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink)' }}>
+                      📷 Photos prises du terrain (Entrée de rang, murger, grappes, accès)
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                      Sur mobile, ouvre directement l’appareil photo · Compression automatique hors-ligne
+                    </div>
+                  </div>
+                  <label className="btn btn-sm btn-gold" style={{ cursor: 'pointer', margin: 0 }}>
+                    <Camera size={13} />
+                    <span>Prendre / Importer une photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleAddParcelPhoto}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newPhotoCaption}
+                    onChange={(e) => setNewPhotoCaption(e.target.value)}
+                    placeholder="Légende de la prochaine photo (ex: Portail d'accès rang n°1 côté nord)"
+                    style={{ fontSize: '12px', padding: '6px 10px' }}
+                  />
+                </div>
+
+                {(() => {
+                  const track = getParcelTrack(configParcel);
+                  const photos = track.photos ?? [
+                    {
+                      id: 'default-photo-1',
+                      dataUrl: DEFAULT_FIELD_PHOTO_SVG,
+                      caption: `Entrée de rang Pastille n°${track.customPastilleNum ?? (CLIMAT_METADATA[configParcel.id]?.pastilleNum ?? 1)}`,
+                      date: '2026-10-20',
+                    },
+                  ];
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
+                      {photos.map((ph) => (
+                        <div
+                          key={ph.id}
+                          style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '8px',
+                            background: 'var(--color-surface)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <img
+                            src={ph.dataUrl}
+                            alt={ph.caption}
+                            onClick={() => setPreviewPhoto(ph)}
+                            style={{ width: '100%', height: '90px', objectFit: 'cover', cursor: 'pointer' }}
+                          />
+                          <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {ph.caption}
+                              </div>
+                              <div style={{ fontSize: '10px', color: 'var(--color-ink-light)' }}>{ph.date}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveParcelPhoto(configParcel, ph.id)}
+                              style={{ color: 'var(--color-crimson)', padding: '3px', cursor: 'pointer' }}
+                              title="Supprimer cette photo"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setConfigParcel(null)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Enregistrer le paramétrage de la parcelle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox d'aperçu plein écran d'une photo terrain */}
+      {previewPhoto && (
+        <div className="modal-backdrop" onClick={() => setPreviewPhoto(null)}>
+          <div className="modal-content" style={{ maxWidth: '720px', padding: '16px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div>
+                <h3 className="serif-display" style={{ fontSize: '20px', fontWeight: 700 }}>{previewPhoto.caption}</h3>
+                <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>Photo terrain prise le {previewPhoto.date}</div>
+              </div>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setPreviewPhoto(null)}>
+                Fermer
+              </button>
+            </div>
+            <img
+              src={previewPhoto.dataUrl}
+              alt={previewPhoto.caption}
+              style={{ width: '100%', maxHeight: '460px', objectFit: 'contain', borderRadius: '8px', background: '#141814' }}
+            />
           </div>
         </div>
       )}
