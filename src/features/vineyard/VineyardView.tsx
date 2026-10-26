@@ -58,19 +58,27 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     classification: '1er Cru',
     appellation: 'Puligny-Montrachet 1er Cru',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AB n°0142 (Rangs 1 à 42)',
+    sectionCadastrale: 'Section AH n°0092 (25,38 ares · Rangs 1 à 42)',
     nbRangs: '42 rangs (28 Chardonnay / 14 Pinot)',
     pageLivret: 12,
     pastilleNum: 1,
-    lat: 46.94815,
-    lng: 4.73865,
+    lat: 46.94825,
+    lng: 4.73905,
     pinX: 24,
     pinY: 32,
     polygon: [
-      [46.9486, 4.7376],
-      [46.9488, 4.7395],
-      [46.9477, 4.7398],
-      [46.9475, 4.7379],
+      [46.948483, 4.738357],
+      [46.948575, 4.738427],
+      [46.948582, 4.738428],
+      [46.948657, 4.738464],
+      [46.94818, 4.739673],
+      [46.948138, 4.739772],
+      [46.948124, 4.739767],
+      [46.948071, 4.739747],
+      [46.948046, 4.739742],
+      [46.947961, 4.73974],
+      [46.947932, 4.739729],
+      [46.948483, 4.738357],
     ],
     terroir: 'Calcaire à entroques & marnes blanches',
     altitude: '265 m · Exposition Est-Sud-Est',
@@ -81,21 +89,33 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
   },
   'origin-b': {
     classification: '1er Cru',
-    appellation: 'Chassagne-Montrachet 1er Cru',
-    commune: 'Chassagne-Montrachet (INSEE 21150)',
-    sectionCadastrale: 'Section AD n°0088 (Coteau médian)',
+    appellation: 'Puligny-Montrachet 1er Cru',
+    commune: 'Puligny-Montrachet (INSEE 21512)',
+    sectionCadastrale: 'Section AH n°0068 (21,04 ares · Coteau médian)',
     nbRangs: '34 rangs (Vignes franches)',
     pageLivret: 18,
     pastilleNum: 2,
-    lat: 46.94495,
-    lng: 4.73685,
+    lat: 46.94508,
+    lng: 4.73702,
     pinX: 54,
     pinY: 28,
     polygon: [
-      [46.9455, 4.7359],
-      [46.9456, 4.7377],
-      [46.9444, 4.7379],
-      [46.9443, 4.7361],
+      [46.944708, 4.736966],
+      [46.944778, 4.736777],
+      [46.944809, 4.736693],
+      [46.944842, 4.736608],
+      [46.945253, 4.736969],
+      [46.945259, 4.737],
+      [46.945447, 4.737156],
+      [46.945371, 4.737369],
+      [46.945353, 4.737424],
+      [46.945207, 4.737335],
+      [46.945186, 4.737319],
+      [46.945122, 4.737258],
+      [46.945023, 4.737173],
+      [46.944889, 4.737067],
+      [46.9448, 4.737016],
+      [46.944708, 4.736966],
     ],
     terroir: 'Argilo-calcaire sur dalle rocheuse',
     altitude: '250 m · Coteau médian',
@@ -108,19 +128,22 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     classification: 'Grand Cru',
     appellation: 'Bâtard-Montrachet Grand Cru (fictif)',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AC n°0019 (Clos du Puits)',
+    sectionCadastrale: 'Section AI n°0131 (46,02 ares · Clos du Puits)',
     nbRangs: '24 rangs (Rangs 1 à 24 · Priorité 05h00)',
     pageLivret: 7,
     pastilleNum: 3,
-    lat: 46.94625,
-    lng: 4.74215,
+    lat: 46.94642,
+    lng: 4.74258,
     pinX: 82,
     pinY: 34,
     polygon: [
-      [46.9468, 4.7413],
-      [46.9469, 4.7431],
-      [46.9457, 4.7433],
-      [46.9456, 4.7415],
+      [46.946296, 4.743614],
+      [46.946189, 4.743553],
+      [46.946025, 4.743479],
+      [46.946425, 4.742155],
+      [46.946574, 4.741657],
+      [46.946824, 4.741833],
+      [46.946296, 4.743614],
     ],
     terroir: 'Terres brunes profondes & cailloutis calcaires',
     altitude: '240 m · Pied de coteau d’élite',
@@ -133,19 +156,26 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     classification: 'Village',
     appellation: 'Puligny-Montrachet Village',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AE n°0204 (Terrasses Basses)',
+    sectionCadastrale: 'Section AI n°0114 (58,50 ares · Terrasses Basses)',
     nbRangs: '26 rangs (Cépage blanc)',
     pageLivret: 24,
     pastilleNum: 4,
-    lat: 46.94345,
-    lng: 4.74455,
+    lat: 46.94295,
+    lng: 4.74415,
     pinX: 26,
     pinY: 68,
     polygon: [
-      [46.944, 4.7437],
-      [46.9441, 4.7453],
-      [46.9429, 4.7455],
-      [46.9428, 4.7439],
+      [46.943543, 4.744916],
+      [46.942154, 4.743793],
+      [46.942027, 4.743348],
+      [46.942172, 4.743409],
+      [46.942278, 4.743459],
+      [46.942437, 4.743577],
+      [46.943116, 4.744096],
+      [46.943437, 4.744353],
+      [46.943441, 4.744342],
+      [46.943663, 4.744513],
+      [46.943543, 4.744916],
     ],
     terroir: 'Limons argilo-calcaires de pied de combe',
     altitude: '230 m · Plaine haute',
@@ -158,19 +188,23 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     classification: '1er Cru',
     appellation: 'Puligny-Montrachet 1er Cru',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AB n°0175 (Pierres Plates Nord)',
+    sectionCadastrale: 'Section AH n°0158 (35,78 ares · Pierres Plates Nord)',
     nbRangs: '16 rangs (Propriété Domaine · Équipe B)',
     pageLivret: 31,
     pastilleNum: 5,
-    lat: 46.94935,
-    lng: 4.74145,
+    lat: 46.94945,
+    lng: 4.74135,
     pinX: 50,
     pinY: 60,
     polygon: [
-      [46.9498, 4.7406],
-      [46.9499, 4.7422],
-      [46.9489, 4.7424],
-      [46.9488, 4.7408],
+      [46.94952, 4.740576],
+      [46.949587, 4.740613],
+      [46.949782, 4.740723],
+      [46.949431, 4.742175],
+      [46.949354, 4.742124],
+      [46.949266, 4.742064],
+      [46.949178, 4.742002],
+      [46.94952, 4.740576],
     ],
     terroir: 'Dalles calcaires affleurantes',
     altitude: '275 m · Haut de coteau',
@@ -183,19 +217,32 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
     classification: '1er Cru',
     appellation: 'Puligny-Montrachet 1er Cru',
     commune: 'Puligny-Montrachet (INSEE 21512)',
-    sectionCadastrale: 'Section AB n°0176 (Pierres Plates Fermage)',
+    sectionCadastrale: 'Section AK n°0104 (74,88 ares · Pierres Plates Fermage)',
     nbRangs: '14 rangs (Fermage · Accès humide)',
     pageLivret: 32,
     pastilleNum: 6,
-    lat: 46.94825,
-    lng: 4.74425,
+    lat: 46.94815,
+    lng: 4.74385,
     pinX: 50,
     pinY: 82,
     polygon: [
-      [46.9487, 4.7435],
-      [46.9488, 4.745],
-      [46.9478, 4.7452],
-      [46.9477, 4.7437],
+      [46.947651, 4.744339],
+      [46.947902, 4.743668],
+      [46.948166, 4.742958],
+      [46.948211, 4.743004],
+      [46.948238, 4.743019],
+      [46.948366, 4.743108],
+      [46.948415, 4.743127],
+      [46.948477, 4.743143],
+      [46.948636, 4.743256],
+      [46.948626, 4.7433],
+      [46.948496, 4.743854],
+      [46.948339, 4.74452],
+      [46.948049, 4.744485],
+      [46.947827, 4.744451],
+      [46.947784, 4.744435],
+      [46.94774, 4.744409],
+      [46.947651, 4.744339],
     ],
     terroir: 'Éboulis calcaires fins',
     altitude: '268 m',
@@ -206,21 +253,27 @@ const CLIMAT_METADATA: Record<string, ClimatLivretMeta> = {
   },
   'parcel-f': {
     classification: 'Village',
-    appellation: 'Meursault Village',
-    commune: 'Meursault (INSEE 21412)',
-    sectionCadastrale: 'Section BE n°0214 (Lieu-dit du Moulin)',
+    appellation: 'Puligny-Montrachet Village',
+    commune: 'Puligny-Montrachet (INSEE 21512)',
+    sectionCadastrale: 'Section AH n°0045 (19,29 ares · Vigne du Moulin)',
     nbRangs: '22 rangs (Vendange demain matin 06h30)',
     pageLivret: 38,
     pastilleNum: 7,
-    lat: 46.95115,
-    lng: 4.73985,
+    lat: 46.95122,
+    lng: 4.73955,
     pinX: 78,
     pinY: 74,
     polygon: [
-      [46.9517, 4.7389],
-      [46.9518, 4.7407],
-      [46.9506, 4.7409],
-      [46.9505, 4.7391],
+      [46.950982, 4.739791],
+      [46.951228, 4.739093],
+      [46.951236, 4.739068],
+      [46.951446, 4.739218],
+      [46.951479, 4.739243],
+      [46.951473, 4.739261],
+      [46.951218, 4.740008],
+      [46.951111, 4.739909],
+      [46.950988, 4.739797],
+      [46.950982, 4.739791],
     ],
     terroir: 'Marnes argilo-calcaires',
     altitude: '295 m',
@@ -271,6 +324,7 @@ interface CustomParcelTracking {
   extraKg: number;
   extraHl: number;
   customPin?: { xPct: number; yPct: number; lat: number; lng: number };
+  customPolygon?: [number, number][];
   customGoogleMapsUrl?: string;
   customNbRangs?: string;
   customAccessNotes?: string;
@@ -518,6 +572,47 @@ export const VineyardView: React.FC<{
       },
     }));
     setIsEditingGpsPin(false);
+
+    // Détection automatique de la vraie délimitation cadastrale IGN sous le point cliqué
+    const geom = encodeURIComponent(JSON.stringify({ type: 'Point', coordinates: [lng, lat] }));
+    fetch(`https://apicarto.ign.fr/api/cadastre/parcelle?geom=${geom}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const feat = data?.features?.[0];
+        if (!feat) return;
+        const ring =
+          feat.geometry?.type === 'MultiPolygon'
+            ? feat.geometry.coordinates?.[0]?.[0]
+            : feat.geometry?.type === 'Polygon'
+            ? feat.geometry.coordinates?.[0]
+            : null;
+        if (!Array.isArray(ring) || ring.length < 3) return;
+        const exactPoly: [number, number][] = ring.map((pt: [number, number]) => [
+          Number(pt[1].toFixed(6)),
+          Number(pt[0].toFixed(6)),
+        ]);
+        const props = feat.properties ?? {};
+        const ares = props.contenance ? `${(Number(props.contenance) / 100).toFixed(2)} ares` : '';
+        const sectionLabel =
+          props.section && props.numero
+            ? `Section ${props.section} n°${props.numero}${ares ? ` (${ares})` : ''}`
+            : undefined;
+
+        persistParcelTracking((prev) => {
+          const latest = prev[parcelId] ?? current;
+          return {
+            ...prev,
+            [parcelId]: {
+              ...latest,
+              customPolygon: exactPoly,
+              ...(sectionLabel ? { customSectionCadastrale: sectionLabel } : {}),
+            },
+          };
+        });
+      })
+      .catch(() => {
+        // Offline fallback: keep existing polygon
+      });
   };
 
   const mapItems: ParcelMapItem[] = parcels.map((p) => {
@@ -532,6 +627,7 @@ export const VineyardView: React.FC<{
       classification: meta.classification,
       appellation: meta.appellation,
       commune: meta.commune,
+      sectionCadastrale: tr.customSectionCadastrale ?? meta.sectionCadastrale,
       nbRangs: tr.customNbRangs ?? meta.nbRangs,
       status: tr.status,
       daySlot: tr.daySlot,
@@ -540,7 +636,7 @@ export const VineyardView: React.FC<{
       isCustomGps: Boolean(tr.customPin),
       googleMapsUrl:
         tr.customGoogleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-      polygon: meta.polygon,
+      polygon: tr.customPolygon ?? meta.polygon,
     };
   });
 

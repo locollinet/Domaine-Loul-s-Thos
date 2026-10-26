@@ -19,6 +19,7 @@ export interface ParcelMapItem {
   classification: 'Grand Cru' | '1er Cru' | 'Village';
   appellation: string;
   commune: string;
+  sectionCadastrale?: string;
   nbRangs: string;
   status: 'a_faire' | 'en_cours' | 'vendange';
   daySlot: 'today' | 'tomorrow' | 'upcoming' | 'done';
@@ -256,7 +257,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !selectedItem || mapStyle === 'livret') return;
-    map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 16), {
+    map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 17), {
       animate: true,
     });
   }, [selectedParcelId, selectedItem, mapStyle]);
@@ -598,6 +599,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
                 </span>
               </div>
               <div className="tabular" style={{ fontSize: '11px', color: '#E2C799', marginTop: '2px' }}>
+                {selectedItem.sectionCadastrale ? `${selectedItem.sectionCadastrale} · ` : ''}
                 GPS : {selectedItem.lat.toFixed(5)}° N, {selectedItem.lng.toFixed(5)}° E · {selectedItem.nbRangs}
               </div>
               {gpsState.label && (
