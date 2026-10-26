@@ -491,6 +491,15 @@ const AppInner: React.FC = () => {
               <button
                 className="btn btn-danger"
                 onClick={async () => {
+                  try {
+                    Object.keys(localStorage).forEach((k) => {
+                      if (k.startsWith('domaine-erp-')) {
+                        localStorage.removeItem(k);
+                      }
+                    });
+                  } catch {
+                    // Ignore storage error
+                  }
                   await resetDemo();
                   setConfirmReset(false);
                 }}

@@ -14,6 +14,20 @@ export default defineConfig({
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
   },
   preview: { port: 3000, host: '0.0.0.0' },
+  build: {
+    chunkSizeWarningLimit: 750,
+    rolldownOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/leaflet')) return 'vendor-leaflet';
+          if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
+          if (id.includes('node_modules/react')) return 'vendor-react';
+          if (id.includes('/src/features/vineyard/')) return 'feature-vineyard';
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],

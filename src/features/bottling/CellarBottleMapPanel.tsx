@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package } from 'lucide-react';
+import { Package, Plus, Scissors, Building2 } from 'lucide-react';
 import type { BottlingBatch, Sku, DomainState } from '../../domain/types';
 import { batchPosition } from '../../domain/selectors';
 
@@ -11,9 +11,13 @@ export interface BottleSlotRecord {
   cuveeLabel: string;
   vintage: number;
   formatLabel: string;
-  zone: 'Zone A · Palox Tiré-Bouché' | 'Zone B · Palettes Prêtes' | 'Zone C · Caveau & Fins de Lots' | 'Zone D · Œnotèque Voûtée';
+  zone: string;
   rackCode: string; // ex: "Allée C · Casier #C-01"
-  dressingState: 'Habillé CRD France (Cartons de 6)' | 'Habillé Export Neutre (Cartons)' | 'Tiré-Bouché Nu (Palox Fil 600 cols)' | 'Caisse Bois Origine (CBO)';
+  dressingState:
+    | 'Habillé CRD France (Cartons de 6)'
+    | 'Habillé Export Neutre (Cartons)'
+    | 'Tiré-Bouché Nu (Palox Fil 600 cols)'
+    | 'Caisse Bois Origine (CBO)';
   physicalBottles: number;
   availableBottles: number;
   urgency: SaleUrgencyLevel;
@@ -24,6 +28,26 @@ export interface BottleSlotRecord {
 }
 
 const STORAGE_KEY = 'domaine-erp-bottle-cellar-slots-v1';
+const ZONES_STORAGE_KEY = 'domaine-erp-bottle-cellar-zones-v1';
+const RACKS_STORAGE_KEY = 'domaine-erp-bottle-cellar-racks-v1';
+
+const DEFAULT_ZONES: string[] = [
+  'Zone C · Caveau & Fins de Lots',
+  'Zone B · Palettes Prêtes',
+  'Zone A · Palox Tiré-Bouché',
+  'Zone D · Œnotèque Voûtée',
+];
+
+const DEFAULT_RACKS: string[] = [
+  'Allée A · Travée 01 · Palox Fil #A-12',
+  'Allée A · Travée 02 · Palox Fil #A-14',
+  'Allée B · Travée 01 · Palette #B-02 (Quai Départ)',
+  'Allée B · Travée 02 · Palette #B-04',
+  'Allée C · Casier #C-01 (Niveau 1 · Caveau)',
+  'Allée C · Casier #C-02 (Rotation Rapide)',
+  'Cave Voûtée · Alvéole Pierre #D-01',
+  'Cave Voûtée · Alvéole Pierre #D-03',
+];
 
 const DEFAULT_EXTRA_SLOTS: BottleSlotRecord[] = [
   {
@@ -33,7 +57,7 @@ const DEFAULT_EXTRA_SLOTS: BottleSlotRecord[] = [
     vintage: 2023,
     formatLabel: 'Bouteille 75 cl',
     zone: 'Zone C · Caveau & Fins de Lots',
-    rackCode: 'Allée C · Casier #C-01 (Niveau 1)',
+    rackCode: 'Allée C · Casier #C-01 (Niveau 1 · Caveau)',
     dressingState: 'Habillé CRD France (Cartons de 6)',
     physicalBottles: 36,
     availableBottles: 36,
@@ -100,17 +124,6 @@ const DEFAULT_EXTRA_SLOTS: BottleSlotRecord[] = [
   },
 ];
 
-const RACK_OPTIONS = [
-  'Allée A · Travée 01 · Palox Fil #A-12',
-  'Allée A · Travée 02 · Palox Fil #A-14',
-  'Allée B · Travée 01 · Palette #B-02 (Quai Départ)',
-  'Allée B · Travée 02 · Palette #B-04',
-  'Allée C · Casier #C-01 (Niveau 1 · Caveau)',
-  'Allée C · Casier #C-02 (Rotation Rapide)',
-  'Cave Voûtée · Alvéole Pierre #D-01',
-  'Cave Voûtée · Alvéole Pierre #D-03',
-];
-
 interface CellarBottleMapPanelProps {
   state: DomainState;
   batches: BottlingBatch[];
@@ -132,9 +145,43 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
     return DEFAULT_EXTRA_SLOTS;
   });
 
+  const [zones, setZones] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(ZONES_STORAGE_KEY);
+      if (raw) return JSON.parse(raw) as string[];
+    } catch {
+      // Ignore
+    }
+    return DEFAULT_ZONES;
+  });
+
+  const [racks, setRacks] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(RACKS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw) as string[];
+    } catch {
+      // Ignore
+    }
+    return DEFAULT_RACKS;
+  });
+
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | SaleUrgencyLevel>('all');
   const [selectedSlotId, setSelectedSlotId] = useState<string>(DEFAULT_EXTRA_SLOTS[0]?.id ?? '');
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
+
+  // Modale d'ajout d'une Zone / Entrepôt ou Travée / Palox sur-mesure
+  const [showAddStructureModal, setShowAddStructureModal] = useState(false);
+  const [newZoneName, setNewZoneName] = useState('Zone E · Entrepôt Climatisé Beaune (13°C)');
+  const [newRackName, setNewRackName] = useState('Entrepôt Beaune · Allée 1 · Palox #E-01');
+
+  // Modale de Split (Scinder un lot sur plusieurs emplacements simultanés)
+  const [splitTargetSlot, setSplitTargetSlot] = useState<BottleSlotRecord | null>(null);
+  const [splitQty, setSplitQty] = useState('120');
+  const [splitDestZone, setSplitDestZone] = useState<string>(DEFAULT_ZONES[1] ?? 'Zone B · Palettes Prêtes');
+  const [splitDestRack, setSplitDestRack] = useState<string>(DEFAULT_RACKS[2] ?? 'Allée B · Travée 01 · Palette #B-02 (Quai Départ)');
+  const [splitDressing, setSplitDressing] = useState<BottleSlotRecord['dressingState']>(
+    'Habillé CRD France (Cartons de 6)'
+  );
 
   const persistSlots = (next: BottleSlotRecord[]) => {
     setSlots(next);
@@ -145,12 +192,16 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
     }
   };
 
-  // Fusionne dynamiquement les nouveaux lots créés dans l'ERP (via "+ Nouvelle mise en bouteilles") avec les emplacements du chai à bouteilles
+  // Fusionne dynamiquement les nouveaux lots créés dans l'ERP avec les emplacements du chai à bouteilles
   const mergedSlots: BottleSlotRecord[] = [...slots];
   batches.forEach((b, idx) => {
     const pos = batchPosition(state, b);
-    const existingIdx = mergedSlots.findIndex((s) => s.batchCode === b.code);
-    if (existingIdx >= 0) {
+    const matchingIndices = mergedSlots
+      .map((s, i) => (s.batchCode === b.code ? i : -1))
+      .filter((i) => i >= 0);
+
+    if (matchingIndices.length === 1) {
+      const existingIdx = matchingIndices[0]!;
       const current = mergedSlots[existingIdx];
       if (current) {
         mergedSlots[existingIdx] = {
@@ -159,7 +210,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
           availableBottles: pos.available,
         };
       }
-    } else {
+    } else if (matchingIndices.length === 0) {
       const sku = skus[b.skuId];
       mergedSlots.unshift({
         id: `slot-${b.id}`,
@@ -167,7 +218,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         cuveeLabel: sku?.label.replace(' — fictif', '') ?? b.code,
         vintage: b.vintage,
         formatLabel: sku?.sizeMl === 1500 ? 'Magnum 150 cl' : 'Bouteille 75 cl',
-        zone: 'Zone A · Palox Tiré-Bouché',
+        zone: zones[0] ?? 'Zone A · Palox Tiré-Bouché',
         rackCode: `Allée A · Travée 0${(idx % 3) + 1} · Palox Fil #A-0${idx + 1}`,
         dressingState: 'Habillé CRD France (Cartons de 6)',
         physicalBottles: pos.physical,
@@ -194,19 +245,19 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
   const totalBottlesInCellar = mergedSlots.reduce((acc, s) => acc + s.physicalBottles, 0);
 
   const handleMoveSlot = (slotId: string, newRackCode: string) => {
-    const newZone: BottleSlotRecord['zone'] = newRackCode.startsWith('Allée A')
-      ? 'Zone A · Palox Tiré-Bouché'
-      : newRackCode.startsWith('Allée B')
-      ? 'Zone B · Palettes Prêtes'
-      : newRackCode.startsWith('Allée C')
-      ? 'Zone C · Caveau & Fins de Lots'
-      : 'Zone D · Œnotèque Voûtée';
-
     const updated = mergedSlots.map((s) =>
-      s.id === slotId ? { ...s, rackCode: newRackCode, zone: newZone } : s
+      s.id === slotId ? { ...s, rackCode: newRackCode } : s
     );
     persistSlots(updated);
-    setStatusBanner(`Lot déplacé vers l’emplacement : ${newRackCode} (${newZone}).`);
+    setStatusBanner(`Lot déplacé vers l’emplacement : ${newRackCode}.`);
+  };
+
+  const handleChangeZone = (slotId: string, newZone: string) => {
+    const updated = mergedSlots.map((s) =>
+      s.id === slotId ? { ...s, zone: newZone } : s
+    );
+    persistSlots(updated);
+    setStatusBanner(`Lot affecté à la zone : ${newZone}.`);
   };
 
   const handleChangeUrgency = (slotId: string, newUrgency: SaleUrgencyLevel) => {
@@ -223,7 +274,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         ? {
             ...s,
             dressingState: 'Habillé CRD France (Cartons de 6)' as const,
-            zone: 'Zone B · Palettes Prêtes' as const,
+            zone: 'Zone B · Palettes Prêtes',
             rackCode: 'Allée B · Travée 01 · Palette #B-02 (Quai Départ)',
             urgency: 'high' as const,
           }
@@ -232,6 +283,78 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
     persistSlots(updated);
     setStatusBanner(
       'Opération d’habillage validée : lot étiqueté CRD, mis en cartons de 6 et transféré en Zone B (Prêt à expédier).'
+    );
+  };
+
+  // Ajout d'une Zone d'Entrepôt et/ou d'un Emplacement (Palox / Travée / Casier) propre au domaine
+  const handleAddCustomStructure = (e: React.FormEvent) => {
+    e.preventDefault();
+    const z = newZoneName.trim();
+    const r = newRackName.trim();
+    if (z && !zones.includes(z)) {
+      const nextZ = [...zones, z];
+      setZones(nextZ);
+      try {
+        localStorage.setItem(ZONES_STORAGE_KEY, JSON.stringify(nextZ));
+      } catch {
+        // Ignore
+      }
+    }
+    if (r && !racks.includes(r)) {
+      const nextR = [...racks, r];
+      setRacks(nextR);
+      try {
+        localStorage.setItem(RACKS_STORAGE_KEY, JSON.stringify(nextR));
+      } catch {
+        // Ignore
+      }
+    }
+    setShowAddStructureModal(false);
+    setStatusBanner(
+      `Structure d’entrepôt mise à jour : Zone "${z || 'existante'}" et emplacement "${r || 'existant'}" ajoutés.`
+    );
+  };
+
+  // Scission (Split) d'un lot sur 2 emplacements simultanés avec conservation stricte des quantités
+  const handleExecuteSplit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!splitTargetSlot) return;
+    const qty = parseInt(splitQty, 10);
+    if (Number.isNaN(qty) || qty <= 0 || qty >= splitTargetSlot.availableBottles) return;
+
+    const remainingPhys = splitTargetSlot.physicalBottles - qty;
+    const remainingAvail = splitTargetSlot.availableBottles - qty;
+
+    const newChildSlot: BottleSlotRecord = {
+      ...splitTargetSlot,
+      id: `${splitTargetSlot.id}-split-${Date.now()}`,
+      zone: splitDestZone,
+      rackCode: splitDestRack,
+      dressingState: splitDressing,
+      physicalBottles: qty,
+      availableBottles: qty,
+      urgency: splitDressing.includes('Habillé') ? 'high' : splitTargetSlot.urgency,
+      urgencyReason: `Fraction de ${qty} cols issue du lot ${splitTargetSlot.batchCode} (${splitDressing}).`,
+    };
+
+    const next = mergedSlots.flatMap((s) =>
+      s.id === splitTargetSlot.id
+        ? [
+            {
+              ...s,
+              physicalBottles: remainingPhys,
+              availableBottles: remainingAvail,
+            },
+            newChildSlot,
+          ]
+        : [s]
+    );
+
+    persistSlots(next);
+    setSelectedSlotId(newChildSlot.id);
+    setSplitTargetSlot(null);
+    setStatusBanner(
+      `Lot ${splitTargetSlot.batchCode} réparti : ${qty} cols transférés vers "${splitDestRack}" (${splitDestZone}) et ${remainingAvail} cols conservés dans "${splitTargetSlot.rackCode}".`
     );
   };
 
@@ -267,11 +390,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
       );
     }
     if (u === 'resting') {
-      return (
-        <span className="badge badge-green">
-          🟢 EN REPOS POST-MISE (GARDE)
-        </span>
-      );
+      return <span className="badge badge-green">🟢 EN REPOS POST-MISE (GARDE)</span>;
     }
     return <span className="badge badge-gold">👑 ŒNOTÈQUE & ALLOCATIONS RARES</span>;
   };
@@ -283,7 +402,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         <div className="kpi-card" style={{ borderLeft: '4px solid #DC2626' }}>
           <div className="kpi-label">Lots Urgents à Écouler en Priorité</div>
           <div className="kpi-value tabular" style={{ color: '#B91C1C' }}>
-            {urgentCount} lot(s)
+            {urgentCount} emplacement(s)
           </div>
           <div className="kpi-sub">
             Fins de millésime à vendre avant changement de carte ou palox à libérer avant mise
@@ -293,20 +412,20 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         <div className="kpi-card" style={{ borderLeft: '4px solid #F97316' }}>
           <div className="kpi-label">En Pleine Fenêtre Commerciale (Prêts)</div>
           <div className="kpi-value tabular" style={{ color: '#C2410C' }}>
-            {highPriorityCount} lot(s)
+            {highPriorityCount} emplacement(s)
           </div>
           <div className="kpi-sub">
-            Habillés en cartons sur palettes (Zone B) · Rotation active CHR & Cavistes
+            Habillés en cartons sur palettes · Rotation active CHR & Cavistes
           </div>
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-label">Stock Total Rangé au Chai à Bouteilles</div>
+          <div className="kpi-label">Stock Total Rangé ({zones.length} Zones d’Entrepôt)</div>
           <div className="kpi-value tabular">
             {totalBottlesInCellar.toLocaleString('fr-FR')} cols
           </div>
           <div className="kpi-sub">
-            Répartis sur 4 zones climatisées (12,5 °C · 78% HR) : Palox, Palettes, Caveau & Œnotèque
+            Multi-emplacements actif : un même lot peut être réparti entre Palox, Palette & Caveau
           </div>
         </div>
       </div>
@@ -336,9 +455,9 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         </div>
       )}
 
-      {/* 2. Plan Visuel des 4 Zones Physiques du Chai à Bouteilles + Fiche Sommelier & Rangement */}
+      {/* 2. Plan Visuel des Zones Physiques du Chai à Bouteilles + Fiche Sommelier & Rangement */}
       <div className="grid-2">
-        {/* Carte Interactive des 4 Zones de Rangement (Palox / Palettes / Caveau / Œnotèque) */}
+        {/* Carte Interactive des Zones de Rangement (100% adaptable à tout domaine/entrepôt) */}
         <div className="card">
           <div
             style={{
@@ -351,24 +470,36 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
             }}
           >
             <div>
-              <span className="badge badge-gold">CARTOGRAPHIE DU CHAI À BOUTEILLES</span>
+              <span className="badge badge-gold">ARCHITECTURE D’ENTREPÔT PERSONNALISABLE</span>
               <h3 style={{ margin: '4px 0 0 0', fontSize: '18px' }}>
-                Plan de Rangement Physique (Travées, Palox & Œnotèque)
+                Plan de Rangement ({zones.length} Zones · {racks.length} Travées/Palox)
               </h3>
             </div>
 
-            <select
-              className="form-select"
-              style={{ width: 'auto', fontSize: '12px' }}
-              value={urgencyFilter}
-              onChange={(e) => setUrgencyFilter(e.target.value as 'all' | SaleUrgencyLevel)}
-            >
-              <option value="all">Toutes les priorités de vente ({mergedSlots.length})</option>
-              <option value="urgent">🔴 Urgent à vendre en priorité</option>
-              <option value="high">🟠 Priorité commerciale haute</option>
-              <option value="resting">🟢 En repos post-mise (Garde)</option>
-              <option value="oenotheque">👑 Réserve Œnotèque</option>
-            </select>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-gold"
+                onClick={() => setShowAddStructureModal(true)}
+                title="Ajouter un nouveau bâtiment, une cave voûtée, une allée ou un palox propre au domaine"
+              >
+                <Building2 size={13} />
+                <span>+ Zone / Travée / Palox</span>
+              </button>
+
+              <select
+                className="form-select"
+                style={{ width: 'auto', fontSize: '12px' }}
+                value={urgencyFilter}
+                onChange={(e) => setUrgencyFilter(e.target.value as 'all' | SaleUrgencyLevel)}
+              >
+                <option value="all">Toutes priorités ({mergedSlots.length})</option>
+                <option value="urgent">🔴 Urgent à vendre</option>
+                <option value="high">🟠 Priorité haute</option>
+                <option value="resting">🟢 En repos (Garde)</option>
+                <option value="oenotheque">👑 Œnotèque</option>
+              </select>
+            </div>
           </div>
 
           <div
@@ -378,14 +509,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
               gap: '10px',
             }}
           >
-            {(
-              [
-                'Zone C · Caveau & Fins de Lots',
-                'Zone B · Palettes Prêtes',
-                'Zone A · Palox Tiré-Bouché',
-                'Zone D · Œnotèque Voûtée',
-              ] as const
-            ).map((zoneName) => {
+            {zones.map((zoneName) => {
               const zoneItems = filteredSlots.filter((s) => s.zone === zoneName);
               return (
                 <div
@@ -413,7 +537,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                     <span style={{ fontWeight: 700, fontSize: '12px', color: '#E2C799' }}>
                       {zoneName}
                     </span>
-                    <span style={{ fontSize: '11px', opacity: 0.8 }}>{zoneItems.length} lot(s)</span>
+                    <span style={{ fontSize: '11px', opacity: 0.8 }}>{zoneItems.length} réf.</span>
                   </div>
 
                   {zoneItems.map((slot) => {
@@ -438,9 +562,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                           background: isSelected
                             ? 'rgba(196, 164, 122, 0.22)'
                             : 'rgba(255, 255, 255, 0.05)',
-                          border: isSelected
-                            ? `2px solid #FFFFFF`
-                            : `1.5px solid ${borderColor}`,
+                          border: isSelected ? `2px solid #FFFFFF` : `1.5px solid ${borderColor}`,
                           color: '#FAF8F5',
                           cursor: 'pointer',
                         }}
@@ -483,7 +605,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
 
                   {zoneItems.length === 0 && (
                     <div style={{ fontSize: '11px', opacity: 0.6, padding: '8px 0' }}>
-                      Aucun lot dans cette zone avec ce filtre.
+                      Aucun lot dans cette zone.
                     </div>
                   )}
                 </div>
@@ -519,12 +641,12 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                   {activeSlot.availableBottles} cols vendables
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                  sur {activeSlot.physicalBottles} cols physiques en place
+                  sur {activeSlot.physicalBottles} cols dans cet emplacement
                 </div>
               </div>
             </div>
 
-            {/* Diagnostic d'urgence de vente (Pourquoi vendre ce lot en priorité ?) */}
+            {/* Diagnostic d'urgence de vente */}
             <div
               style={{
                 padding: '12px 14px',
@@ -581,25 +703,42 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
               </div>
             </div>
 
-            {/* Contrôles de Rangement (Déplacer de Palox/Casier) & Changement de Priorité */}
+            {/* Contrôles de Zone, Rangement (Palox/Casier) & Changement de Priorité */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '12px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+                gap: '10px',
                 marginBottom: '14px',
               }}
             >
               <div>
                 <label className="form-label" style={{ fontSize: '11.5px' }}>
-                  📍 Emplacement physique actuel (Déplacer le lot)
+                  🏢 Zone / Bâtiment d’entrepôt
+                </label>
+                <select
+                  className="form-select"
+                  value={activeSlot.zone}
+                  onChange={(e) => handleChangeZone(activeSlot.id, e.target.value)}
+                >
+                  {zones.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11.5px' }}>
+                  📍 Travée / Palox / Casier précis
                 </label>
                 <select
                   className="form-select"
                   value={activeSlot.rackCode}
                   onChange={(e) => handleMoveSlot(activeSlot.id, e.target.value)}
                 >
-                  {RACK_OPTIONS.map((rk) => (
+                  {racks.map((rk) => (
                     <option key={rk} value={rk}>
                       {rk}
                     </option>
@@ -609,7 +748,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
 
               <div>
                 <label className="form-label" style={{ fontSize: '11.5px' }}>
-                  🔥 Niveau d’urgence commerciale (Ordre de priorité)
+                  🔥 Niveau d’urgence commerciale
                 </label>
                 <select
                   className="form-select"
@@ -618,28 +757,43 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                     handleChangeUrgency(activeSlot.id, e.target.value as SaleUrgencyLevel)
                   }
                 >
-                  <option value="urgent">🔴 Urgent à vendre en priorité (Fin de lot)</option>
-                  <option value="high">🟠 Priorité commerciale haute (Pleine fenêtre)</option>
-                  <option value="resting">🟢 En repos post-mise (Bloqué garde)</option>
-                  <option value="oenotheque">👑 Réserve Œnotèque (Grands formats / Vieux mill.)</option>
+                  <option value="urgent">🔴 Urgent à vendre en priorité</option>
+                  <option value="high">🟠 Priorité commerciale haute</option>
+                  <option value="resting">🟢 En repos post-mise (Garde)</option>
+                  <option value="oenotheque">👑 Réserve Œnotèque</option>
                 </select>
               </div>
             </div>
 
-            {activeSlot.dressingState.includes('Tiré-Bouché Nu') && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Boutons d'actions logistiques : Scinder sur un autre emplacement (Split) ou Habiller */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+              {activeSlot.availableBottles > 6 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSplitTargetSlot(activeSlot);
+                    setSplitQty(String(Math.min(60, Math.floor(activeSlot.availableBottles / 2))));
+                  }}
+                >
+                  <Scissors size={14} />
+                  <span>
+                    Scinder / Répartir une partie sur un autre emplacement (Palox → Palette / Caveau)
+                  </span>
+                </button>
+              )}
+
+              {activeSlot.dressingState.includes('Tiré-Bouché Nu') && (
                 <button
                   type="button"
                   className="btn btn-gold"
                   onClick={() => handleDressPaloxToReady(activeSlot.id)}
                 >
                   <Package size={14} />
-                  <span>
-                    Lancer l’habillage de ce Palox (Étiqueter CRD & Transférer en Zone B Prêt à vendre)
-                  </span>
+                  <span>Habiller tout ce Palox (Étiqueter CRD → Zone B)</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -658,7 +812,7 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
         >
           <div>
             <h3 style={{ margin: 0, fontSize: '17px' }}>
-              Registre d’Écoulement Prioritaire & Localisation des Lots en Cave
+              Registre d’Écoulement Prioritaire & Localisation Multi-Emplacements en Cave
             </h3>
             <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-ink-muted)' }}>
               Permet à l’équipe commerciale et au magasinier de savoir immédiatement quel lot vendre en premier et dans quelle allée/palox le prélever.
@@ -717,6 +871,152 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Modale 1 : Ajouter une Zone / Bâtiment ou un Palox / Travée sur-mesure */}
+      {showAddStructureModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddStructureModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, fontSize: '20px' }}>
+              Configurer l’Architecture de votre Chai à Bouteilles / Entrepôt
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+              Adaptez les zones et les travées à la topologie exacte du domaine (Cave voûtée, bâtiment climatisé, entrepôt logistique déporté, palox 500 ou 600 cols).
+            </p>
+            <form onSubmit={handleAddCustomStructure}>
+              <div className="form-group">
+                <label className="form-label">Nouvelle Zone / Bâtiment de stockage</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newZoneName}
+                  onChange={(e) => setNewZoneName(e.target.value)}
+                  placeholder="Ex: Zone E · Entrepôt Climatisé Beaune (13°C)"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Nouvelle Allée / Travée / Palox / Alvéole</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newRackName}
+                  onChange={(e) => setNewRackName(e.target.value)}
+                  placeholder="Ex: Entrepôt Beaune · Allée 1 · Palox #E-01"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAddStructureModal(false)}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <Plus size={14} />
+                  <span>Ajouter au plan de cave</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale 2 : Scinder (Split) un lot sur un autre emplacement simultané */}
+      {splitTargetSlot && (
+        <div className="modal-backdrop" onClick={() => setSplitTargetSlot(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0, fontSize: '20px' }}>
+              Scinder / Répartir le lot {splitTargetSlot.batchCode} ({splitTargetSlot.cuveeLabel})
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+              Transférez une partie des <strong>{splitTargetSlot.availableBottles} bouteilles</strong> disponibles de{' '}
+              <code>{splitTargetSlot.rackCode}</code> vers un second emplacement (ex: habillage partiel sur palette ou réassort caveau) tout en conservant le solde dans le palox d’origine.
+            </p>
+            <form onSubmit={handleExecuteSplit}>
+              <div className="form-group">
+                <label className="form-label">
+                  Quantité à prélever et déplacer (max {splitTargetSlot.availableBottles - 1} cols)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={splitTargetSlot.availableBottles - 1}
+                  className="form-input tabular"
+                  value={splitQty}
+                  onChange={(e) => setSplitQty(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Zone de destination</label>
+                <select
+                  className="form-select"
+                  value={splitDestZone}
+                  onChange={(e) => setSplitDestZone(e.target.value)}
+                >
+                  {zones.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Emplacement précis (Palox / Palette / Casier)</label>
+                <select
+                  className="form-select"
+                  value={splitDestRack}
+                  onChange={(e) => setSplitDestRack(e.target.value)}
+                >
+                  {racks.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">État d’habillage de la fraction déplacée</label>
+                <select
+                  className="form-select"
+                  value={splitDressing}
+                  onChange={(e) =>
+                    setSplitDressing(e.target.value as BottleSlotRecord['dressingState'])
+                  }
+                >
+                  <option value="Habillé CRD France (Cartons de 6)">
+                    Habillé CRD France (Cartons de 6)
+                  </option>
+                  <option value="Habillé Export Neutre (Cartons)">
+                    Habillé Export Neutre (Cartons)
+                  </option>
+                  <option value="Caisse Bois Origine (CBO)">Caisse Bois Origine (CBO)</option>
+                  <option value="Tiré-Bouché Nu (Palox Fil 600 cols)">
+                    Tiré-Bouché Nu (Palox Fil 600 cols)
+                  </option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSplitTargetSlot(null)}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <Scissors size={14} />
+                  <span>Valider la répartition multi-emplacements</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -13,7 +13,9 @@ import {
 import { useStore } from '../../app/store-context';
 import { PARAMETERS } from '../../domain/commands/cellar';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
-import type { Measurement, MeasurementParameter } from '../../domain/types';
+import type { Container, ContainerKind, Measurement, MeasurementParameter } from '../../domain/types';
+
+const CUSTOM_CONTAINERS_KEY = 'domaine-erp-custom-containers-v1';
 
 export const CellarView: React.FC = () => {
   const { state, dispatch } = useStore();
@@ -47,10 +49,29 @@ export const CellarView: React.FC = () => {
   const [showQualityModal, setShowQualityModal] = useState<'hold' | 'release' | null>(null);
   const [qualityReason, setQualityReason] = useState('');
 
+  // Custom Container Configuration Modal (Adaptable to any winery structure)
+  const [showAddContainerModal, setShowAddContainerModal] = useState(false);
+  const [newContainerCode, setNewContainerCode] = useState('OEUF-01');
+  const [newContainerKind, setNewContainerKind] = useState<ContainerKind>('vat');
+  const [newContainerCapHl, setNewContainerCapHl] = useState('16');
+  const [newContainerLocation, setNewContainerLocation] = useState('Chai Blancs · Travée Œufs Béton');
+  const [customContainers, setCustomContainers] = useState<Container[]>(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_CONTAINERS_KEY);
+      return raw ? (JSON.parse(raw) as Container[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
   if (!state) return null;
 
   const lots = Object.values(state.lots);
-  const containers = Object.values(state.containers);
+  const baseContainers = Object.values(state.containers);
+  const containers: Container[] = [
+    ...baseContainers,
+    ...customContainers.filter((cc) => !state.containers[cc.id]),
+  ];
   const selectedLot = state.lots[selectedLotId] || lots[0];
 
   const lotMeas = Object.values(state.measurements)
@@ -200,12 +221,35 @@ export const CellarView: React.FC = () => {
     }
   };
 
+  const handleAddCustomContainer = (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = newContainerCode.trim().toUpperCase() || `C-${containers.length + 1}`;
+    const capHl = parseFloat(newContainerCapHl || '10') || 10;
+    const item: Container = {
+      id: `custom-cont-${code.toLowerCase()}-${Date.now()}`,
+      code,
+      kind: newContainerKind,
+      capacityMl: Math.round(capHl * 100_000),
+      location: newContainerLocation.trim() || 'Chai Principal',
+      state: 'available',
+      plan: { row: 2, col: (containers.length % 4) + 1 },
+    };
+    const next = [...customContainers, item];
+    setCustomContainers(next);
+    try {
+      localStorage.setItem(CUSTOM_CONTAINERS_KEY, JSON.stringify(next));
+    } catch {
+      // Ignore quota
+    }
+    setShowAddContainerModal(false);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
       <div className="page-header" style={{ marginBottom: '0' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span className="badge badge-gold">Chai de Vinification</span>
+            <span className="badge badge-gold">Chai de Vinification ({containers.length} contenants)</span>
             <span className="badge badge-grape">Vins Tranquilles Blancs & Rouges</span>
           </div>
           <h1 className="page-title">Chai & Vinification</h1>
@@ -213,19 +257,31 @@ export const CellarView: React.FC = () => {
             Plan de cuverie synoptique avec jauges de niveau, suivi analytique réel et itinéraires œnologiques.
           </p>
         </div>
-        <div className="segmented-control">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button
-            className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
-            onClick={() => setViewMode('plan')}
+            type="button"
+            className="btn btn-sm btn-gold"
+            onClick={() => setShowAddContainerModal(true)}
+            title="Ajouter une cuve inox, un œuf béton, un foudre, un demi-muid 600L ou une pièce 228L au plan du chai"
           >
-            <LayoutGrid size={14} /> Plan de cave visuel
+            <Plus size={14} />
+            <span>+ Configurer un contenant</span>
           </button>
-          <button
-            className={`segmented-btn ${viewMode === 'table' ? 'active' : ''}`}
-            onClick={() => setViewMode('table')}
-          >
-            <TableIcon size={14} /> Table des contenants
-          </button>
+
+          <div className="segmented-control">
+            <button
+              className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
+              onClick={() => setViewMode('plan')}
+            >
+              <LayoutGrid size={14} /> Plan de cave visuel
+            </button>
+            <button
+              className={`segmented-btn ${viewMode === 'table' ? 'active' : ''}`}
+              onClick={() => setViewMode('table')}
+            >
+              <TableIcon size={14} /> Table des contenants
+            </button>
+          </div>
         </div>
       </div>
 
@@ -951,6 +1007,77 @@ export const CellarView: React.FC = () => {
                 </button>
                 <button type="submit" className={showQualityModal === 'hold' ? 'btn btn-danger' : 'btn btn-primary'}>
                   Confirmer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ajout Contenant sur-mesure (Cuve, Foudre, Œuf béton, Demi-muid, Pièce 228L) */}
+      {showAddContainerModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddContainerModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
+              Ajouter un contenant sur-mesure au plan de cuverie
+            </h2>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+              Adaptez la cuverie à la structure exacte du domaine (Cuve inox thermorégulée, Œuf béton, Foudre chêne, Demi-muid 600 L, Pièce bourguignonne 228 L).
+            </p>
+            <form onSubmit={handleAddCustomContainer}>
+              <div className="form-group">
+                <label className="form-label">Code du contenant (ex: OEUF-01, FOUDRE-02, F-18)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newContainerCode}
+                  onChange={(e) => setNewContainerCode(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Famille de contenant</label>
+                <select
+                  className="form-select"
+                  value={newContainerKind}
+                  onChange={(e) => setNewContainerKind(e.target.value as ContainerKind)}
+                >
+                  <option value="tank">Cuve Inox / Béton (tank)</option>
+                  <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
+                  <option value="barrel">Pièce 228 L / Barrique 225 L / Demi-muid 600 L (barrel)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Capacité nominale en hectolitres (hL) — ex: 2,28 pour une pièce de 228 L</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input tabular"
+                  value={newContainerCapHl}
+                  onChange={(e) => setNewContainerCapHl(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Localisation / Salle de chai</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newContainerLocation}
+                  onChange={(e) => setNewContainerLocation(e.target.value)}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAddContainerModal(false)}
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Ajouter au plan de cave
                 </button>
               </div>
             </form>

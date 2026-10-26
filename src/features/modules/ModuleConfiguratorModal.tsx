@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sliders,
   CheckCircle2,
@@ -16,6 +16,8 @@ import {
   Handshake,
   Crown,
   Landmark,
+  Download,
+  Upload,
 } from 'lucide-react';
 import {
   useModuleConfig,
@@ -146,9 +148,82 @@ const ADDON_DESCRIPTIONS: Array<{
 
 export const ModuleConfiguratorModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { config, applyPreset, toggleMainModule, toggleAddon } = useModuleConfig();
+  const [snapshotMsg, setSnapshotMsg] = useState<string | null>(null);
 
   const activeMainCount = Object.values(config.enabledMainModules).filter(Boolean).length;
   const activeAddonCount = Object.values(config.enabledAddons).filter(Boolean).length;
+
+  const DOMAINE_STORAGE_KEYS = [
+    'domaine-erp-modules-config-v1',
+    'domaine-erp-parcel-configs-v1',
+    'domaine-erp-imported-parcels-v1',
+    'domaine-erp-bottle-cellar-slots-v1',
+    'domaine-erp-bottle-cellar-zones-v1',
+    'domaine-erp-bottle-cellar-racks-v1',
+    'domaine-erp-custom-containers-v1',
+  ];
+
+  const handleExportDomainProfile = () => {
+    const dump: Record<string, unknown> = {
+      exportedAt: new Date().toISOString(),
+      profileVersion: 1,
+      keys: {},
+    };
+    const keyMap: Record<string, unknown> = {};
+    DOMAINE_STORAGE_KEYS.forEach((k) => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw) keyMap[k] = JSON.parse(raw);
+      } catch {
+        // Ignore
+      }
+    });
+    dump.keys = keyMap;
+
+    try {
+      const blob = new Blob([JSON.stringify(dump, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'profil-domaine-sur-mesure.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Ignore in test environment
+    }
+    setSnapshotMsg(
+      'Profil complet du domaine ("profil-domaine-sur-mesure.json") exporté avec succès (Parcelles, Livret CVI, Zones d’entrepôt, Cuves sur-mesure & Modules).'
+    );
+  };
+
+  const handleImportDomainProfile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(String(ev.target?.result ?? '{}')) as {
+          keys?: Record<string, unknown>;
+        };
+        if (parsed.keys && typeof parsed.keys === 'object') {
+          Object.entries(parsed.keys).forEach(([k, val]) => {
+            if (k.startsWith('domaine-erp-')) {
+              localStorage.setItem(k, JSON.stringify(val));
+            }
+          });
+          setSnapshotMsg('Profil Domaine chargé ! Rechargement de la configuration...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 400);
+        }
+      } catch {
+        setSnapshotMsg('Fichier JSON de profil invalide.');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -439,6 +514,77 @@ export const ModuleConfiguratorModal: React.FC<{ onClose: () => void }> = ({ onC
               );
             })}
           </div>
+        </div>
+
+        {/* 4. Sauvegarde & Portabilité d'un Profil Domaine Sur-Mesure (.JSON) */}
+        <div
+          style={{
+            padding: '14px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border-strong)',
+            marginBottom: '18px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '10px',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--color-ink)' }}>
+                4. Portabilité & Sauvegarde de Configuration Domaine (.JSON)
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+                Exportez ou rechargez en 1 clic une configuration complète préparée pour un prospect (Parcelles CVI, Livret, Zones d’entrepôt, Cuves sur-mesure & Modules actifs).
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-gold"
+                onClick={handleExportDomainProfile}
+              >
+                <Download size={14} />
+                <span>Exporter Profil Domaine (.JSON)</span>
+              </button>
+
+              <label
+                className="btn btn-sm btn-secondary"
+                style={{ cursor: 'pointer', margin: 0 }}
+              >
+                <Upload size={14} />
+                <span>Charger un Profil (.JSON)</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportDomainProfile}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+          </div>
+
+          {snapshotMsg && (
+            <div
+              style={{
+                marginTop: '10px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'rgba(26, 94, 66, 0.12)',
+                border: '1px solid rgba(26, 94, 66, 0.35)',
+                fontSize: '12px',
+                fontWeight: 600,
+              }}
+            >
+              ✅ {snapshotMsg}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
