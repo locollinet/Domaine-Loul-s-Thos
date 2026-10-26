@@ -910,3 +910,633 @@ tr:hover td {
     font-size: 16px;
   }
 }
+
+
+/* ==========================================================================
+   DESIGN SYSTEM v2 « MAISON » — Briques réutilisables (préfixe ds-)
+   Principes : 1 écran = 1 question · verbes d'action · grandes cibles tactiles
+   · couleur = statut · chiffres lisibles · zéro jargon technique visible.
+   ========================================================================== */
+
+:root {
+  --ds-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-tap: 52px;
+  --ds-ring: 0 0 0 3px rgba(196, 164, 122, 0.45);
+}
+
+.ds-page {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  max-width: 1280px;
+}
+
+.ds-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ds-section-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: -0.01em;
+}
+
+.ds-section-hint {
+  font-size: 12.5px;
+  color: var(--color-ink-light);
+}
+
+/* ---------- Hero d'accueil ---------- */
+.ds-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 22px;
+  padding: 26px 28px;
+  border-radius: var(--radius-xl);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='260' viewBox='0 0 520 260' fill='none' stroke='%23C4A47A' stroke-opacity='0.22' stroke-width='1.2'%3E%3Cpath d='M0 210 C120 170 220 200 320 150 S470 90 520 100'/%3E%3Cpath d='M0 228 C130 190 230 222 330 172 S480 112 520 124'/%3E%3Cpath d='M0 246 C140 210 240 244 340 194 S490 134 520 148'/%3E%3Cpath d='M0 190 C110 150 210 178 310 128 S460 68 520 76'/%3E%3Cpath d='M0 170 C100 130 200 156 300 106 S450 46 520 52'/%3E%3C/svg%3E") right bottom / 560px auto no-repeat,
+    linear-gradient(135deg, #FFFDF9 0%, #F5EFE3 100%);
+  border: 1px solid var(--color-gold-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ds-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-gold-dark);
+}
+
+.ds-hero-title {
+  font-family: var(--font-serif);
+  font-size: 38px;
+  line-height: 1.05;
+  font-weight: 600;
+  color: var(--color-forest);
+  margin: 8px 0 6px;
+  letter-spacing: -0.015em;
+}
+
+.ds-hero-sub {
+  font-size: 14px;
+  color: var(--color-ink-muted);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.ds-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  backdrop-filter: blur(4px);
+}
+
+.ds-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Carte « Votre priorité maintenant » */
+.ds-next {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, #1E221E 0%, #2D3A30 100%);
+  color: #FAF8F5;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(196, 164, 122, 0.35);
+}
+
+.ds-next-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #FFFFFF;
+  margin-top: 6px;
+}
+
+.ds-next-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(250, 248, 245, 0.78);
+  margin-top: 6px;
+}
+
+.ds-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-gold);
+  color: #1E221E;
+  font-weight: 700;
+  font-size: 14px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  box-shadow: 0 6px 18px -6px rgba(196, 164, 122, 0.7);
+  align-self: flex-start;
+}
+
+.ds-cta:hover {
+  background: #D2B48A;
+  transform: translateY(-1px);
+}
+
+.ds-cta:focus-visible,
+.ds-tile:focus-visible,
+.ds-stat:focus-visible,
+.ds-step:focus-visible,
+.ds-row:focus-visible,
+.ds-vintage:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-ring);
+}
+
+/* ---------- Tuiles d'action rapide (verbes) ---------- */
+.ds-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ds-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 118px;
+  padding: 16px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ds-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-gold-border);
+}
+
+.ds-tile.is-recommended {
+  border-color: var(--color-gold);
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--color-gold-soft) 100%);
+}
+
+.ds-tile-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold-dark);
+}
+
+.ds-icon-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  flex-shrink: 0;
+}
+
+.ds-tone-forest { background: var(--color-forest-soft); color: var(--color-forest); }
+.ds-tone-grape { background: var(--color-grape-soft); color: var(--color-grape); }
+.ds-tone-gold { background: var(--color-gold-soft); color: var(--color-gold-dark); }
+.ds-tone-amber { background: var(--color-amber-soft); color: var(--color-amber); }
+.ds-tone-ink { background: var(--color-surface-soft); color: var(--color-ink); }
+.ds-tone-crimson { background: var(--color-crimson-soft); color: var(--color-crimson); }
+
+.ds-tile-label {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+
+.ds-tile-sub {
+  font-size: 11.5px;
+  color: var(--color-ink-light);
+  margin-top: 2px;
+}
+
+/* ---------- Statistiques clés ---------- */
+.ds-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ds-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ds-stat:hover {
+  border-color: var(--color-gold-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.ds-stat-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+
+.ds-stat-top .ds-icon-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.ds-stat-value {
+  font-family: var(--font-serif);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-stat-unit {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink-light);
+  margin-left: 4px;
+}
+
+.ds-stat-foot {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+.ds-bar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.ds-bar > span {
+  height: 100%;
+  transition: width 600ms var(--ds-ease);
+}
+
+/* ---------- Parcours de la vigne au verre (stepper) ---------- */
+.ds-journey {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  padding: 20px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.ds-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 4px;
+  text-align: center;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.ds-step:hover {
+  background: var(--color-surface-hover);
+}
+
+.ds-step::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: calc(-50% + 28px);
+  right: calc(50% + 28px);
+  height: 2px;
+  background: var(--color-border);
+}
+
+.ds-step:first-child::before {
+  display: none;
+}
+
+.ds-step.is-done::before,
+.ds-step.is-active::before,
+.ds-step.is-next::before {
+  background: var(--color-forest);
+}
+
+.ds-step-node {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-surface-soft);
+  color: var(--color-ink-light);
+  border: 2px solid var(--color-border);
+  transition: transform var(--transition-fast);
+}
+
+.ds-step:hover .ds-step-node {
+  transform: scale(1.06);
+}
+
+.ds-step.is-done .ds-step-node {
+  background: var(--color-forest);
+  border-color: var(--color-forest);
+  color: #FFFFFF;
+}
+
+.ds-step.is-active .ds-step-node {
+  background: var(--color-amber-soft);
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+}
+
+.ds-step.is-next .ds-step-node {
+  background: var(--color-gold);
+  border-color: var(--color-gold-dark);
+  color: #1E221E;
+  box-shadow: 0 0 0 6px rgba(196, 164, 122, 0.22);
+}
+
+.ds-step-label {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--color-ink);
+}
+
+.ds-step-state {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink-light);
+}
+
+.ds-step.is-done .ds-step-state { color: var(--color-forest); }
+.ds-step.is-active .ds-step-state { color: var(--color-amber); }
+.ds-step.is-next .ds-step-state { color: var(--color-gold-dark); }
+
+/* ---------- Deux colonnes : millésimes + à traiter ---------- */
+.ds-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ds-panel {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+/* Timeline des millésimes, façon étiquette */
+.ds-vintages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ds-vintage {
+  display: grid;
+  grid-template-columns: 6px 74px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px 12px 0;
+  text-align: left;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
+}
+
+.ds-vintage:hover {
+  border-color: var(--color-gold-border);
+  background: #FFFFFF;
+  transform: translateX(2px);
+}
+
+.ds-vintage-strip {
+  align-self: stretch;
+  border-radius: 0 4px 4px 0;
+}
+
+.ds-strip-red { background: linear-gradient(180deg, #8B2A33, #5A161C); }
+.ds-strip-white { background: linear-gradient(180deg, #E9D9A6, #C9AE6A); }
+.ds-strip-mixed { background: linear-gradient(180deg, #E9D9A6 0%, #E9D9A6 50%, #7A2530 50%, #7A2530 100%); }
+.ds-strip-future { background: repeating-linear-gradient(180deg, #CFC7B5 0 6px, transparent 6px 10px); }
+
+.ds-vintage-year {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--color-forest);
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.ds-vintage-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-light);
+}
+
+.ds-vintage-stage {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--color-ink);
+  margin-top: 2px;
+}
+
+.ds-vintage-detail {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--color-ink-light);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.ds-vintage:hover .ds-go,
+.ds-row:hover .ds-go {
+  background: var(--color-forest);
+  color: #FFFFFF;
+  border-color: var(--color-forest);
+}
+
+/* Liste « À traiter aujourd'hui » */
+.ds-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ds-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--ds-tap);
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.ds-row:hover {
+  background: #FFFFFF;
+  border-color: var(--color-gold-border);
+}
+
+.ds-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-row-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--color-ink);
+}
+
+.ds-row-sub {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  margin-top: 1px;
+}
+
+.ds-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-forest-soft);
+  color: var(--color-forest);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Apparition douce en cascade */
+@keyframes dsRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ds-rise {
+  animation: dsRise 420ms var(--ds-ease) both;
+}
+
+.ds-rise-1 { animation-delay: 40ms; }
+.ds-rise-2 { animation-delay: 90ms; }
+.ds-rise-3 { animation-delay: 140ms; }
+.ds-rise-4 { animation-delay: 190ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-rise { animation: none; }
+  .ds-tile:hover, .ds-vintage:hover, .ds-cta:hover { transform: none; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1180px) {
+  .ds-quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 960px) {
+  .ds-hero { grid-template-columns: 1fr; padding: 22px; }
+  .ds-split { grid-template-columns: 1fr; }
+  .ds-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .ds-hero-title { font-size: 30px; }
+  .ds-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ds-tile { min-height: 104px; }
+  .ds-journey {
+    grid-template-columns: repeat(5, minmax(84px, 1fr));
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .ds-step { scroll-snap-align: start; }
+  .ds-vintage { grid-template-columns: 6px 58px minmax(0, 1fr) auto; gap: 10px; }
+  .ds-vintage-year { font-size: 24px; }
+}
