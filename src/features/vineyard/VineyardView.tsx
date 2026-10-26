@@ -26,6 +26,7 @@ import { canRun } from '../../domain/commands';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { HarvestCount, Mission, MissionStatus, Parcel } from '../../domain/types';
 import { InteractiveVineyardMap, type ParcelMapItem } from './InteractiveVineyardMap';
+import { LivretImportModal, type ImportedParcelRecord } from './LivretImportModal';
 
 function normalizeAccents(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -332,10 +333,14 @@ interface CustomParcelTracking {
   customPageLivret?: number;
   customPastilleNum?: number;
   customSectionCadastrale?: string;
+  customClassification?: 'Grand Cru' | '1er Cru' | 'Village';
+  customAppellation?: string;
+  customCommune?: string;
   photos?: ParcelFieldPhoto[];
 }
 
 const PARCEL_STORAGE_KEY = 'domaine-erp-parcel-configs-v1';
+const IMPORTED_PARCELS_STORAGE_KEY = 'domaine-erp-imported-parcels-v1';
 
 // Photo terrain par défaut (repère visuel d'entrée de rangs et murger en Bourgogne)
 const DEFAULT_FIELD_PHOTO_SVG =
@@ -418,6 +423,16 @@ export const VineyardView: React.FC<{
 
   // Mode "Repositionnement Point GPS Domaine" (On-top du cadastre et du livret)
   const [isEditingGpsPin, setIsEditingGpsPin] = useState(false);
+  const [showLivretImportModal, setShowLivretImportModal] = useState(false);
+  const [importedBannerMsg, setImportedBannerMsg] = useState<string | null>(null);
+  const [importedParcels, setImportedParcels] = useState<Parcel[]>(() => {
+    try {
+      const raw = localStorage.getItem(IMPORTED_PARCELS_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Parcel[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [parcelTracking, setParcelTracking] = useState<Record<string, CustomParcelTracking>>(() => {
     try {
       const raw = localStorage.getItem(PARCEL_STORAGE_KEY);
@@ -472,7 +487,12 @@ export const VineyardView: React.FC<{
 
   if (!state) return null;
 
-  const parcels = Object.values(state.parcels);
+  const baseParcels = Object.values(state.parcels);
+  const parcels: Parcel[] = [
+    ...baseParcels,
+    ...importedParcels.filter((ip) => !state.parcels[ip.id]),
+  ];
+  const parcelMap: Record<string, Parcel> = Object.fromEntries(parcels.map((p) => [p.id, p]));
   const missions = Object.values(state.missions);
   const counts = Object.values(state.harvestCounts);
   const transports = Object.values(state.transports);
@@ -521,13 +541,17 @@ export const VineyardView: React.FC<{
 
   const filteredParcels = parcels.filter((p) => {
     const meta = CLIMAT_METADATA[p.id] ?? DEFAULT_CLIMAT_META;
-    if (levelFilter !== 'all' && meta.classification !== levelFilter) return false;
+    const tr = getParcelTrack(p);
+    const effClass = tr.customClassification ?? meta.classification;
+    const effApp = tr.customAppellation ?? meta.appellation;
+    const effComm = tr.customCommune ?? meta.commune;
+    if (levelFilter !== 'all' && effClass !== levelFilter) return false;
     if (!parcelSearch.trim()) return true;
     const q = normalizeAccents(parcelSearch);
-    return normalizeAccents(`${p.code} ${p.name} ${p.grape} ${meta.appellation} ${meta.commune}`).includes(q);
+    return normalizeAccents(`${p.code} ${p.name} ${p.grape} ${effApp} ${effComm}`).includes(q);
   });
 
-  const selectedParcel = (selectedParcelId ? state.parcels[selectedParcelId] : null) ?? parcels[0] ?? null;
+  const selectedParcel = (selectedParcelId ? parcelMap[selectedParcelId] : null) ?? parcels[0] ?? null;
   const selectedMeta = selectedParcel ? (CLIMAT_METADATA[selectedParcel.id] ?? DEFAULT_CLIMAT_META) : DEFAULT_CLIMAT_META;
   const selectedTrack = selectedParcel ? getParcelTrack(selectedParcel) : null;
   const selectedMetrics = selectedParcel ? getParcelHarvestMetrics(selectedParcel) : null;
@@ -554,8 +578,99 @@ export const VineyardView: React.FC<{
     });
   };
 
+  const handleApplyLivretImport = (records: ImportedParcelRecord[]) => {
+    const newParcelsToAdd: Parcel[] = [];
+
+    records.forEach((rec, idx) => {
+      if (!rec.matchExistingId) {
+        newParcelsToAdd.push({
+          id: rec.id,
+          code: rec.code,
+          name: rec.name,
+          owner: 'Domaine des Trois Coteaux (Import Livret)',
+          cadastralRef: `${rec.section} ${rec.numero}`,
+          grape: rec.grape,
+          color: rec.color,
+          areaM2: { value: rec.areaM2, status: 'measured' },
+          plantedYear: 1988,
+          gps: { lat: rec.lat, lng: rec.lng, source: 'Livret & Cadastre IGN' },
+          access: rec.accessNotes,
+          notes: rec.contextNotes,
+          schematic: {
+            x: 15 + ((idx * 23) % 65),
+            y: 18 + ((idx * 19) % 62),
+            w: 16,
+            h: 14,
+          },
+        });
+      }
+    });
+
+    if (newParcelsToAdd.length > 0) {
+      setImportedParcels((prev) => {
+        const mergedMap = new Map<string, Parcel>();
+        prev.forEach((p) => mergedMap.set(p.id, p));
+        newParcelsToAdd.forEach((p) => mergedMap.set(p.id, p));
+        const nextList = Array.from(mergedMap.values());
+        try {
+          localStorage.setItem(IMPORTED_PARCELS_STORAGE_KEY, JSON.stringify(nextList));
+        } catch {
+          // Ignore quota errors
+        }
+        return nextList;
+      });
+    }
+
+    persistParcelTracking((prev) => {
+      const next = { ...prev };
+      records.forEach((rec) => {
+        const targetId = rec.matchExistingId ?? rec.id;
+        const existingTrack = next[targetId] ?? {
+          daySlot: rec.daySlot,
+          status: rec.status,
+          extraCaisses: 0,
+          extraKg: 0,
+          extraHl: 0,
+        };
+        next[targetId] = {
+          ...existingTrack,
+          daySlot: rec.daySlot,
+          status: rec.status,
+          customPin: {
+            xPct: existingTrack.customPin?.xPct ?? 50,
+            yPct: existingTrack.customPin?.yPct ?? 50,
+            lat: rec.lat,
+            lng: rec.lng,
+          },
+          customPolygon: rec.polygon,
+          customGoogleMapsUrl: rec.googleMapsUrl,
+          customNbRangs: rec.nbRangs,
+          customAccessNotes: rec.accessNotes,
+          customContextNotes: rec.contextNotes,
+          customPageLivret: rec.pageLivret,
+          customPastilleNum: rec.pastilleNum,
+          customSectionCadastrale: rec.sectionCadastrale,
+          customClassification: rec.classification,
+          customAppellation: rec.appellation,
+          customCommune: rec.commune,
+        };
+      });
+      return next;
+    });
+
+    const firstRecord = records[0];
+    if (firstRecord) {
+      const firstId = firstRecord.matchExistingId ?? firstRecord.id;
+      setSelectedParcelId(firstId);
+    }
+    setShowLivretImportModal(false);
+    setImportedBannerMsg(
+      `Livret numérique appliqué avec succès : ${records.length} parcelle(s) synchronisée(s) sur la carte satellite & le cadastre IGN.`
+    );
+  };
+
   const handleSetCustomGpsFromMap = (parcelId: string, lat: number, lng: number) => {
-    const target = state.parcels[parcelId];
+    const target = parcelMap[parcelId];
     if (!target) return;
     const current = getParcelTrack(target);
     persistParcelTracking((prev) => ({
@@ -624,9 +739,9 @@ export const VineyardView: React.FC<{
       parcel: p,
       pastilleNum: tr.customPastilleNum ?? meta.pastilleNum,
       pageLivret: tr.customPageLivret ?? meta.pageLivret,
-      classification: meta.classification,
-      appellation: meta.appellation,
-      commune: meta.commune,
+      classification: tr.customClassification ?? meta.classification,
+      appellation: tr.customAppellation ?? meta.appellation,
+      commune: tr.customCommune ?? meta.commune,
       sectionCadastrale: tr.customSectionCadastrale ?? meta.sectionCadastrale,
       nbRangs: tr.customNbRangs ?? meta.nbRangs,
       status: tr.status,
@@ -954,6 +1069,18 @@ export const VineyardView: React.FC<{
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {!restrictedFieldMode && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowLivretImportModal(true)}
+              title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
+            >
+              <BookOpen size={14} />
+              <span>📖 Importer Livret / CVI</span>
+            </button>
+          )}
+
           {onToggleRestrictedMode && (
             <button
               type="button"
@@ -1014,6 +1141,32 @@ export const VineyardView: React.FC<{
       </div>
 
       {/* BANDEAU 05h00 DU MATIN : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
+      {importedBannerMsg && (
+        <div
+          style={{
+            padding: '10px 16px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(16, 185, 129, 0.14)',
+            border: '1px solid rgba(16, 185, 129, 0.45)',
+            color: 'var(--color-ink)',
+            fontSize: '13px',
+            fontWeight: 600,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <span>✅ {importedBannerMsg}</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            onClick={() => setImportedBannerMsg(null)}
+          >
+            OK
+          </button>
+        </div>
+      )}
       <div
         style={{
           background: 'linear-gradient(135deg, #19211A 0%, #243025 100%)',
@@ -2687,6 +2840,14 @@ export const VineyardView: React.FC<{
             />
           </div>
         </div>
+      )}
+      {/* Modale d'Import & Traduction de Livrets Numériques (PDF/Texte, CVI Douanes, CSV, JSON/GeoJSON) */}
+      {showLivretImportModal && (
+        <LivretImportModal
+          existingParcels={parcels}
+          onClose={() => setShowLivretImportModal(false)}
+          onApplyImport={handleApplyLivretImport}
+        />
       )}
     </div>
   );
