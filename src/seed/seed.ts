@@ -137,23 +137,36 @@ const harvestCounts = [
   count('count-h-c-2', 'mission-h-c', 'parcel-c', 4, '2026-10-23T11:45:00.000Z', null),
 ];
 
-function container(id: string, code: string, kind: Container['kind'], capacityL: number, location: string, row: number, col: number, state: Container['state'] = 'available'): Container {
-  return { id, code, kind, capacityMl: capacityL * 1000, location, state, plan: { row, col } };
+function container(
+  id: string,
+  code: string,
+  kind: Container['kind'],
+  capacityL: number,
+  location: string,
+  row: number,
+  col: number,
+  state: Container['state'] = 'available',
+  cooper?: string,
+  woodOrigin?: string,
+  toast?: string,
+  barrelAgeYears?: number,
+): Container {
+  return { id, code, kind, capacityMl: capacityL * 1000, location, state, plan: { row, col }, cooper, woodOrigin, toast, barrelAgeYears };
 }
 
 const containers: Container[] = [
-  container('tank-01', 'C-01', 'tank', 800, 'Cuverie', 1, 1),
-  container('tank-02', 'C-02', 'tank', 1000, 'Cuverie', 1, 2),
-  container('tank-03', 'C-03', 'tank', 600, 'Cuverie', 1, 3),
-  container('tank-04', 'C-04', 'tank', 500, 'Cuverie', 1, 4),
-  container('tank-05', 'C-05', 'tank', 300, 'Cuverie', 2, 1),
-  container('vat-06', 'C-06', 'vat', 500, 'Cuverie', 2, 2),
-  container('tank-07', 'C-07', 'tank', 400, 'Cuverie', 2, 3, 'maintenance'),
-  container('tank-08', 'C-08', 'tank', 300, 'Cuverie', 2, 4),
-  container('demo-barrel-1', 'F-01', 'barrel', 225, 'Chai à barriques', 3, 1),
-  container('demo-barrel-2', 'F-02', 'barrel', 225, 'Chai à barriques', 3, 2),
-  container('barrel-03', 'F-03', 'barrel', 225, 'Chai à barriques', 3, 3),
-  container('barrel-04', 'F-04', 'barrel', 225, 'Chai à barriques', 3, 4),
+  container('tank-01', 'C-01', 'tank', 800, 'Cuverie principale', 1, 1),
+  container('tank-02', 'C-02', 'tank', 1000, 'Cuverie principale', 1, 2),
+  container('tank-03', 'C-03', 'tank', 600, 'Cuverie principale', 1, 3),
+  container('tank-04', 'C-04', 'tank', 500, 'Cuverie principale', 1, 4),
+  container('tank-05', 'C-05', 'tank', 300, 'Cuverie inox', 2, 1),
+  container('vat-06', 'C-06', 'vat', 500, 'Chai foudres & demi-muids', 2, 2, 'available', 'Seguin Moreau', 'Chêne de l’Allier', 'Moyenne', 3),
+  container('tank-07', 'C-07', 'tank', 400, 'Cuverie inox', 2, 3, 'maintenance'),
+  container('tank-08', 'C-08', 'tank', 300, 'Cuverie inox', 2, 4),
+  container('demo-barrel-1', 'F-01', 'barrel', 225, 'Chai à barriques', 3, 1, 'available', 'François Frères', 'Tronçais', 'Moyenne +', 0),
+  container('demo-barrel-2', 'F-02', 'barrel', 225, 'Chai à barriques', 3, 2, 'available', 'Taransaud', 'Allier', 'Moyenne', 1),
+  container('barrel-03', 'F-03', 'barrel', 228, 'Chai à barriques', 3, 3, 'available', 'Damy', 'Vosges', 'Légère', 2),
+  container('barrel-04', 'F-04', 'barrel', 228, 'Chai à barriques', 3, 4, 'available', 'Radoux', 'Bertranges', 'Moyenne', 1),
 ];
 
 function lot(l: Partial<WineLot> & Pick<WineLot, 'id' | 'code' | 'name' | 'vintage' | 'color' | 'stage' | 'quality'>): WineLot {

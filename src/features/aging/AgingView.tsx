@@ -4,7 +4,6 @@ import {
   ArrowLeftRight,
   Sparkles,
   Wine,
-  CheckCircle2,
   Droplets,
   Euro,
   ArrowRight,
@@ -23,14 +22,20 @@ export const AgingView: React.FC = () => {
   const [inputA_vol, setInputA_vol] = useState('300'); // Litres
   const [inputB_vol, setInputB_vol] = useState('200'); // Litres
 
-  // Transfer Modal
+  // Transfer & Topping Modal
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferMode, setTransferMode] = useState<'transfer' | 'topping'>('transfer');
   const [transferLotId, setTransferLotId] = useState('lot-2024-aging');
   const [transferFromCont, setTransferFromCont] = useState('demo-barrel-1');
   const [transferToCont, setTransferToCont] = useState('barrel-03');
   const [transferVolL, setTransferVolL] = useState('50');
   const [transferLossL, setTransferLossL] = useState('1');
   const [transferReason, setTransferReason] = useState('Soutirage d’aération');
+
+  // Bâtonnage Modal
+  const [showBatonnageModal, setShowBatonnageModal] = useState(false);
+  const [batonnageLotId, setBatonnageLotId] = useState('lot-2024-aging');
+  const [batonnageNote, setBatonnageNote] = useState('Bâtonnage doux à la dondaine sur fûts neufs et 1 vin. Remise en suspension des lies fines.');
 
   if (!state) return null;
 
@@ -83,18 +88,47 @@ export const AgingView: React.FC = () => {
     const volMl = Math.round(parseFloat(transferVolL) * 1000);
     const lossMl = Math.round(parseFloat(transferLossL) * 1000);
     try {
+      if (transferMode === 'topping') {
+        await dispatch({
+          type: 'cellar.topping',
+          payload: {
+            lotId: transferLotId,
+            sourceContainerId: transferFromCont,
+            targetContainerId: transferToCont,
+            volumeMl: volMl,
+          },
+        });
+      } else {
+        await dispatch({
+          type: 'cellar.transfer',
+          payload: {
+            lotId: transferLotId,
+            fromContainerId: transferFromCont,
+            toContainerId: transferToCont,
+            volumeMl: volMl,
+            lossMl: lossMl,
+            reason: transferReason.trim() || 'Soutirage d’élevage',
+          },
+        });
+      }
+      setShowTransferModal(false);
+    } catch {
+      // Handled
+    }
+  };
+
+  const handleExecuteBatonnage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
       await dispatch({
-        type: 'cellar.transfer',
+        type: 'cellar.note',
         payload: {
-          lotId: transferLotId,
-          fromContainerId: transferFromCont,
-          toContainerId: transferToCont,
-          volumeMl: volMl,
-          lossMl: lossMl,
-          reason: transferReason,
+          lotId: batonnageLotId,
+          label: 'Bâtonnage des lies fines',
+          details: batonnageNote.trim() || 'Remise en suspension manuelle des lies fines pour enrichir la texture et protéger le vin contre l’oxydation.',
         },
       });
-      setShowTransferModal(false);
+      setShowBatonnageModal(false);
     } catch {
       // Handled
     }
@@ -114,13 +148,15 @@ export const AgingView: React.FC = () => {
   const totalKnownCostEur = Math.round(
     lotsReadyForBlend.reduce((sum, l) => sum + (l.cost.knownCents ?? 0), 0) / 100
   );
-  const barrelIds = ['demo-barrel-1', 'demo-barrel-2'];
-  const barrelUsedMl = barrelIds.reduce(
-    (sum, id) => sum + (state.occupancies[id]?.volumeMl ?? 0),
+  const agingContainers = Object.values(state.containers).filter(
+    (c) => c.kind === 'barrel' || c.kind === 'vat'
+  );
+  const barrelUsedMl = agingContainers.reduce(
+    (sum, c) => sum + (state.occupancies[c.id]?.volumeMl ?? 0),
     0
   );
-  const barrelCapMl = barrelIds.reduce(
-    (sum, id) => sum + (state.containers[id]?.capacityMl ?? 225000),
+  const barrelCapMl = agingContainers.reduce(
+    (sum, c) => sum + c.capacityMl,
     0
   );
   const barrelFillPct = barrelCapMl > 0 ? Math.round((barrelUsedMl / barrelCapMl) * 100) : 0;
@@ -192,31 +228,33 @@ export const AgingView: React.FC = () => {
           <button
             type="button"
             className="ds-tile"
-            onClick={() => setShowTransferModal(true)}
+            onClick={() => {
+              setTransferMode('transfer');
+              setShowTransferModal(true);
+            }}
           >
             <div className="ds-icon-bubble ds-tone-gold">
               <ArrowLeftRight size={20} strokeWidth={1.9} />
             </div>
             <div>
-              <div className="ds-tile-label">Soutirer ou transférer</div>
-              <div className="ds-tile-sub">Déplacer du vin entre barriques ou cuves avec perte tracée</div>
+              <div className="ds-tile-label">Soutirer ou ouiller</div>
+              <div className="ds-tile-sub">Transfert sur lies nettes ou ouillage précis des fûts</div>
             </div>
           </button>
 
-          <div
+          <button
+            type="button"
             className="ds-tile"
-            style={{ cursor: 'default' }}
+            onClick={() => setShowBatonnageModal(true)}
           >
             <div className="ds-icon-bubble ds-tone-forest">
-              <CheckCircle2 size={20} strokeWidth={1.9} />
+              <Droplets size={20} strokeWidth={1.9} />
             </div>
             <div>
-              <div className="ds-tile-label">Bilan matière contrôlé</div>
-              <div className="ds-tile-sub">
-                Somme des fûts = volume exact du lot ({totalAgingLitres.toLocaleString('fr-FR')} L)
-              </div>
+              <div className="ds-tile-label">Bâtonner les lies</div>
+              <div className="ds-tile-sub">Remise en suspension manuelle pour nourrir le vin sous bois</div>
             </div>
-          </div>
+          </button>
         </div>
       </section>
 
@@ -425,52 +463,84 @@ export const AgingView: React.FC = () => {
         <div className="ds-panel">
           <div className="ds-section-head">
             <div>
-              <h2 className="ds-section-title">Parc à barriques (Élevage 2024)</h2>
-              <span className="ds-section-meta">Cliquez sur une pièce en chêne pour la soutirer ou la transférer</span>
+              <h2 className="ds-section-title">Parc à barriques & foudres (Élevage)</h2>
+              <span className="ds-section-meta">Sélectionnez une barrique ou un foudre pour soutirer, ouiller ou consulter la tonnellerie</span>
             </div>
-            <span className="badge badge-grape">Millésime 2024</span>
+            <span className="badge badge-grape">{agingContainers.length} fûts & foudres</span>
           </div>
 
           <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px', lineHeight: 1.5 }}>
-            Le lot <em>Blanc 2024 en barriques</em> (<code>L24-B-01</code>) est réparti sur deux
-            fûts de 225 L. La somme des barriques correspond au millilitre près au volume du lot (200 L).
+            Suivi individuel par tonnellerie, origine de la forêt et type de chauffe. La somme des fûts correspond au millilitre près au volume des lots sous bois.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px' }}>
-            {['demo-barrel-1', 'demo-barrel-2'].map((bId) => {
-              const c = state.containers[bId];
-              const occ = state.occupancies[bId];
-              const fillPct = occ ? Math.round((occ.volumeMl / (c?.capacityMl || 1)) * 100) : 0;
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
+            {agingContainers.map((c) => {
+              const occ = state.occupancies[c.id];
+              const occLot = occ ? state.lots[occ.lotId] : null;
+              const fillPct = occ ? Math.round((occ.volumeMl / (c.capacityMl || 1)) * 100) : 0;
+              const capL = Math.round(c.capacityMl / 1000);
               return (
                 <div
-                  key={bId}
+                  key={c.id}
                   className="ds-barrel-card ds-clickable-card"
                   onClick={() => {
                     if (occ) {
                       setTransferLotId(occ.lotId);
-                      setTransferFromCont(bId);
+                      setTransferFromCont(c.id);
                       setTransferVolL(String(Math.min(50, occ.volumeMl / 1000)));
+                    } else {
+                      setTransferToCont(c.id);
                     }
                     setShowTransferModal(true);
                   }}
-                  title={`Cliquer pour soutirer ou transférer la barrique ${c?.code ?? bId}`}
+                  title={occ ? `Cliquer pour soutirer ou ouiller ${c.code}` : `${c.code} (${capL} L) · Prêt à entonner`}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '15px', color: 'var(--color-ink)' }}>🪵 {c?.code}</strong>
-                    <span className="badge badge-gold">Fût 225 L</span>
+                    <strong style={{ fontSize: '15px', color: 'var(--color-ink)' }}>🪵 {c.code}</strong>
+                    <span className="badge badge-gold">
+                      {c.kind === 'vat' ? `Foudre ${capL} L` : `Fût ${capL} L`}
+                    </span>
                   </div>
-                  <div
-                    style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-forest)', fontFamily: 'var(--font-serif)' }}
-                    className="tabular"
-                  >
-                    {occ ? occ.volumeMl / 1000 : 0} L
+
+                  {c.cooper && (
+                    <div style={{ fontSize: '11px', color: 'var(--color-gold-dark)', fontWeight: 600, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.cooper} · {c.woodOrigin ?? 'Chêne'} ({c.toast ?? 'Moy.'})
+                      {c.barrelAgeYears !== undefined && (
+                        <span style={{ color: 'var(--color-ink-muted)', fontWeight: 400, marginLeft: '3px' }}>
+                          · {c.barrelAgeYears === 0 ? 'Neuf' : `${c.barrelAgeYears} vin(s)`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '6px' }}>
+                    <div
+                      style={{ fontSize: '24px', fontWeight: 700, color: occ ? 'var(--color-forest)' : 'var(--color-ink-light)', fontFamily: 'var(--font-serif)' }}
+                      className="tabular"
+                    >
+                      {occ ? occ.volumeMl / 1000 : 0} L
+                      <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--color-ink-muted)', marginLeft: '4px' }}>
+                        / {capL} L
+                      </span>
+                    </div>
+                    {occLot ? (
+                      <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Logé : <strong>{occLot.code}</strong> ({occLot.name})
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11.5px', color: 'var(--color-ink-light)', marginTop: '2px' }}>
+                        Disponible pour entonnage
+                      </div>
+                    )}
                   </div>
-                  <div className="ds-bar" aria-hidden="true">
-                    <span style={{ width: `${fillPct}%`, background: 'var(--color-gold-dark)' }} />
+
+                  <div className="ds-bar" aria-hidden="true" style={{ marginTop: '6px' }}>
+                    <span style={{ width: `${fillPct}%`, background: occ ? 'var(--color-gold-dark)' : 'var(--color-border)' }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
                     <span>Remplissage : <strong>{fillPct}%</strong></span>
-                    <span className="ds-action-chip">Soutirer ce fût →</span>
+                    <span className="ds-action-chip">{occ ? 'Soutirer / Ouiller →' : 'Entonner →'}</span>
                   </div>
                 </div>
               );
@@ -656,13 +726,45 @@ export const AgingView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Transfert */}
+      {/* Modal Transfert & Ouillage */}
       {showTransferModal && (
         <div className="modal-backdrop" onClick={() => setShowTransferModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Transfert de vin / Soutirage
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
+                {transferMode === 'topping' ? 'Ouillage de fût' : 'Transfert de vin / Soutirage'}
+              </h2>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${transferMode === 'transfer' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setTransferMode('transfer');
+                    setTransferReason('Soutirage d’aération / Élimination des lies');
+                  }}
+                >
+                  Soutirage
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${transferMode === 'topping' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setTransferMode('topping');
+                    setTransferLossL('0');
+                    setTransferReason('Ouillage périodique du chai');
+                  }}
+                >
+                  Ouillage
+                </button>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+              {transferMode === 'topping'
+                ? 'L’ouillage compense l’évaporation naturelle (part des anges) en complétant le fût avec le même lot, sans perte matière.'
+                : 'Le soutirage permet de décanter le vin propre et d’isoler les lies ou bourbes avec une perte tracée.'}
+            </p>
+
             <form onSubmit={handleExecuteTransfer}>
               <div className="form-group">
                 <label className="form-label">Lot concerné</label>
@@ -759,11 +861,13 @@ export const AgingView: React.FC = () => {
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label className="form-label">Volume transféré (L)</label>
+                  <label className="form-label">
+                    {transferMode === 'topping' ? 'Volume d’ouillage (L)' : 'Volume transféré (L)'}
+                  </label>
                   <input
                     type="number"
                     step="0.1"
-                    min="1"
+                    min="0.1"
                     className="form-input"
                     value={transferVolL}
                     onChange={(e) => setTransferVolL(e.target.value)}
@@ -771,22 +875,31 @@ export const AgingView: React.FC = () => {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Perte explicite tracée (L)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    className="form-input"
-                    value={transferLossL}
-                    onChange={(e) => setTransferLossL(e.target.value)}
-                    required
-                  />
-                </div>
+                {transferMode === 'transfer' ? (
+                  <div className="form-group">
+                    <label className="form-label">Perte explicite tracée (L)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className="form-input"
+                      value={transferLossL}
+                      onChange={(e) => setTransferLossL(e.target.value)}
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">Perte</label>
+                    <div style={{ padding: '9px 12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--color-forest)', fontWeight: 600 }}>
+                      ✓ 0 L (compensation de l’évaporation)
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Motif du transfert</label>
+                <label className="form-label">Motif de l’opération</label>
                 <input
                   type="text"
                   className="form-input"
@@ -801,7 +914,58 @@ export const AgingView: React.FC = () => {
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Valider le transfert
+                  {transferMode === 'topping' ? 'Valider l’ouillage' : 'Valider le transfert'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Bâtonnage des lies fines */}
+      {showBatonnageModal && (
+        <div className="modal-backdrop" onClick={() => setShowBatonnageModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>
+              Bâtonnage des lies fines
+            </h2>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+              Remise en suspension manuelle des lies fines pour nourrir le vin, développer le gras et apporter une protection antioxydante naturelle sans intrant chimique.
+            </p>
+            <form onSubmit={handleExecuteBatonnage}>
+              <div className="form-group">
+                <label className="form-label">Lot sous élevage à bâtonner</label>
+                <select
+                  className="form-select"
+                  value={batonnageLotId}
+                  onChange={(e) => setBatonnageLotId(e.target.value)}
+                >
+                  {lotsReadyForBlend.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} · {l.name} ({l.vintage})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Observations & Consigne de chai</label>
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={batonnageNote}
+                  onChange={(e) => setBatonnageNote(e.target.value)}
+                  placeholder="Ex : Bâtonnage doux à la dondaine sur fûts neufs et 1 vin. Lie fine bien nette, aucune réduction."
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowBatonnageModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Consigner le bâtonnage
                 </button>
               </div>
             </form>

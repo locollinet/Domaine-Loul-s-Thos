@@ -83,6 +83,10 @@ export const CellarView: React.FC = () => {
   const [newContainerKind, setNewContainerKind] = useState<ContainerKind>('vat');
   const [newContainerCapHl, setNewContainerCapHl] = useState('16');
   const [newContainerLocation, setNewContainerLocation] = useState('Chai Blancs · Travée Œufs Béton');
+  const [newContainerCooper, setNewContainerCooper] = useState('');
+  const [newContainerWoodOrigin, setNewContainerWoodOrigin] = useState('');
+  const [newContainerToast, setNewContainerToast] = useState('Moyenne');
+  const [newContainerBarrelAge, setNewContainerBarrelAge] = useState('0');
   const [customContainers, setCustomContainers] = useState<Container[]>(() => {
     try {
       const raw = localStorage.getItem(CUSTOM_CONTAINERS_KEY);
@@ -98,6 +102,10 @@ export const CellarView: React.FC = () => {
   const [editCapHl, setEditCapHl] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editState, setEditState] = useState<'available' | 'maintenance'>('available');
+  const [editCooper, setEditCooper] = useState('');
+  const [editWoodOrigin, setEditWoodOrigin] = useState('');
+  const [editToast, setEditToast] = useState('Moyenne');
+  const [editBarrelAge, setEditBarrelAge] = useState('0');
 
   const [containerOverrides, setContainerOverrides] = useState<Record<string, Partial<Container>>>(() => {
     try {
@@ -294,6 +302,7 @@ export const CellarView: React.FC = () => {
     e.preventDefault();
     const code = newContainerCode.trim().toUpperCase() || `C-${containers.length + 1}`;
     const capHl = parseFloat(newContainerCapHl || '10') || 10;
+    const isOak = newContainerKind === 'barrel' || newContainerKind === 'vat';
     const item: Container = {
       id: `custom-cont-${code.toLowerCase()}-${Date.now()}`,
       code,
@@ -302,6 +311,10 @@ export const CellarView: React.FC = () => {
       location: newContainerLocation.trim() || 'Chai Principal',
       state: 'available',
       plan: { row: 2, col: (containers.length % 4) + 1 },
+      cooper: isOak ? (newContainerCooper.trim() || undefined) : undefined,
+      woodOrigin: isOak ? (newContainerWoodOrigin.trim() || undefined) : undefined,
+      toast: isOak ? (newContainerToast.trim() || undefined) : undefined,
+      barrelAgeYears: isOak ? (newContainerBarrelAge ? parseInt(newContainerBarrelAge, 10) : 0) : undefined,
     };
     const next = [...customContainers, item];
     setCustomContainers(next);
@@ -320,18 +333,27 @@ export const CellarView: React.FC = () => {
     setEditCapHl((c.capacityMl / 100_000).toFixed(2).replace(/\.00$/, ''));
     setEditLocation(c.location);
     setEditState(c.state);
+    setEditCooper(c.cooper ?? '');
+    setEditWoodOrigin(c.woodOrigin ?? '');
+    setEditToast(c.toast ?? 'Moyenne');
+    setEditBarrelAge(c.barrelAgeYears !== undefined ? String(c.barrelAgeYears) : '0');
   };
 
   const handleSaveEditContainer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!showEditContainerModal) return;
     const capHl = Math.max(0.1, parseFloat(editCapHl || '1'));
+    const isOak = editKind === 'barrel' || editKind === 'vat';
     const patch: Partial<Container> = {
       code: editCode.trim().toUpperCase() || showEditContainerModal.code,
       kind: editKind,
       capacityMl: Math.round(capHl * 100_000),
       location: editLocation.trim() || showEditContainerModal.location,
       state: editState,
+      cooper: isOak ? (editCooper.trim() || undefined) : undefined,
+      woodOrigin: isOak ? (editWoodOrigin.trim() || undefined) : undefined,
+      toast: isOak ? (editToast.trim() || undefined) : undefined,
+      barrelAgeYears: isOak ? (editBarrelAge ? parseInt(editBarrelAge, 10) : 0) : undefined,
     };
     updateContainerOverride(showEditContainerModal.id, patch);
 
@@ -385,7 +407,7 @@ export const CellarView: React.FC = () => {
         <div>
           <div className="ds-eyebrow">
             <span className="ds-pulse" aria-hidden="true" />
-            <span>Cuverie Inox & Pièces Bourguignonnes · {containers.length} contenants configurés</span>
+            <span>Cuverie Inox, Foudres & Fûts de Chêne · {containers.length} contenants configurés</span>
           </div>
           <h1 className="ds-hero-title">Chai & Vinification</h1>
           <p className="ds-hero-sub">
@@ -662,7 +684,7 @@ export const CellarView: React.FC = () => {
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{c.code}</span>
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       <span className={`badge ${c.state === 'maintenance' ? 'badge-crimson' : c.kind === 'barrel' ? 'badge-gold' : 'badge-muted'}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-                        {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? `Fût ${c.capacityMl / 1000}L` : 'Cuve Inox'}
+                        {c.state === 'maintenance' ? 'Maint.' : c.kind === 'barrel' ? `Fût ${c.capacityMl / 1000}L` : c.kind === 'vat' ? `Foudre ${c.capacityMl / 1000}L` : `Cuve ${c.capacityMl / 1000}L`}
                       </span>
                       <button
                         type="button"
@@ -686,6 +708,12 @@ export const CellarView: React.FC = () => {
                       </button>
                     </div>
                   </div>
+
+                  {c.cooper && (
+                    <div style={{ fontSize: '10px', color: 'var(--color-gold-dark)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                      {c.cooper} · {c.woodOrigin ?? 'Chêne'} ({c.toast ?? 'Moy.'})
+                    </div>
+                  )}
 
                   {/* Jauge visuelle de cuve / fût */}
                   <div className="vessel-tank-cylinder">
@@ -768,7 +796,7 @@ export const CellarView: React.FC = () => {
                       }}
                     >
                       <td style={{ fontWeight: 700 }}>{c.code}</td>
-                      <td>{c.kind === 'barrel' ? 'Barrique chêne' : 'Cuve'} · {c.location}</td>
+                      <td>{c.kind === 'barrel' ? (c.cooper ? `Fût (${c.cooper})` : 'Barrique chêne') : c.kind === 'vat' ? 'Foudre / Demi-muid' : 'Cuve'} · {c.location}</td>
                       <td className="tabular">{c.capacityMl / 1000} L</td>
                       <td className="tabular" style={{ fontWeight: 600 }}>
                         {occ ? `${occ.volumeMl / 1000} L (${Math.round((occ.volumeMl / c.capacityMl) * 100)}%)` : 'Vide'}
@@ -1585,6 +1613,65 @@ export const CellarView: React.FC = () => {
                   required
                 />
               </div>
+
+              {(newContainerKind === 'barrel' || newContainerKind === 'vat') && (
+                <div style={{ padding: '12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '8px' }}>
+                    🪵 Caractéristiques de Tonnellerie & Fûts
+                  </div>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Tonnellerie</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Ex : François Frères, Taransaud, Seguin Moreau, Damy..."
+                        value={newContainerCooper}
+                        onChange={(e) => setNewContainerCooper(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Origine du bois / Forêt</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Ex : Tronçais, Allier, Vosges, Bertranges..."
+                        value={newContainerWoodOrigin}
+                        onChange={(e) => setNewContainerWoodOrigin(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Type de chauffe</label>
+                      <select
+                        className="form-select"
+                        value={newContainerToast}
+                        onChange={(e) => setNewContainerToast(e.target.value)}
+                      >
+                        <option value="Légère">Chauffe Légère</option>
+                        <option value="Moyenne">Chauffe Moyenne</option>
+                        <option value="Moyenne +">Chauffe Moyenne +</option>
+                        <option value="Forte">Chauffe Forte</option>
+                        <option value="Immersion">Chauffe Immersion</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Rotation / Nombre de vins</label>
+                      <select
+                        className="form-select"
+                        value={newContainerBarrelAge}
+                        onChange={(e) => setNewContainerBarrelAge(e.target.value)}
+                      >
+                        <option value="0">Fût Neuf (0 vin)</option>
+                        <option value="1">1 vin (1 an d’usage)</option>
+                        <option value="2">2 vins (2 ans d’usage)</option>
+                        <option value="3">3 vins et plus (fût aguerri)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
@@ -1691,6 +1778,65 @@ export const CellarView: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {(editKind === 'barrel' || editKind === 'vat') && (
+                <div style={{ padding: '12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '8px' }}>
+                    🪵 Caractéristiques de Tonnellerie & Fûts
+                  </div>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Tonnellerie</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Ex : François Frères, Taransaud, Seguin Moreau, Damy..."
+                        value={editCooper}
+                        onChange={(e) => setEditCooper(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Origine du bois / Forêt</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Ex : Tronçais, Allier, Vosges, Bertranges..."
+                        value={editWoodOrigin}
+                        onChange={(e) => setEditWoodOrigin(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid-2">
+                    <div className="form-group">
+                      <label className="form-label">Type de chauffe</label>
+                      <select
+                        className="form-select"
+                        value={editToast}
+                        onChange={(e) => setEditToast(e.target.value)}
+                      >
+                        <option value="Légère">Chauffe Légère</option>
+                        <option value="Moyenne">Chauffe Moyenne</option>
+                        <option value="Moyenne +">Chauffe Moyenne +</option>
+                        <option value="Forte">Chauffe Forte</option>
+                        <option value="Immersion">Chauffe Immersion</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Rotation / Nombre de vins</label>
+                      <select
+                        className="form-select"
+                        value={editBarrelAge}
+                        onChange={(e) => setEditBarrelAge(e.target.value)}
+                      >
+                        <option value="0">Fût Neuf (0 vin)</option>
+                        <option value="1">1 vin (1 an d’usage)</option>
+                        <option value="2">2 vins (2 ans d’usage)</option>
+                        <option value="3">3 vins et plus (fût aguerri)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 const occ = state.occupancies[showEditContainerModal.id];

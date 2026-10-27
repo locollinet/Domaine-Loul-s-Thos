@@ -215,6 +215,10 @@ export interface Container {
   location: string;
   state: 'available' | 'maintenance';
   plan: { row: number; col: number };
+  cooper?: string;
+  woodOrigin?: string;
+  toast?: string;
+  barrelAgeYears?: number;
 }
 
 /** Demo hypothesis : one lot per container at a time. Lot volume = Σ occupancies. */

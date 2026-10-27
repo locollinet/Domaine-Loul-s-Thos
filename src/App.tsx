@@ -174,7 +174,7 @@ const AppInner: React.FC = () => {
                   <div className="brand-emblem">TC</div>
                   <div>
                     <div className="brand-title">Trois Coteaux</div>
-                    <div className="brand-subtitle">Haute Bourgogne · Démo</div>
+                    <div className="brand-subtitle">Grands Domaines & Terroirs · Démo</div>
                   </div>
                 </div>
               </div>
@@ -232,12 +232,16 @@ const AppInner: React.FC = () => {
                 color: 'rgba(250, 248, 245, 0.65)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ fontWeight: 600, color: '#C4A47A' }}>24 Octobre 2026</span>
                 <span style={{ fontSize: '10px', opacity: 0.75 }}>5 Millésimes</span>
               </div>
-              <div style={{ fontSize: '10.5px', opacity: 0.7 }}>
-                ● Pastille or = focus persona actif
+              <div style={{ fontSize: '11px', color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', fontWeight: 600 }}>
+                <span>✓</span>
+                <span>Chai & Souterrain Hors-Ligne (PWA)</span>
+              </div>
+              <div style={{ fontSize: '10px', opacity: 0.75 }}>
+                Persistance locale IndexedDB active sous cave
               </div>
             </div>
           </aside>
