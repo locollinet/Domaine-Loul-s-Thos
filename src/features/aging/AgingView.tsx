@@ -11,8 +11,12 @@ import {
 import { useStore } from '../../app/store-context';
 import { previewBlend } from '../../domain/commands/cellar';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
-export const AgingView: React.FC = () => {
+export const AgingView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'aging' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
 
   // Blend Modal / Trial state
@@ -36,6 +40,14 @@ export const AgingView: React.FC = () => {
   const [showBatonnageModal, setShowBatonnageModal] = useState(false);
   const [batonnageLotId, setBatonnageLotId] = useState('lot-2024-aging');
   const [batonnageNote, setBatonnageNote] = useState('Bâtonnage doux à la dondaine sur fûts neufs et 1 vin. Remise en suspension des lies fines.');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.blendName) setBlendName(p.blendName);
+    if (p.destContainerId) setDestContainerId(p.destContainerId);
+    if (p.openModal === 'blend') setShowBlendModal(true);
+    else if (p.openModal === 'transfer') setShowTransferModal(true);
+    else if (p.openModal === 'batonnage') setShowBatonnageModal(true);
+  });
 
   if (!state) return null;
 

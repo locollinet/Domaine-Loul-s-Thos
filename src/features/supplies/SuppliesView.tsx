@@ -9,8 +9,12 @@ import {
   Truck,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
-export const SuppliesView: React.FC = () => {
+export const SuppliesView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'supplies' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
 
   // PO Modal
@@ -32,6 +36,13 @@ export const SuppliesView: React.FC = () => {
   const [showInvModal, setShowInvModal] = useState<string | null>(null);
   const [invCounted, setInvCounted] = useState('');
   const [invReason, setInvReason] = useState('Inventaire périodique de cave');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.dryGoodId) setPoGoodId(p.dryGoodId);
+    if (typeof p.quantity === 'number') setPoQuantity(String(p.quantity));
+    if (p.supplier) setSupplier(p.supplier);
+    if (p.openModal === 'po') setShowPoModal(true);
+  });
 
   if (!state) return null;
 

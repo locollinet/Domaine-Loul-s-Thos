@@ -89,5 +89,11 @@ describe('App & UI Navigation (L0 - L7)', () => {
     // Open Guided Demo Modal
     fireEvent.click(screen.getByRole('button', { name: /Scénario Démo/i }));
     expect(screen.getByText(/Visite guidée du scénario de démo/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /✕ Fermer/i }));
+
+    // Open AI Copilot Drawer & verify contextual scope + offline local execution
+    fireEvent.click(screen.getByRole('button', { name: /Copilote IA/i }));
+    expect(screen.getByLabelText(/Panneau Copilote IA/i)).toBeInTheDocument();
+    expect(screen.getByText(/Maître de chai · Ventes & Commerce · Coûts masqués/i)).toBeInTheDocument();
   });
 });

@@ -15,8 +15,12 @@ import { batchPosition, lotOccupancies, lotVolumeMl } from '../../domain/selecto
 import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { ELabelQrPanel } from './ELabelQrPanel';
 import { CellarBottleMapPanel } from './CellarBottleMapPanel';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
-export const BottlingView: React.FC = () => {
+export const BottlingView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'bottling' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
   const [subTab, setSubTab] = useState<'stocks' | 'cellar_map' | 'elabel'>('stocks');
@@ -28,6 +32,14 @@ export const BottlingView: React.FC = () => {
   const [bottleCount, setBottleCount] = useState('660');
   const [lossLitres, setLossLitres] = useState('5');
   const [serviceCostEur, setServiceCostEur] = useState('330');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.subTab) setSubTab(p.subTab);
+    if (p.lotId) setSelectedLotId(p.lotId);
+    if (p.skuId) setSelectedSkuId(p.skuId);
+    if (typeof p.bottles === 'number') setBottleCount(String(p.bottles));
+    if (p.openModal === 'bottling') setShowBottlingModal(true);
+  });
 
   if (!state) return null;
 

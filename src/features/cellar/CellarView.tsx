@@ -19,6 +19,8 @@ import { useStore } from '../../app/store-context';
 import { PARAMETERS } from '../../domain/commands/cellar';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { Container, ContainerKind, Measurement, MeasurementParameter } from '../../domain/types';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
 const CUSTOM_CONTAINERS_KEY = 'domaine-erp-custom-containers-v1';
 const CONTAINER_OVERRIDES_KEY = 'domaine-erp-container-overrides-v1';
@@ -44,7 +46,9 @@ const DEFAULT_PARAM_VALUES: Record<MeasurementParameter, string> = {
   malic: '1.8',
 };
 
-export const CellarView: React.FC = () => {
+export const CellarView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'cellar' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const [selectedLotId, setSelectedLotId] = useState<string>('lot-2026-white');
   const [selectedContainerId, setSelectedContainerId] = useState<string>('');
@@ -113,6 +117,20 @@ export const CellarView: React.FC = () => {
       return raw ? (JSON.parse(raw) as Record<string, Partial<Container>>) : {};
     } catch {
       return {};
+    }
+  });
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.lotId) setSelectedLotId(p.lotId);
+    if (p.containerId) setSelectedContainerId(p.containerId);
+    if (p.openModal === 'measurement') {
+      const param = p.parameter ?? 'density';
+      setParamKey(param);
+      setParamUnit(p.unit ?? PARAMETERS[param].units[0] ?? 'g/L');
+      setParamVal(p.value ?? DEFAULT_PARAM_VALUES[param]);
+      setShowMeasModal(true);
+    } else if (p.openModal === 'tasting') {
+      setShowTastingModal(true);
     }
   });
 

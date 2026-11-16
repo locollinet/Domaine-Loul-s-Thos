@@ -31,6 +31,8 @@ import { InteractiveVineyardMap, type ParcelMapItem } from './InteractiveVineyar
 import { LivretImportModal, type ImportedParcelRecord } from './LivretImportModal';
 import { PhytoAndTesaPanel } from './PhytoAndTesaPanel';
 import { useModuleConfig } from '../modules/ModuleConfigContext';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
 function normalizeAccents(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -416,7 +418,8 @@ function compressImageFile(file: File): Promise<string> {
 export const VineyardView: React.FC<{
   restrictedFieldMode?: boolean;
   onToggleRestrictedMode?: () => void;
-}> = ({ restrictedFieldMode = false, onToggleRestrictedMode }) => {
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'vineyard' }>;
+}> = ({ restrictedFieldMode = false, onToggleRestrictedMode, prefill }) => {
   const { state, dispatch, role } = useStore();
   const { isAddonEnabled } = useModuleConfig();
   // Navigation simple par onglets clairs (Zéro surcharge à l'écran)
@@ -491,6 +494,29 @@ export const VineyardView: React.FC<{
   const [obsMeasureLabel, setObsMeasureLabel] = useState('Maturité réfractométrique');
   const [obsMeasureVal, setObsMeasureVal] = useState('13.4');
   const [obsMeasureUnit, setObsMeasureUnit] = useState('% vol. potentiel');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.subTab) setSubTab(p.subTab);
+    if (p.parcelId) setSelectedParcelId(p.parcelId);
+    if (p.openModal === 'count' && state) {
+      const m =
+        (p.missionId ? state.missions[p.missionId] : undefined) ??
+        Object.values(state.missions).find((x) => x.operation === 'harvest' && x.status === 'in_progress') ??
+        Object.values(state.missions).find((x) => x.operation === 'harvest');
+      if (m) {
+        setSubTab('harvest');
+        setShowCountModal(m);
+        if (typeof p.quantity === 'number') setCountQuantity(String(p.quantity));
+      }
+    }
+    if (p.openModal === 'observation' && state) {
+      const parcel = (p.parcelId ? state.parcels[p.parcelId] : undefined) ?? Object.values(state.parcels)[0];
+      if (parcel) {
+        setShowObsModal(parcel);
+        if (p.obsText) setObsText(p.obsText);
+      }
+    }
+  });
 
   if (!state) return null;
 

@@ -12,8 +12,12 @@ import { useStore } from '../../app/store-context';
 import { invoiceBalance } from '../../domain/selectors';
 import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { CustomsDrmPanel } from './CustomsDrmPanel';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
-export const FinanceView: React.FC = () => {
+export const FinanceView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'finance' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
   const [subTab, setSubTab] = useState<'finance' | 'drm'>('finance');
@@ -36,6 +40,10 @@ export const FinanceView: React.FC = () => {
     } catch {
       return {};
     }
+  });
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.subTab) setSubTab(p.subTab);
   });
 
   if (!state) return null;

@@ -13,8 +13,12 @@ import { useStore } from '../../app/store-context';
 import { batchPosition } from '../../domain/selectors';
 import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { AllocationsAndPrimeursPanel } from './AllocationsAndPrimeursPanel';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
-export const SalesView: React.FC = () => {
+export const SalesView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'sales' }>;
+}> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
   const [subTab, setSubTab] = useState<'orders' | 'allocations'>('orders');
@@ -37,6 +41,15 @@ export const SalesView: React.FC = () => {
   const [returnBatchId, setReturnBatchId] = useState('');
   const [returnQty, setReturnQty] = useState('6');
   const [returnReason, setReturnReason] = useState('Bouteilles couleuses lors du transport');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.subTab) setSubTab(p.subTab);
+    if (p.customerId) setSelectedCustId(p.customerId);
+    if (p.batchId) setSelectedBatchId(p.batchId);
+    if (typeof p.quantity === 'number') setOrderQty(String(p.quantity));
+    if (typeof p.asQuote === 'boolean') setAsQuote(p.asQuote);
+    if (p.openModal === 'order') setShowOrderModal(true);
+  });
 
   if (!state) return null;
 

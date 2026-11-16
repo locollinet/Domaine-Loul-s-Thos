@@ -27,6 +27,7 @@ import { BottlingView } from './features/bottling/BottlingView';
 import { CellarView } from './features/cellar/CellarView';
 import { DemoGuideModal } from './features/demo/DemoGuideModal';
 import { AiCopilotDrawer } from './features/ai/AiCopilotDrawer';
+import type { AssistantPrefillPayload, AssistantTabId } from './features/ai/types';
 import { FinanceView } from './features/finance/FinanceView';
 import {
   ModuleConfigProvider,
@@ -53,6 +54,7 @@ const AppInner: React.FC = () => {
   const { state, role, setRole, resetDemo, feedback, clearFeedback, isReady } = useStore();
   const { isMainEnabled } = useModuleConfig();
   const [activeTab, setActiveTab] = useState<string>('overview');
+  const [pendingPrefill, setPendingPrefill] = useState<AssistantPrefillPayload | null>(null);
   const [restrictedFieldMode, setRestrictedFieldMode] = useState<boolean>(false);
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
@@ -100,6 +102,20 @@ const AppInner: React.FC = () => {
   }
 
   const recommendedTabs = ROLE_PRIMARY_TABS[role] ?? [];
+
+  const navigateClean = (tab: string) => {
+    setPendingPrefill(null);
+    setActiveTab(tab);
+  };
+
+  const handleNavigatePrefill = (prefill: AssistantPrefillPayload) => {
+    if (!isMainEnabled(prefill.tab as MainModuleId)) {
+      navigateClean('overview');
+      return;
+    }
+    setPendingPrefill(prefill);
+    setActiveTab(prefill.tab);
+  };
 
   // Compteurs vivants dans la barre latérale (pour guider l'œil sans jargon)
   const untransportedCrates = Object.values(state.harvestCounts).filter((c) => c.transportId === null && c.quantity > 0).length;
@@ -447,20 +463,49 @@ const AppInner: React.FC = () => {
               />
             ) : (
               <>
-                {activeTab === 'overview' && <OverviewView onNavigate={setActiveTab} />}
+                {activeTab === 'overview' && <OverviewView onNavigate={navigateClean} />}
                 {activeTab === 'vineyard' && (
                   <VineyardView
                     restrictedFieldMode={false}
                     onToggleRestrictedMode={() => setRestrictedFieldMode(true)}
+                    prefill={pendingPrefill?.tab === 'vineyard' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'cellar' && <CellarView />}
-                {activeTab === 'aging' && <AgingView />}
-                {activeTab === 'bottling' && <BottlingView />}
-                {activeTab === 'supplies' && <SuppliesView />}
-                {activeTab === 'sales' && <SalesView />}
-                {activeTab === 'finance' && <FinanceView />}
-                {activeTab === 'traceability' && <TraceabilityView />}
+                {activeTab === 'cellar' && (
+                  <CellarView
+                    prefill={pendingPrefill?.tab === 'cellar' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'aging' && (
+                  <AgingView
+                    prefill={pendingPrefill?.tab === 'aging' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'bottling' && (
+                  <BottlingView
+                    prefill={pendingPrefill?.tab === 'bottling' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'supplies' && (
+                  <SuppliesView
+                    prefill={pendingPrefill?.tab === 'supplies' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'sales' && (
+                  <SalesView
+                    prefill={pendingPrefill?.tab === 'sales' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'finance' && (
+                  <FinanceView
+                    prefill={pendingPrefill?.tab === 'finance' ? pendingPrefill : undefined}
+                  />
+                )}
+                {activeTab === 'traceability' && (
+                  <TraceabilityView
+                    prefill={pendingPrefill?.tab === 'traceability' ? pendingPrefill : undefined}
+                  />
+                )}
               </>
             )}
           </main>
@@ -569,6 +614,8 @@ const AppInner: React.FC = () => {
       <AiCopilotDrawer
         isOpen={showAiCopilot}
         onClose={() => setShowAiCopilot(false)}
+        activeTab={activeTab as AssistantTabId}
+        onNavigatePrefill={handleNavigatePrefill}
       />
 
       {/* Configurateur d'Offre & Modules à la Carte */}

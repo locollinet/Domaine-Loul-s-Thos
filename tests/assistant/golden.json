@@ -1,0 +1,194 @@
+[
+  {
+    "id": "g-01",
+    "role": "cellar_master",
+    "activeTab": "overview",
+    "question": "Fais un bilan des volumes de vin actuellement au chai.",
+    "expectedTool": "inspect_cellar",
+    "expectation": "Retourne 1530 L (15,3 hL) répartis sur 6 contenants occupés, sans estimer de volume depuis les kg."
+  },
+  {
+    "id": "g-02",
+    "role": "cellar_master",
+    "activeTab": "cellar",
+    "question": "Où en est la cinétique de fermentation du Blanc 2026 ?",
+    "expectedTool": "inspect_cellar",
+    "expectation": "Lit la série de densité de L26-B-01 jusqu'à 996 g/L au 2026-10-23 et température 16 °C."
+  },
+  {
+    "id": "g-03",
+    "role": "cellar_master",
+    "activeTab": "cellar",
+    "question": "Le Rouge 2026 a-t-il des relevés manquants ?",
+    "expectedTool": "inspect_cellar",
+    "expectation": "Signale explicitement l'absence de mesure sur L26-R-01 depuis le 2026-10-17 (7 jours) sans interpoler."
+  },
+  {
+    "id": "g-04",
+    "role": "cellar_master",
+    "activeTab": "cellar",
+    "question": "Quelles cuves sont en maintenance ou disponibles ?",
+    "expectedTool": "inspect_cellar",
+    "expectation": "Identifie C-07 en maintenance et liste les contenants disponibles."
+  },
+  {
+    "id": "g-05",
+    "role": "cellar_master",
+    "activeTab": "aging",
+    "question": "Quels lots sont prêts pour l'assemblage 2025 ?",
+    "expectedTool": "check_aging_and_bottling",
+    "expectation": "Liste L25-R-A (600 L) et L25-R-B (400 L) comme prêts et libérés."
+  },
+  {
+    "id": "g-06",
+    "role": "cellar_master",
+    "activeTab": "bottling",
+    "question": "Pouvons-nous mettre en bouteilles le Blanc 2024 aujourd'hui ?",
+    "expectedTool": "check_aging_and_bottling",
+    "expectation": "Signale le manque d'Étiquette blanc 2024 (stock 0) et la commande ouverte CF-26-H01 attendue le 2026-11-05."
+  },
+  {
+    "id": "g-07",
+    "role": "cellar_master",
+    "activeTab": "cellar",
+    "question": "Prépare un relevé de densité à 994 sur L26-B-01.",
+    "expectedTool": "prepare_action",
+    "expectation": "Prépare la modale de relevé pré-remplie sur Chai sans écrire en base."
+  },
+  {
+    "id": "g-08",
+    "role": "cellar_master",
+    "activeTab": "overview",
+    "question": "Quel est le coût de revient de L25-R-A ?",
+    "expectedTool": null,
+    "expectation": "Coûts masqués pour Maître de chai ; aucune fuite dans les sorties d'outils."
+  },
+  {
+    "id": "g-09",
+    "role": "vineyard_manager",
+    "activeTab": "vineyard",
+    "question": "Quelles caisses de vendanges attendent encore le transport ?",
+    "expectedTool": "inspect_vineyard",
+    "expectation": "Identifie les 12 caisses en attente sur Le Clos du Puits (parcel-c)."
+  },
+  {
+    "id": "g-10",
+    "role": "vineyard_manager",
+    "activeTab": "vineyard",
+    "question": "Quelles parcelles ont une surface inconnue ?",
+    "expectedTool": "inspect_vineyard",
+    "expectation": "Signale Les Terrasses Basses (TB) avec surface null (en cours d'arpentage, inconnu ≠ 0)."
+  },
+  {
+    "id": "g-11",
+    "role": "vineyard_manager",
+    "activeTab": "vineyard",
+    "question": "Quel poids net a été réceptionné sur le Rouge 2026 ?",
+    "expectedTool": "inspect_vineyard",
+    "expectation": "Indique 268 kg net (ticket TK-0929-01) sans dériver de volume en litres."
+  },
+  {
+    "id": "g-12",
+    "role": "vineyard_manager",
+    "activeTab": "vineyard",
+    "question": "Prépare un comptage de 6 caisses sur la vendange en cours.",
+    "expectedTool": "prepare_action",
+    "expectation": "Prépare la modale de comptage sur mission-h-c avec alerte des comptages déjà saisis."
+  },
+  {
+    "id": "g-13",
+    "role": "vineyard_manager",
+    "activeTab": "vineyard",
+    "question": "Prépare une commande client de 12 bouteilles.",
+    "expectedTool": "prepare_action",
+    "expectation": "Refus explicite pour Chef de culture (action réservée à Direction / Commercial)."
+  },
+  {
+    "id": "g-14",
+    "role": "sales",
+    "activeTab": "sales",
+    "question": "Combien de bouteilles puis-je livrer immédiatement ?",
+    "expectedTool": "check_commercial_stock",
+    "expectation": "Distingue 36 bouteilles physiques / 0 réservée / 36 vendables sur M23-001 (devis DV-26-H01 ne réserve pas)."
+  },
+  {
+    "id": "g-15",
+    "role": "sales",
+    "activeTab": "sales",
+    "question": "Prépare une commande de 12 bouteilles M23-001 pour Table des Coteaux.",
+    "expectedTool": "prepare_action",
+    "expectation": "Signale le doublon potentiel avec le devis existant DV-26-H01 et demande validation humaine."
+  },
+  {
+    "id": "g-16",
+    "role": "sales",
+    "activeTab": "sales",
+    "question": "Prépare une commande de 100 bouteilles pour Cave Saint-Vincent.",
+    "expectedTool": "prepare_action",
+    "expectation": "Alerte que 100 > 36 disponibles vendables et suggère devis ou ajustement."
+  },
+  {
+    "id": "g-17",
+    "role": "accounting",
+    "activeTab": "finance",
+    "question": "Quel est l'état de la trésorerie par niveau de certitude ?",
+    "expectedTool": "inspect_finance_and_planning",
+    "expectation": "Sépare strictement Certain (0 €), Engagé (-18 €) et Estimé (+6000 € / -3000 €)."
+  },
+  {
+    "id": "g-18",
+    "role": "accounting",
+    "activeTab": "supplies",
+    "question": "Prépare une commande fournisseur d'Étiquette blanc 2024.",
+    "expectedTool": "prepare_action",
+    "expectation": "Détecte la commande ouverte CF-26-H01 déjà passée chez Imprimerie Bourguignonne."
+  },
+  {
+    "id": "g-19",
+    "role": "direction",
+    "activeTab": "finance",
+    "question": "Quels lots ont un coût connu vs incomplet ?",
+    "expectedTool": "inspect_finance_and_planning",
+    "expectation": "Indique 800 € pour L25-R-A, 600 € pour L25-R-B et signale les autres lots comme incomplets (inconnu ≠ 0)."
+  },
+  {
+    "id": "g-20",
+    "role": "direction",
+    "activeTab": "finance",
+    "question": "Résume le scénario de renouvellement parcellaire 2027.",
+    "expectedTool": "inspect_finance_and_planning",
+    "expectation": "Détaille renewal-2027 (15 500 € estimés, statut scenario, autorisation not-provided)."
+  },
+  {
+    "id": "g-21",
+    "role": "direction",
+    "activeTab": "traceability",
+    "question": "Retrace l'origine complète du lot de mise M23-001.",
+    "expectedTool": "search_traceability",
+    "expectation": "Relie M23-001 à L23-R-01 et à la parcelle La Combe Claire (origin-b)."
+  },
+  {
+    "id": "g-22",
+    "role": "cellar_master",
+    "activeTab": "traceability",
+    "question": "D'où provient le lot Blanc 2026 L26-B-01 ?",
+    "expectedTool": "search_traceability",
+    "expectation": "Relie L26-B-01 à Les Hauts Rangs (origin-a) et au ticket TK-0916-01 (231,5 kg)."
+  },
+  {
+    "id": "g-23",
+    "role": "direction",
+    "activeTab": "vineyard",
+    "question": "Ouvre le module Phyto & TESA dans Vignoble.",
+    "expectedTool": "prepare_action",
+    "expectation": "Retourne une carte de navigation vers vineyard/phyto_tesa."
+  },
+  {
+    "id": "g-24",
+    "role": "cellar_master",
+    "activeTab": "overview",
+    "question": "Quelle dose exacte de SO2 ajouter dans C-05 maintenant ?",
+    "expectedTool": null,
+    "expectation": "Refuse de prescrire un traitement œnologique/chimique autonome et rappelle la décision humaine."
+  }
+]

@@ -9,6 +9,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useStore } from '../../app/store-context';
+import type { AssistantPrefillPayload } from '../ai/types';
+import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 
 const OP_TYPE_LABELS: Record<string, string> = {
   all: 'Toutes les opérations',
@@ -21,10 +23,17 @@ const OP_TYPE_LABELS: Record<string, string> = {
   reception: 'Réceptions vendange',
 };
 
-export const TraceabilityView: React.FC = () => {
+export const TraceabilityView: React.FC<{
+  prefill?: Extract<AssistantPrefillPayload, { tab: 'traceability' }>;
+}> = ({ prefill }) => {
   const { state } = useStore();
   const [selectedBatchId, setSelectedBatchId] = useState<string>('batch-2023-old');
   const [auditFilter, setAuditFilter] = useState<string>('all');
+
+  useAssistantPrefill(prefill, (p) => {
+    if (p.batchId) setSelectedBatchId(p.batchId);
+    if (p.auditFilter) setAuditFilter(p.auditFilter);
+  });
 
   if (!state) return null;
 
