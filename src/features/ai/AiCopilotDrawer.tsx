@@ -1,58 +1,96 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { RotateCcw, Sparkles, Square, X } from 'lucide-react';
 import { useStore } from '../../app/store-context';
-import { askGemini, getGeminiApiKey, setGeminiApiKey } from '../../infra/ai';
+import { askGemini, type CopilotHistoryTurn } from '../../infra/ai';
 
-interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-}
+const INITIAL_GREETING: CopilotHistoryTurn = {
+  role: 'model',
+  text: 'Bonjour ! Je suis le Copilote IA de l’exploitation. J’ai accès à l’état en direct de vos parcelles, de votre chai et de vos stocks de bouteilles. Comment puis-je vous assister ?',
+};
 
 export const AiCopilotDrawer: React.FC<{
   isOpen: boolean;
   onClose: () => void;
 }> = ({ isOpen, onClose }) => {
   const { state } = useStore();
-  const [apiKey, setApiKey] = useState(getGeminiApiKey() || '');
-  const [isEditingKey, setIsEditingKey] = useState(!getGeminiApiKey());
   const [prompt, setPrompt] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'model',
-      text: 'Bonjour ! Je suis le Copilote IA de l’exploitation. J’ai accès à l’état en direct de vos parcelles, de votre chai et de vos stocks de bouteilles. Comment puis-je vous assister ?',
-    },
-  ]);
+  const [messages, setMessages] = useState<CopilotHistoryTurn[]>([INITIAL_GREETING]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [isOpen, messages, isLoading, errorMsg]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   if (!isOpen || !state) return null;
 
-  const hasKey = Boolean(getGeminiApiKey());
+  const handleCancelRequest = () => {
+    requestIdRef.current += 1;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsLoading(false);
+  };
 
-  const handleSaveKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    setGeminiApiKey(apiKey);
-    setIsEditingKey(false);
+  const handleResetConversation = () => {
+    handleCancelRequest();
+    setMessages([INITIAL_GREETING]);
     setErrorMsg(null);
+    setLastFailedPrompt(null);
+    setPrompt('');
   };
 
   const handleSendMessage = async (textToSend?: string) => {
-    const text = (textToSend || prompt).trim();
+    const text = (textToSend ?? prompt).trim();
     if (!text || isLoading) return;
 
+    const currentRequestId = ++requestIdRef.current;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const priorHistory = messages;
+    const nextMessages: CopilotHistoryTurn[] = [...priorHistory, { role: 'user', text }];
+
     setErrorMsg(null);
-    const newHistory: ChatMessage[] = [...messages, { role: 'user', text }];
-    setMessages(newHistory);
-    setPrompt('');
+    setLastFailedPrompt(null);
+    setMessages(nextMessages);
+    if (!textToSend) {
+      setPrompt('');
+    }
     setIsLoading(true);
 
     try {
-      const reply = await askGemini(text, state, messages);
-      setMessages([...newHistory, { role: 'model', text: reply }]);
+      const reply = await askGemini(text, state, priorHistory, controller.signal);
+      if (requestIdRef.current !== currentRequestId) return;
+      setMessages([...nextMessages, { role: 'model', text: reply.text }]);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erreur de communication avec Gemini.';
+      if (requestIdRef.current !== currentRequestId) return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setErrorMsg('Analyse interrompue.');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Erreur de communication avec le copilote.';
       setErrorMsg(msg);
+      setLastFailedPrompt(text);
+      // Keep conversation clean so retrying does not duplicate the failed turn
+      setMessages(priorHistory);
     } finally {
-      setIsLoading(false);
+      if (requestIdRef.current === currentRequestId) {
+        setIsLoading(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -101,69 +139,47 @@ export const AiCopilotDrawer: React.FC<{
             color: 'white',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>✨</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Sparkles size={18} style={{ color: '#C4A47A', flexShrink: 0 }} />
             <div>
               <div style={{ fontWeight: 700, fontSize: '15px' }}>Copilote IA Viticole</div>
-              <div style={{ fontSize: '11px', opacity: 0.85 }}>Connecté à Google AI Studio (Gemini 3.8 Flash)</div>
+              <div style={{ fontSize: '11px', opacity: 0.85 }}>
+                Analyse en direct du domaine · Mode lecture seule
+              </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ color: 'white', fontSize: '18px', padding: '4px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* API Key Banner / Config */}
-        <div style={{ padding: '10px 16px', background: 'var(--color-surface-soft)', borderBottom: '1px solid var(--color-border)' }}>
-          {isEditingKey ? (
-            <form onSubmit={handleSaveKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label htmlFor="ai-studio-key" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>
-                Clé API Google AI Studio (stockée localement dans votre navigateur) :
-              </label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  id="ai-studio-key"
-                  type="password"
-                  placeholder="AIzaSy..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="form-input"
-                  style={{ minHeight: '32px', fontSize: '12px' }}
-                  required
-                />
-                <button type="submit" className="btn btn-sm btn-primary">
-                  Enregistrer
-                </button>
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-ink-light)' }}>
-                Obtenez une clé gratuitement sur{' '}
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: 'var(--color-forest)', textDecoration: 'underline' }}
-                >
-                  aistudio.google.com
-                </a>.
-              </div>
-            </form>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-              <span style={{ color: 'var(--color-forest)', fontWeight: 600 }}>
-                ● Clé AI Studio active ({apiKey.slice(0, 6)}••••)
-              </span>
-              <button
-                className="btn btn-sm btn-secondary"
-                style={{ fontSize: '11px', padding: '2px 8px', minHeight: '26px' }}
-                onClick={() => setIsEditingKey(true)}
-              >
-                Changer la clé
-              </button>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={handleResetConversation}
+              title="Nouvelle conversation"
+              aria-label="Nouvelle conversation"
+              style={{
+                color: 'white',
+                padding: '6px',
+                cursor: 'pointer',
+                opacity: 0.85,
+                background: 'transparent',
+                border: 'none',
+              }}
+            >
+              <RotateCcw size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fermer le copilote"
+              style={{
+                color: 'white',
+                padding: '6px',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Chat message history */}
@@ -203,21 +219,54 @@ export const AiCopilotDrawer: React.FC<{
                 alignSelf: 'flex-start',
                 background: 'var(--color-surface-soft)',
                 borderRadius: 'var(--radius-md)',
-                padding: '8px 14px',
+                padding: '10px 14px',
                 fontSize: '12px',
                 color: 'var(--color-ink-muted)',
-                fontStyle: 'italic',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
               }}
             >
-              Analyse des données du domaine en cours...
+              <span style={{ fontStyle: 'italic' }}>Analyse des données du domaine en cours...</span>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={handleCancelRequest}
+                style={{ fontSize: '11px', padding: '2px 8px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Square size={10} fill="currentColor" />
+                <span>Arrêter</span>
+              </button>
             </div>
           )}
 
           {errorMsg && (
-            <div className="alert alert-error" style={{ fontSize: '12px', margin: '4px 0' }}>
-              {errorMsg}
+            <div
+              className="alert alert-error"
+              role="alert"
+              style={{
+                fontSize: '12px',
+                margin: '4px 0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '8px',
+              }}
+            >
+              <span>{errorMsg}</span>
+              {lastFailedPrompt && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => handleSendMessage(lastFailedPrompt)}
+                  style={{ fontSize: '11px', padding: '3px 10px', minHeight: '26px' }}
+                >
+                  Réessayer
+                </button>
+              )}
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Quick prompt suggestions */}
@@ -229,10 +278,11 @@ export const AiCopilotDrawer: React.FC<{
             {quickPrompts.map((qp, idx) => (
               <button
                 key={idx}
+                type="button"
                 className="btn btn-sm btn-secondary"
                 style={{ fontSize: '11px', whiteSpace: 'nowrap', padding: '4px 8px', minHeight: '26px' }}
                 onClick={() => handleSendMessage(qp)}
-                disabled={!hasKey || isLoading}
+                disabled={isLoading}
               >
                 {qp}
               </button>
@@ -251,17 +301,17 @@ export const AiCopilotDrawer: React.FC<{
           >
             <input
               type="text"
-              placeholder={hasKey ? 'Posez une question sur le domaine...' : 'Renseignez d’abord votre clé ci-dessus'}
+              placeholder="Posez une question sur le domaine..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               className="form-input"
               style={{ flex: 1, minHeight: '38px' }}
-              disabled={!hasKey || isLoading}
+              disabled={isLoading}
             />
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={!hasKey || isLoading || !prompt.trim()}
+              disabled={isLoading || !prompt.trim()}
               style={{ minHeight: '38px', padding: '0 16px' }}
             >
               Envoyer

@@ -1,40 +1,56 @@
-import { GoogleGenAI } from '@google/genai';
 import { lotVolumeMl, batchPosition } from '../domain/selectors';
 import type { DomainState } from '../domain/types';
 
-export function getGeminiApiKey(): string | null {
-  const fromStorage = typeof window !== 'undefined' ? localStorage.getItem('domaine_gemini_api_key')?.trim() : null;
-  if (fromStorage && fromStorage.length > 0) return fromStorage;
-
-  const fromViteEnv = (import.meta.env['VITE_GEMINI_API_KEY'] as string | undefined)?.trim();
-  if (fromViteEnv && fromViteEnv.length > 0) return fromViteEnv;
-
-  return null;
+export interface CopilotHistoryTurn {
+  role: 'user' | 'model';
+  text: string;
 }
 
-export function setGeminiApiKey(key: string): void {
-  if (!key.trim()) {
-    localStorage.removeItem('domaine_gemini_api_key');
-  } else {
-    localStorage.setItem('domaine_gemini_api_key', key.trim());
-  }
+export interface CopilotResponse {
+  text: string;
+  model?: string;
 }
 
 /**
  * Builds a compact, structured snapshot of the domain state
- * so Gemini has real-time context of lots, tanks, bottles and missions.
+ * so the server-side Copilot has real-time context of lots, tanks,
+ * analytical measurements, bottles, orders and field missions.
  */
 export function buildDomainContextSummary(state: DomainState): string {
-  const lots = Object.values(state.lots).map((l) => ({
-    code: l.code,
-    nom: l.name,
-    millesime: l.vintage,
-    couleur: l.color,
-    stade: l.stage,
-    qualite: l.quality,
-    volumeLitres: lotVolumeMl(state, l.id) / 1000,
-    coutConnuEuros: l.cost.knownCents ? l.cost.knownCents / 100 : null,
-  }));
+  const lots = Object.values(state.lots).map((l) => {
+    const activeMeasurements = Object.values(state.measurements)
+      .filter((m) => m.lotId === l.id && m.supersededBy === null)
+      .sort((a, b) => b.sampledAt.localeCompare(a.sampledAt))
+      .slice(0, 6)
+      .map((m) => ({
+        parametre: m.parameter,
+        valeur: m.value,
+        unite: m.unit,
+        date: m.sampledAt.slice(0, 10),
+      }));
+
+    const contenants = Object.values(state.occupancies)
+      .filter((o) => o.lotId === l.id)
+      .map((o) => ({
+        code: state.containers[o.containerId]?.code ?? o.containerId,
+        type: state.containers[o.containerId]?.kind,
+        volumeLitres: o.volumeMl / 1000,
+      }));
+
+    return {
+      code: l.code,
+      nom: l.name,
+      millesime: l.vintage,
+      couleur: l.color,
+      stade: l.stage,
+      qualite: l.quality,
+      volumeLitres: lotVolumeMl(state, l.id) / 1000,
+      coutConnuEuros: l.cost.incomplete ? null : l.cost.knownCents / 100,
+      coutPartielEuros: l.cost.incomplete ? l.cost.knownCents / 100 : null,
+      contenants,
+      relevesActifs: activeMeasurements,
+    };
+  });
 
   const bouteilles = Object.values(state.batches).map((b) => {
     const pos = batchPosition(state, b);
@@ -65,86 +81,101 @@ export function buildDomainContextSummary(state: DomainState): string {
     operation: m.operation,
   }));
 
-  return JSON.stringify({
-    domaine: state.organization.name,
-    dateDemonstration: state.referenceDate.slice(0, 10),
-    lotsAuChai: lots,
-    stocksBouteilles: bouteilles,
-    commandesEnCours: commandes,
-    missionsTerrain: missions,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      domaine: state.organization.name,
+      dateDemonstration: state.referenceDate.slice(0, 10),
+      lotsAuChai: lots,
+      stocksBouteilles: bouteilles,
+      commandesEnCours: commandes,
+      missionsTerrain: missions,
+    },
+    null,
+    2
+  );
 }
+
+const CLIENT_TIMEOUT_MS = 45_000;
 
 export async function askGemini(
   prompt: string,
   state: DomainState,
-  history: { role: 'user' | 'model'; text: string }[] = []
-): Promise<string> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error(
-      'Aucune clé API Gemini configurée. Veuillez renseigner votre clé Google AI Studio (VITE_GEMINI_API_KEY ou dans l’interface).'
-    );
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  history: CopilotHistoryTurn[] = [],
+  externalSignal?: AbortSignal
+): Promise<CopilotResponse> {
   const contextSummary = buildDomainContextSummary(state);
 
-  const systemInstruction = `Tu es le Copilote IA officiel du Domaine des Trois Coteaux (domaine viticole de démonstration).
-Tu assistes le maître de chai, le chef de culture et la direction.
-Tu as accès à l'état complet en temps réel du domaine (ci-dessous au format JSON).
+  const timeoutController = new AbortController();
+  const timer = setTimeout(() => {
+    timeoutController.abort(new Error('Délai d’attente dépassé côté navigateur.'));
+  }, CLIENT_TIMEOUT_MS);
 
-RÈGLES IMPORTANTES DU DOMAINE :
-1. Réponds toujours en français, avec clarté, concision et professionnalisme.
-2. Tu t'appuies STRICTEMENT sur les données fournies dans le contexte ci-dessous.
-3. Distinction stricte : Stock physique ≠ Réservé ≠ Bloqué qualité ≠ Disponible vendable.
-4. Aucun traitement œnologique ou chimique n'est prescrit de façon autonome : tu fournis des analyses et alertes pour assister la décision humaine.
-5. Inconnu ≠ zéro pour les coûts et surfaces.
+  const onExternalAbort = () => {
+    timeoutController.abort(externalSignal?.reason ?? new Error('Requête annulée.'));
+  };
 
-ÉTAT EN DIRECT DU DOMAINE :
-${contextSummary}
-`;
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  }
 
   try {
-    const contents = [
-      ...history.map((h) => ({
-        role: h.role,
-        parts: [{ text: h.text }],
-      })),
-      {
-        role: 'user',
-        parts: [{ text: prompt }],
+    const response = await fetch('/api/copilot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    ];
+      body: JSON.stringify({
+        prompt,
+        contextSummary,
+        history,
+      }),
+      signal: timeoutController.signal,
+    });
 
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.3,
-        },
-      });
-    } catch (modelErr: unknown) {
-      console.warn('Fallback to gemini-flash-latest...', modelErr);
-      response = await ai.models.generateContent({
-        model: 'gemini-flash-latest',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.3,
-        },
-      });
+    const contentType = response.headers.get('content-type') ?? '';
+    let payload: { text?: string; model?: string; error?: string } | null = null;
+    if (contentType.includes('application/json')) {
+      payload = (await response.json()) as { text?: string; model?: string; error?: string };
+    } else {
+      const rawText = await response.text();
+      if (!response.ok) {
+        throw new Error(rawText || `Erreur serveur (${response.status})`);
+      }
     }
 
-    return response.text || 'Aucune réponse générée.';
+    if (!response.ok) {
+      throw new Error(payload?.error || `Erreur serveur (${response.status})`);
+    }
+
+    return {
+      text: payload?.text?.trim() || 'Aucune réponse générée.',
+      model: payload?.model,
+    };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('API_KEY_INVALID') || msg.includes('403')) {
-      throw new Error('Clé API Google AI Studio invalide ou permissions insuffisantes.', { cause: err });
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
     }
-    throw new Error(`Erreur Gemini AI Studio : ${msg}`, { cause: err });
+    if (timeoutController.signal.aborted) {
+      const reason = timeoutController.signal.reason;
+      if (reason instanceof Error) {
+        throw new Error(reason.message, { cause: err });
+      }
+      throw new Error('La requête a été interrompue ou a expiré.', { cause: err });
+    }
+    if (err instanceof TypeError) {
+      throw new Error('Impossible de joindre le serveur du copilote. Vérifiez que le serveur applicatif est démarré.', {
+        cause: err,
+      });
+    }
+    throw err instanceof Error ? err : new Error(String(err), { cause: err });
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', onExternalAbort);
+    }
   }
 }

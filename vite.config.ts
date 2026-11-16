@@ -4,9 +4,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ''),
-  },
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
     host: '0.0.0.0',
