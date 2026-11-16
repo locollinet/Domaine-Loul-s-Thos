@@ -316,15 +316,30 @@ export const SuppliesView: React.FC<{
           <div className="ds-stat-value">
             {Math.min(
               state.dryGoods['bottle-750']?.onHand ?? 0,
-              state.dryGoods['cork-natural']?.onHand ?? 0
+              state.dryGoods['closure']?.onHand ?? 0
             ).toLocaleString('fr-FR')}
             <span className="ds-stat-unit">cols max</span>
           </div>
           <div className="ds-bar" aria-hidden="true">
-            <span style={{ width: '78%', background: 'var(--color-forest)' }} />
+            <span
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.round(
+                    (Math.min(
+                      state.dryGoods['bottle-750']?.onHand ?? 0,
+                      state.dryGoods['closure']?.onHand ?? 0
+                    ) /
+                      2000) *
+                      100
+                  )
+                )}%`,
+                background: 'var(--color-forest)',
+              }}
+            />
           </div>
           <div className="ds-stat-foot">
-            Limité par le composant le moins abondant en magasin
+            Limité par le composant le moins abondant (bouteilles / bouchons)
           </div>
         </div>
       </section>
@@ -502,11 +517,12 @@ export const SuppliesView: React.FC<{
                           : 'Ouverte'}
                     </span>
                   </td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     {po.status !== 'received' && (
                       <button
                         className="btn btn-sm btn-primary"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setShowReceiveModal(po.id);
                           const remaining = (po.lines[0]?.ordered ?? 0) - (po.lines[0]?.received ?? 0);
                           setReceiveQty(String(remaining));
@@ -608,36 +624,73 @@ export const SuppliesView: React.FC<{
       )}
 
       {/* Modal Réception PO */}
-      {showReceiveModal && (
-        <div className="modal-backdrop" onClick={() => setShowReceiveModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Réceptionner la commande {state.purchaseOrders[showReceiveModal]?.code}
-            </h2>
-            <form onSubmit={handleReceivePo}>
-              <div className="form-group">
-                <label className="form-label">Quantité reçue</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  value={receiveQty}
-                  onChange={(e) => setReceiveQty(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowReceiveModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Valider la réception
-                </button>
-              </div>
-            </form>
+      {showReceiveModal && (() => {
+        const currentPo = state.purchaseOrders[showReceiveModal];
+        const firstLine = currentPo?.lines[0];
+        const poItem = firstLine ? state.dryGoods[firstLine.dryGoodId] : undefined;
+        return (
+          <div className="modal-backdrop" onClick={() => setShowReceiveModal(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
+                Réceptionner la commande {currentPo?.code}
+              </h2>
+              <form onSubmit={handleReceivePo}>
+                {openPos.length > 0 && (
+                  <div className="form-group">
+                    <label className="form-label">Commande fournisseur ouverte</label>
+                    <select
+                      className="form-select"
+                      value={showReceiveModal}
+                      onChange={(e) => {
+                        const nextPo = state.purchaseOrders[e.target.value];
+                        setShowReceiveModal(e.target.value);
+                        const rem =
+                          (nextPo?.lines[0]?.ordered ?? 0) - (nextPo?.lines[0]?.received ?? 0);
+                        setReceiveQty(String(Math.max(1, rem)));
+                      }}
+                    >
+                      {openPos.map((po) => {
+                        const l = po.lines[0];
+                        const item = l ? state.dryGoods[l.dryGoodId] : undefined;
+                        const rem = (l?.ordered ?? 0) - (l?.received ?? 0);
+                        return (
+                          <option key={po.id} value={po.id}>
+                            {po.code} · {po.supplier} — {item?.name ?? ''} (reste {rem})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+                {poItem && (
+                  <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '12px' }}>
+                    Article : <strong>{poItem.name}</strong> · Stock actuel : {poItem.onHand.toLocaleString('fr-FR')} {poItem.unit}
+                  </p>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Quantité reçue</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={receiveQty}
+                    onChange={(e) => setReceiveQty(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowReceiveModal(null)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    Valider la réception
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal Inventaire */}
       {showInvModal && (
@@ -647,6 +700,24 @@ export const SuppliesView: React.FC<{
               Comptage d’inventaire — {state.dryGoods[showInvModal]?.name}
             </h2>
             <form onSubmit={handleInventory}>
+              <div className="form-group">
+                <label className="form-label">Matière sèche à inventorier</label>
+                <select
+                  className="form-select"
+                  value={showInvModal}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setShowInvModal(nextId);
+                    setInvCounted(String(state.dryGoods[nextId]?.onHand ?? 0));
+                  }}
+                >
+                  {dryGoods.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} (stock théorique : {g.onHand.toLocaleString('fr-FR')} {g.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="form-group">
                 <label className="form-label">Quantité physique réellement constatée</label>
                 <input

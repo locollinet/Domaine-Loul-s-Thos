@@ -451,6 +451,19 @@ button {
   color: var(--color-ink);
 }
 
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 /* KPI Stat Card */
 .kpi-card {
   background: var(--color-surface);
@@ -1637,6 +1650,105 @@ tr:hover td {
   border: 1.5px solid var(--color-gold-border);
 }
 
+/* ---------- Barre d'onglets d'espaces de travail (.ds-subnav) ---------- */
+.ds-subnav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
+  scroll-margin-top: 76px;
+}
+
+.ds-subnav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.ds-subnav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ds-subnav-tab:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
+}
+
+.ds-subnav-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-ring);
+}
+
+.ds-subnav-tab.is-active {
+  background: var(--color-forest);
+  color: #FAF8F5;
+  border-color: var(--color-forest);
+  box-shadow: var(--shadow-xs);
+}
+
+.ds-subnav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-surface-soft);
+  color: var(--color-ink-muted);
+  border: 1px solid var(--color-border);
+}
+
+.ds-subnav-tab.is-active .ds-subnav-count {
+  background: rgba(196, 164, 122, 0.25);
+  color: #F5E6CC;
+  border-color: rgba(196, 164, 122, 0.45);
+}
+
+.ds-subnav-count.is-alert {
+  background: var(--color-amber-soft);
+  color: #92400E;
+  border-color: var(--color-amber-border);
+}
+
+.ds-subnav-tab.is-active .ds-subnav-count.is-alert {
+  background: #F97316;
+  color: #FFFFFF;
+  border-color: #F97316;
+}
+
+.ds-subnav-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Apparition douce en cascade (sans transform persistant pour ne jamais casser position: fixed) */
 @keyframes dsRise {
   from { opacity: 0; }
@@ -1672,6 +1784,16 @@ tr:hover td {
 
 @media (max-width: 720px) {
   .ds-hero-title { font-size: 30px; }
+  .ds-subnav { padding: 6px 8px; gap: 8px; }
+  .ds-subnav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ds-subnav-tabs::-webkit-scrollbar { display: none; }
+  .ds-subnav-tab { padding: 7px 11px; font-size: 12.5px; flex-shrink: 0; }
   .ds-quick-grid,
   .ds-quick-grid-4,
   .ds-quick-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

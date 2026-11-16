@@ -17,13 +17,17 @@ import { ELabelQrPanel } from './ELabelQrPanel';
 import { CellarBottleMapPanel } from './CellarBottleMapPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+
+type BottlingTabId = 'stocks' | 'cellar_map' | 'elabel';
 
 export const BottlingView: React.FC<{
   prefill?: Extract<AssistantPrefillPayload, { tab: 'bottling' }>;
 }> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
-  const [subTab, setSubTab] = useState<'stocks' | 'cellar_map' | 'elabel'>('stocks');
+  const [subTab, setSubTab] = useState<BottlingTabId>('stocks');
+  const [focusedBatchCode, setFocusedBatchCode] = useState<string | undefined>(undefined);
   const [showBottlingModal, setShowBottlingModal] = useState(false);
 
   // Form states
@@ -37,6 +41,7 @@ export const BottlingView: React.FC<{
     if (p.subTab) setSubTab(p.subTab);
     if (p.lotId) setSelectedLotId(p.lotId);
     if (p.skuId) setSelectedSkuId(p.skuId);
+    if (p.batchCode) setFocusedBatchCode(p.batchCode);
     if (typeof p.bottles === 'number') setBottleCount(String(p.bottles));
     if (p.openModal === 'bottling') setShowBottlingModal(true);
   });
@@ -92,16 +97,12 @@ export const BottlingView: React.FC<{
   };
 
   const showElabelAddon = isAddonEnabled('elabel_qr');
-  const effectiveSubTab = !showElabelAddon && subTab === 'elabel' ? 'stocks' : subTab;
+  const effectiveSubTab: BottlingTabId = !showElabelAddon && subTab === 'elabel' ? 'stocks' : subTab;
 
-  const selectSubTabAndScroll = (next: 'stocks' | 'cellar_map' | 'elabel') => {
+  const switchBottlingTab = (next: BottlingTabId, batchCode?: string) => {
+    if (batchCode) setFocusedBatchCode(batchCode);
     setSubTab(next);
-    setTimeout(() => {
-      const el = document.getElementById('bottling-workspace-anchor');
-      if (el && typeof el.scrollIntoView === 'function') {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 40);
+    scrollSubNavIntoView('bottling-subnav');
   };
 
   // Synthèse globale des bouteilles
@@ -165,116 +166,61 @@ export const BottlingView: React.FC<{
         </div>
       </section>
 
-      {/* 2. NAVIGATION VISUELLE EN 3 GESTES MÉTIER */}
-      <section className="ds-rise ds-rise-1" aria-label="Ateliers de conditionnement et cave">
-        <div className="ds-section-head">
-          <h2 className="ds-section-title">Choisissez votre atelier</h2>
-          <div className="segmented-control">
-            <button
-              type="button"
-              className={`segmented-btn ${effectiveSubTab === 'stocks' ? 'active' : ''}`}
-              onClick={() => setSubTab('stocks')}
-            >
-              <Package size={14} />
-              <span>1. Mises & Stocks ({batches.length})</span>
-            </button>
-            <button
-              type="button"
-              className={`segmented-btn ${effectiveSubTab === 'cellar_map' ? 'active' : ''}`}
-              onClick={() => setSubTab('cellar_map')}
-            >
-              <Flame size={14} />
-              <span>2. Rangement Cave & Priorités Vente</span>
-            </button>
-            {showElabelAddon && (
-              <button
-                type="button"
-                className={`segmented-btn ${effectiveSubTab === 'elabel' ? 'active' : ''}`}
-                onClick={() => setSubTab('elabel')}
-              >
-                <QrCode size={14} />
-                <span>3. QR Code E-Labeling UE</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="ds-quick-grid-3">
+      {/* 2. NAVIGATION D'ESPACES MÉTIER (STOCKS · RANGEMENT CAVE · E-LABELING) */}
+      <SubNav
+        id="bottling-subnav"
+        ariaLabel="Espaces de travail Conditionnement et Cave à bouteilles"
+        tabs={[
+          {
+            id: 'stocks',
+            label: '📦 Mises & Stocks bouteilles',
+            icon: Package,
+            count: batches.length,
+            hint: 'Consulter ce qui est libre à la vente, réservé ou en quarantaine',
+          },
+          {
+            id: 'cellar_map',
+            label: '🔥 Plan de cave & Priorités vente',
+            icon: Flame,
+            hint: 'Palox, palettes, casiers œnothèque et dates optimales d’écoulement',
+          },
+          ...(showElabelAddon
+            ? [
+                {
+                  id: 'elabel' as const,
+                  label: '📱 QR Code E-Labeling UE',
+                  icon: QrCode,
+                  hint: 'Valeurs nutritionnelles kcal/kJ, ingrédients et tri sélectif',
+                },
+              ]
+            : []),
+        ] satisfies SubNavTab<BottlingTabId>[]}
+        active={effectiveSubTab}
+        onChange={(next) => switchBottlingTab(next)}
+        trailing={
           <button
             type="button"
-            className={`ds-tile ${effectiveSubTab === 'stocks' ? 'is-recommended' : ''}`}
-            onClick={() => selectSubTabAndScroll('stocks')}
+            className="btn btn-sm btn-primary"
+            onClick={() => {
+              if (eligibleLots.length > 0 && !selectedLotId) {
+                setSelectedLotId(eligibleLots[0]!.id);
+              }
+              setShowBottlingModal(true);
+            }}
           >
-            <span className="ds-tile-badge">Stock commercial</span>
-            <div className="ds-icon-bubble ds-tone-forest">
-              <Package size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">Consulter les lots de bouteilles</div>
-              <div className="ds-tile-sub">
-                Voir ce qui est libre à la vente, réservé ou en quarantaine
-              </div>
-            </div>
+            <Plus size={14} />
+            <span>Déclarer un tirage / habillage</span>
           </button>
-
-          <button
-            type="button"
-            className={`ds-tile ${effectiveSubTab === 'cellar_map' ? 'is-recommended' : ''}`}
-            onClick={() => selectSubTabAndScroll('cellar_map')}
-          >
-            <span className="ds-tile-badge">Plan & Urgences</span>
-            <div className="ds-icon-bubble ds-tone-amber">
-              <Flame size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">Ranger la cave & prioriser les ventes</div>
-              <div className="ds-tile-sub">
-                Palox, palettes, casiers œnothèque et dates optimales d’écoulement
-              </div>
-            </div>
-          </button>
-
-          {showElabelAddon ? (
-            <button
-              type="button"
-              className={`ds-tile ${effectiveSubTab === 'elabel' ? 'is-recommended' : ''}`}
-              onClick={() => selectSubTabAndScroll('elabel')}
-            >
-              <span className="ds-tile-badge">Conformité UE</span>
-              <div className="ds-icon-bubble ds-tone-gold">
-                <QrCode size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Générer un QR Code contre-étiquette</div>
-                <div className="ds-tile-sub">
-                  Valeurs nutritionnelles kcal/kJ, ingrédients et tri sélectif
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ds-tile"
-              onClick={() => setShowBottlingModal(true)}
-            >
-              <div className="ds-icon-bubble ds-tone-grape">
-                <Plus size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Déclarer un tirage / habillage</div>
-                <div className="ds-tile-sub">
-                  Convertir un lot en cuve vers des bouteilles prêtes à vendre
-                </div>
-              </div>
-            </button>
-          )}
-        </div>
-      </section>
-
-      <div id="bottling-workspace-anchor" style={{ scrollMarginTop: '76px' }} />
+        }
+      />
 
       {effectiveSubTab === 'cellar_map' ? (
-        <CellarBottleMapPanel state={state} batches={batches} skus={state.skus} />
+        <CellarBottleMapPanel
+          state={state}
+          batches={batches}
+          skus={state.skus}
+          focusedBatchCode={focusedBatchCode}
+        />
       ) : effectiveSubTab === 'elabel' && showElabelAddon ? (
         <ELabelQrPanel batches={batches} skus={state.skus} lots={state.lots} />
       ) : (
@@ -438,7 +384,7 @@ export const BottlingView: React.FC<{
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
-                  onClick={() => selectSubTabAndScroll('cellar_map')}
+                  onClick={() => switchBottlingTab('cellar_map')}
                 >
                   Voir où ils sont rangés →
                 </button>
@@ -472,7 +418,7 @@ export const BottlingView: React.FC<{
                       <tr
                         key={b.id}
                         className="ds-clickable-row"
-                        onClick={() => selectSubTabAndScroll('cellar_map')}
+                        onClick={() => switchBottlingTab('cellar_map', b.code)}
                         title="Cliquer pour localiser ce lot dans le plan des casiers & palox"
                       >
                         <td style={{ fontWeight: 700 }}>{b.code}</td>
@@ -515,7 +461,7 @@ export const BottlingView: React.FC<{
                             <button
                               type="button"
                               className="ds-action-chip"
-                              onClick={() => selectSubTabAndScroll('cellar_map')}
+                              onClick={() => switchBottlingTab('cellar_map', b.code)}
                             >
                               📍 Cave
                             </button>
@@ -548,8 +494,11 @@ export const BottlingView: React.FC<{
             </div>
           </div>
 
-          {/* Modal Mise en bouteilles */}
-          {showBottlingModal && (
+        </>
+      )}
+
+      {/* Modal Mise en bouteilles (accessible depuis tous les onglets) */}
+      {showBottlingModal && (
             <div className="modal-backdrop" onClick={() => setShowBottlingModal(false)}>
               <div className="modal-content" style={{ maxWidth: '650px' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -707,8 +656,6 @@ export const BottlingView: React.FC<{
               </div>
             </div>
           )}
-        </>
-      )}
     </div>
   );
 };

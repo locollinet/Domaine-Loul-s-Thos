@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   Grape,
@@ -55,6 +55,7 @@ const AppInner: React.FC = () => {
   const { isMainEnabled } = useModuleConfig();
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [pendingPrefill, setPendingPrefill] = useState<AssistantPrefillPayload | null>(null);
+  const prefillSeqRef = useRef(0);
   const [restrictedFieldMode, setRestrictedFieldMode] = useState<boolean>(false);
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
@@ -103,8 +104,17 @@ const AppInner: React.FC = () => {
 
   const recommendedTabs = ROLE_PRIMARY_TABS[role] ?? [];
 
+  const effectiveActiveTab =
+    activeTab === 'overview' || isMainEnabled(activeTab as MainModuleId)
+      ? activeTab
+      : 'overview';
+
   const navigateClean = (tab: string) => {
     setPendingPrefill(null);
+    if (tab !== 'overview' && !isMainEnabled(tab as MainModuleId)) {
+      setActiveTab('overview');
+      return;
+    }
     setActiveTab(tab);
   };
 
@@ -113,7 +123,8 @@ const AppInner: React.FC = () => {
       navigateClean('overview');
       return;
     }
-    setPendingPrefill(prefill);
+    const nextNonce = prefill.nonce ?? ++prefillSeqRef.current;
+    setPendingPrefill({ ...prefill, nonce: nextNonce });
     setActiveTab(prefill.tab);
   };
 
@@ -174,7 +185,7 @@ const AppInner: React.FC = () => {
     { id: 'cellar', short: '2. Cuverie', icon: Wine },
     { id: 'aging', short: '3. Fûts', icon: Layers },
     { id: 'bottling', short: '4. Mise', icon: Package },
-    { id: 'sales', short: '5. Allocations', icon: Award },
+    { id: 'sales', short: '5. Ventes', icon: Award },
     { id: 'traceability', short: '6. Filiation', icon: GitBranch },
   ].filter((st) => isMainEnabled(st.id as MainModuleId));
 
@@ -206,10 +217,10 @@ const AppInner: React.FC = () => {
                         return (
                           <button
                             key={item.id}
-                            className={`nav-tab ${activeTab === item.id ? 'active' : ''} ${
+                            className={`nav-tab ${effectiveActiveTab === item.id ? 'active' : ''} ${
                               isRecommended ? 'role-recommended' : ''
                             }`}
-                            onClick={() => setActiveTab(item.id)}
+                            onClick={() => navigateClean(item.id)}
                             title={
                               isRecommended
                                 ? `${item.label} — Écran clé pour ${ROLE_LABELS[role]}`
@@ -328,13 +339,13 @@ const AppInner: React.FC = () => {
               <div className="compact-e2e-pills" aria-label="Chaîne de valeur de bout en bout">
                 {compactSteps.map((st, idx) => {
                   const StepIcon = st.icon;
-                  const isActive = activeTab === st.id;
+                  const isActive = effectiveActiveTab === st.id;
                   return (
                     <React.Fragment key={st.id}>
                       <button
                         type="button"
                         className={`compact-step-pill ${isActive ? 'active' : ''}`}
-                        onClick={() => setActiveTab(st.id)}
+                        onClick={() => navigateClean(st.id)}
                         title={`Accéder à l’étape ${st.short}`}
                       >
                         <StepIcon size={13} style={{ color: isActive ? 'var(--color-gold-dark)' : 'currentColor' }} />
@@ -398,18 +409,20 @@ const AppInner: React.FC = () => {
                   <span>Modules</span>
                 </button>
 
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => {
-                    setActiveTab('vineyard');
-                    setRestrictedFieldMode(true);
-                  }}
-                  title="Basculer vers l'interface simplifiée de terrain (Guidage GPS & feuille de route des équipes)"
-                >
-                  <Navigation size={12} style={{ color: '#F97316' }} />
-                  <span>Mode Terrain</span>
-                </button>
+                {isMainEnabled('vineyard') && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      navigateClean('vineyard');
+                      setRestrictedFieldMode(true);
+                    }}
+                    title="Basculer vers l'interface simplifiée de terrain (Guidage GPS & feuille de route des équipes)"
+                  >
+                    <Navigation size={12} style={{ color: '#F97316' }} />
+                    <span>Mode Terrain</span>
+                  </button>
+                )}
 
                 <button
                   className="btn btn-sm btn-gold"
@@ -463,45 +476,50 @@ const AppInner: React.FC = () => {
               />
             ) : (
               <>
-                {activeTab === 'overview' && <OverviewView onNavigate={navigateClean} />}
-                {activeTab === 'vineyard' && (
+                {effectiveActiveTab === 'overview' && (
+                  <OverviewView
+                    onNavigate={navigateClean}
+                    onNavigatePrefill={handleNavigatePrefill}
+                  />
+                )}
+                {effectiveActiveTab === 'vineyard' && (
                   <VineyardView
                     restrictedFieldMode={false}
                     onToggleRestrictedMode={() => setRestrictedFieldMode(true)}
                     prefill={pendingPrefill?.tab === 'vineyard' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'cellar' && (
+                {effectiveActiveTab === 'cellar' && (
                   <CellarView
                     prefill={pendingPrefill?.tab === 'cellar' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'aging' && (
+                {effectiveActiveTab === 'aging' && (
                   <AgingView
                     prefill={pendingPrefill?.tab === 'aging' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'bottling' && (
+                {effectiveActiveTab === 'bottling' && (
                   <BottlingView
                     prefill={pendingPrefill?.tab === 'bottling' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'supplies' && (
+                {effectiveActiveTab === 'supplies' && (
                   <SuppliesView
                     prefill={pendingPrefill?.tab === 'supplies' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'sales' && (
+                {effectiveActiveTab === 'sales' && (
                   <SalesView
                     prefill={pendingPrefill?.tab === 'sales' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'finance' && (
+                {effectiveActiveTab === 'finance' && (
                   <FinanceView
                     prefill={pendingPrefill?.tab === 'finance' ? pendingPrefill : undefined}
                   />
                 )}
-                {activeTab === 'traceability' && (
+                {effectiveActiveTab === 'traceability' && (
                   <TraceabilityView
                     prefill={pendingPrefill?.tab === 'traceability' ? pendingPrefill : undefined}
                   />
@@ -516,28 +534,42 @@ const AppInner: React.FC = () => {
       <nav aria-label="Navigation mobile terrain" className="mobile-bottom-nav">
         <button
           type="button"
-          className={`mobile-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
+          className={`mobile-nav-item ${effectiveActiveTab === 'overview' ? 'active' : ''}`}
+          onClick={() => navigateClean('overview')}
         >
           <LayoutDashboard size={16} />
           <span>Cockpit</span>
         </button>
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'vineyard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('vineyard')}
-        >
-          <Grape size={16} />
-          <span>Vigne</span>
-        </button>
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === 'cellar' ? 'active' : ''}`}
-          onClick={() => setActiveTab('cellar')}
-        >
-          <Wine size={16} />
-          <span>Chai</span>
-        </button>
+        {isMainEnabled('vineyard') && (
+          <button
+            type="button"
+            className={`mobile-nav-item ${effectiveActiveTab === 'vineyard' ? 'active' : ''}`}
+            onClick={() => navigateClean('vineyard')}
+          >
+            <Grape size={16} />
+            <span>Vigne</span>
+          </button>
+        )}
+        {isMainEnabled('cellar') && (
+          <button
+            type="button"
+            className={`mobile-nav-item ${effectiveActiveTab === 'cellar' ? 'active' : ''}`}
+            onClick={() => navigateClean('cellar')}
+          >
+            <Wine size={16} />
+            <span>Chai</span>
+          </button>
+        )}
+        {(!isMainEnabled('vineyard') || !isMainEnabled('cellar')) && isMainEnabled('sales') && (
+          <button
+            type="button"
+            className={`mobile-nav-item ${effectiveActiveTab === 'sales' ? 'active' : ''}`}
+            onClick={() => navigateClean('sales')}
+          >
+            <Award size={16} />
+            <span>Ventes</span>
+          </button>
+        )}
         <button
           type="button"
           className="mobile-nav-item"
@@ -560,7 +592,8 @@ const AppInner: React.FC = () => {
       {showGlobalSearch && (
         <GlobalSearchModal
           onClose={() => setShowGlobalSearch(false)}
-          onNavigate={(tab) => setActiveTab(tab)}
+          onNavigate={navigateClean}
+          onNavigatePrefill={handleNavigatePrefill}
         />
       )}
 
@@ -605,16 +638,15 @@ const AppInner: React.FC = () => {
       <DemoGuideModal
         isOpen={showDemoGuide}
         onClose={() => setShowDemoGuide(false)}
-        onNavigate={(tab) => {
-          setActiveTab(tab);
-        }}
+        onNavigate={navigateClean}
+        onNavigatePrefill={handleNavigatePrefill}
       />
 
       {/* AI Copilot Drawer */}
       <AiCopilotDrawer
         isOpen={showAiCopilot}
         onClose={() => setShowAiCopilot(false)}
-        activeTab={activeTab as AssistantTabId}
+        activeTab={effectiveActiveTab as AssistantTabId}
         onNavigatePrefill={handleNavigatePrefill}
       />
 

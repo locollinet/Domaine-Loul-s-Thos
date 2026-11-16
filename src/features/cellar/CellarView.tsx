@@ -70,7 +70,7 @@ export const CellarView: React.FC<{
 
   // Declare Volume Modal (Grapes kg -> Wine L explicit measurement)
   const [showDeclareVolModal, setShowDeclareVolModal] = useState(false);
-  const [declareContainerId, setDeclareContainerId] = useState('c-04');
+  const [declareContainerId, setDeclareContainerId] = useState('');
   const [declareLitres, setDeclareLitres] = useState('160');
 
   // Tasting Modal
@@ -131,6 +131,8 @@ export const CellarView: React.FC<{
       setShowMeasModal(true);
     } else if (p.openModal === 'tasting') {
       setShowTastingModal(true);
+    } else if (p.openModal === 'declare_volume') {
+      setShowDeclareVolModal(true);
     }
   });
 
@@ -147,6 +149,14 @@ export const CellarView: React.FC<{
     ...(containerOverrides[c.id] ?? {}),
   }));
   const selectedLot = state.lots[selectedLotId] || lots[0];
+  const emptyAvailableContainers = containers.filter(
+    (c) => c.state === 'available' && !state.occupancies[c.id]
+  );
+  const effectiveDeclareContainerId = emptyAvailableContainers.some(
+    (c) => c.id === declareContainerId
+  )
+    ? declareContainerId
+    : (emptyAvailableContainers[0]?.id ?? '');
   const selectedContainer = selectedContainerId
     ? containers.find((c) => c.id === selectedContainerId) ?? null
     : null;
@@ -225,13 +235,13 @@ export const CellarView: React.FC<{
 
   const handleDeclareVolume = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLot) return;
+    if (!selectedLot || !effectiveDeclareContainerId) return;
     try {
       await dispatch({
         type: 'lot.declareVolume',
         payload: {
           lotId: selectedLot.id,
-          containerId: declareContainerId,
+          containerId: effectiveDeclareContainerId,
           volumeMl: Math.round(parseFloat(declareLitres) * 1000),
           note: 'Entonnage / écoulage mesuré après pressurage',
         },
@@ -474,20 +484,6 @@ export const CellarView: React.FC<{
       <section className="ds-rise ds-rise-1" aria-label="Gestes rapides au chai">
         <div className="ds-section-head">
           <h2 className="ds-section-title">Que souhaitez-vous faire au chai ?</h2>
-          <div className="segmented-control">
-            <button
-              className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
-              onClick={() => setViewMode('plan')}
-            >
-              <LayoutGrid size={14} /> Plan de cave visuel
-            </button>
-            <button
-              className={`segmented-btn ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => setViewMode('table')}
-            >
-              <TableIcon size={14} /> Table des contenants
-            </button>
-          </div>
         </div>
 
         <div className="ds-quick-grid-4">
@@ -655,6 +651,22 @@ export const CellarView: React.FC<{
             </span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${viewMode === 'plan' ? 'active' : ''}`}
+                onClick={() => setViewMode('plan')}
+              >
+                <LayoutGrid size={14} /> Plan de cave visuel
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${viewMode === 'table' ? 'active' : ''}`}
+                onClick={() => setViewMode('table')}
+              >
+                <TableIcon size={14} /> Table des contenants
+              </button>
+            </div>
             <button
               type="button"
               className="btn btn-sm btn-primary"
@@ -1323,6 +1335,20 @@ export const CellarView: React.FC<{
             </h2>
             <form onSubmit={handleAddMeasurement}>
               <div className="form-group">
+                <label className="form-label">Lot / Cuvée concerné(e)</label>
+                <select
+                  className="form-select"
+                  value={selectedLot?.id ?? ''}
+                  onChange={(e) => setSelectedLotId(e.target.value)}
+                >
+                  {lots.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Paramètre mesuré</label>
                 <select
                   className="form-select"
@@ -1474,19 +1500,35 @@ export const CellarView: React.FC<{
             </p>
             <form onSubmit={handleDeclareVolume}>
               <div className="form-group">
+                <label className="form-label">Lot / Cuvée concerné(e)</label>
+                <select
+                  className="form-select"
+                  value={selectedLot?.id ?? ''}
+                  onChange={(e) => setSelectedLotId(e.target.value)}
+                >
+                  {lots.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} · {l.name} ({((l.grapesReceivedG ?? 0) / 1000).toLocaleString('fr-FR')} kg)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Contenant de destination</label>
                 <select
                   className="form-select"
-                  value={declareContainerId}
+                  value={effectiveDeclareContainerId}
                   onChange={(e) => setDeclareContainerId(e.target.value)}
                 >
-                  {containers
-                    .filter((c) => c.state === 'available' && !state.occupancies[c.id])
-                    .map((c) => (
+                  {emptyAvailableContainers.length === 0 ? (
+                    <option value="">Aucune cuve vide disponible</option>
+                  ) : (
+                    emptyAvailableContainers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.code} ({c.capacityMl / 1000} L)
                       </option>
-                    ))}
+                    ))
+                  )}
                 </select>
               </div>
               <div className="form-group">
@@ -1521,6 +1563,20 @@ export const CellarView: React.FC<{
               Note de dégustation — {selectedLot?.name}
             </h2>
             <form onSubmit={handleAddTasting}>
+              <div className="form-group">
+                <label className="form-label">Lot / Cuvée concerné(e)</label>
+                <select
+                  className="form-select"
+                  value={selectedLot?.id ?? ''}
+                  onChange={(e) => setSelectedLotId(e.target.value)}
+                >
+                  {lots.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="form-group">
                 <label className="form-label">Commentaire humain / impressions</label>
                 <textarea

@@ -31,7 +31,7 @@ export type AssistantPrefillPayload =
     }
   | {
       tab: 'vineyard';
-      subTab?: 'atlas' | 'harvest' | 'reception' | 'phyto_tesa';
+      subTab?: 'atlas' | 'livret' | 'harvest' | 'reception' | 'phyto_tesa';
       parcelId?: string;
       openModal?: 'count' | 'observation';
       missionId?: string;
@@ -43,7 +43,7 @@ export type AssistantPrefillPayload =
       tab: 'cellar';
       lotId?: string;
       containerId?: string;
-      openModal?: 'measurement' | 'tasting';
+      openModal?: 'measurement' | 'tasting' | 'declare_volume';
       parameter?: MeasurementParameter;
       value?: string;
       unit?: string;
@@ -61,6 +61,7 @@ export type AssistantPrefillPayload =
       subTab?: 'stocks' | 'cellar_map' | 'elabel';
       lotId?: string;
       skuId?: string;
+      batchCode?: string;
       openModal?: 'bottling';
       bottles?: number;
       nonce?: number;
@@ -76,16 +77,17 @@ export type AssistantPrefillPayload =
   | {
       tab: 'sales';
       subTab?: 'orders' | 'allocations';
-      openModal?: 'order';
+      openModal?: 'order' | 'ship';
       customerId?: string;
       batchId?: string;
+      orderId?: string;
       quantity?: number;
       asQuote?: boolean;
       nonce?: number;
     }
   | {
       tab: 'finance';
-      subTab?: 'finance' | 'drm';
+      subTab?: 'finance' | 'drm' | 'horizon_2027';
       nonce?: number;
     }
   | {

@@ -26,13 +26,16 @@ import {
 import { useStore } from '../../app/store-context';
 import { canRun } from '../../domain/commands';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
-import type { HarvestCount, Mission, MissionStatus, Parcel } from '../../domain/types';
+import type { HarvestCount, Mission, MissionStatus, Parcel, Transport } from '../../domain/types';
 import { InteractiveVineyardMap, type ParcelMapItem } from './InteractiveVineyardMap';
 import { LivretImportModal, type ImportedParcelRecord } from './LivretImportModal';
 import { PhytoAndTesaPanel } from './PhytoAndTesaPanel';
 import { useModuleConfig } from '../modules/ModuleConfigContext';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+
+type VineyardTabId = 'map' | 'livret' | 'harvest' | 'reception' | 'phyto_tesa';
 
 function normalizeAccents(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -422,9 +425,8 @@ export const VineyardView: React.FC<{
 }> = ({ restrictedFieldMode = false, onToggleRestrictedMode, prefill }) => {
   const { state, dispatch, role } = useStore();
   const { isAddonEnabled } = useModuleConfig();
-  // Navigation simple par onglets clairs (Zéro surcharge à l'écran)
-  const [subTab, setSubTab] = useState<'atlas' | 'harvest' | 'reception' | 'phyto_tesa'>('atlas');
-  const [atlasViewMode, setAtlasViewMode] = useState<'map' | 'livret'>('map');
+  // Navigation claire par espaces métier distincts (Carte GPS, Livret, Planning, Quai, Phyto/TESA)
+  const [activeView, setActiveView] = useState<VineyardTabId>('map');
   const [livretStatusFilter, setLivretStatusFilter] = useState<'all' | 'vendange' | 'en_cours' | 'a_faire'>('all');
   const [fieldMode, setFieldMode] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>('parcel-c');
@@ -496,7 +498,9 @@ export const VineyardView: React.FC<{
   const [obsMeasureUnit, setObsMeasureUnit] = useState('% vol. potentiel');
 
   useAssistantPrefill(prefill, (p) => {
-    if (p.subTab) setSubTab(p.subTab);
+    if (p.subTab) {
+      setActiveView(p.subTab === 'atlas' ? 'map' : p.subTab);
+    }
     if (p.parcelId) setSelectedParcelId(p.parcelId);
     if (p.openModal === 'count' && state) {
       const m =
@@ -504,7 +508,7 @@ export const VineyardView: React.FC<{
         Object.values(state.missions).find((x) => x.operation === 'harvest' && x.status === 'in_progress') ??
         Object.values(state.missions).find((x) => x.operation === 'harvest');
       if (m) {
-        setSubTab('harvest');
+        setActiveView('harvest');
         setShowCountModal(m);
         if (typeof p.quantity === 'number') setCountQuantity(String(p.quantity));
       }
@@ -1098,13 +1102,93 @@ export const VineyardView: React.FC<{
     }, 60);
   };
 
-  const selectSubTabAndScroll = (nextTab: 'atlas' | 'harvest' | 'reception' | 'phyto_tesa') => {
-    setSubTab(nextTab);
-    scrollToSection('vineyard-workspace-anchor');
+  const switchVineyardView = (nextView: VineyardTabId) => {
+    setActiveView(nextView);
+    scrollSubNavIntoView('vineyard-subnav');
   };
+
+  const openReceptionForTransport = (transport: Transport) => {
+    const totalCrates = transport.lines.reduce((acc, l) => acc + l.quantity, 0);
+    const firstParcelId = transport.lines[0]?.parcelId;
+    const parcel = firstParcelId ? parcelMap[firstParcelId] : undefined;
+    const lots2026 = Object.values(state.lots).filter((l) => l.vintage === 2026);
+    const matchingLot =
+      lots2026.find((l) => parcel && l.color === parcel.color) ?? lots2026[0];
+    if (matchingLot) setReceptionDestLot(matchingLot.id);
+    if (totalCrates > 0) {
+      setGrossKg(String(totalCrates * 20));
+      setTareKg(String(totalCrates * 2));
+    }
+    setReceptionTicket(`TK-${new Date().toISOString().slice(5, 10).replace('-', '')}-${String(receptions.length + 1).padStart(2, '0')}`);
+    setShowReceptionModal(transport.id);
+  };
+
+  const effectiveView: VineyardTabId =
+    restrictedFieldMode && (activeView === 'reception' || activeView === 'phyto_tesa')
+      ? 'map'
+      : activeView === 'phyto_tesa' && !isAddonEnabled('phyto_tesa')
+        ? 'map'
+        : activeView;
 
   const totalAreaHa = parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0) / 10000, 0);
   const donePct = parcels.length > 0 ? Math.round((globalHarvestStats.doneCount / parcels.length) * 100) : 0;
+  const totalWeighedKg = Math.round(receptions.reduce((sum, r) => sum + r.netG / 1000, 0));
+  const uniqueCommunes = Array.from(
+    new Set(mapItems.map((m) => m.commune.replace(/\s*\(INSEE[^)]*\)/i, '').trim()).filter(Boolean))
+  );
+  const territoryLabel =
+    uniqueCommunes.length === 1
+      ? uniqueCommunes[0]
+      : uniqueCommunes.length > 1
+        ? `${uniqueCommunes[0]} & ${uniqueCommunes.length - 1} commune(s)`
+        : 'Domaine';
+
+  const vineyardTabs: SubNavTab<VineyardTabId>[] = [
+    {
+      id: 'map',
+      label: '🗺️ Vue Carte & GPS',
+      icon: MapPin,
+      count: parcels.length,
+      hint: 'Carte satellite zoomable, limites cadastrales IGN et guidage GPS terrain',
+    },
+    {
+      id: 'livret',
+      label: '📖 Vue Livret & Vendanges',
+      icon: BookOpen,
+      count: parcels.length,
+      hint: 'Fiches agronomiques par climat, références cadastrales et rendements',
+    },
+    {
+      id: 'harvest',
+      label: '📅 Planning & Vendanges',
+      icon: Calendar,
+      count: untransportedCounts.length > 0 ? `${untransportedCounts.length} prêt` : counts.length,
+      alert: untransportedCounts.length > 0,
+      hint: 'Ordre de coupe Aujourd’hui / Demain, comptage des caisses et départ bennes',
+    },
+    ...(!restrictedFieldMode
+      ? [
+          {
+            id: 'reception' as const,
+            label: '⚖️ Quai & Pesées',
+            icon: Scale,
+            count: inTransitCount > 0 ? `${inTransitCount} en route` : receptions.length,
+            alert: inTransitCount > 0,
+            hint: 'Navettes en transit, pesée Brut/Tare/Net et affectation cuverie',
+          },
+        ]
+      : []),
+    ...(!restrictedFieldMode && isAddonEnabled('phyto_tesa')
+      ? [
+          {
+            id: 'phyto_tesa' as const,
+            label: '🌿 Phyto & TESA',
+            icon: CheckCircle2,
+            hint: 'Cahier phytosanitaire Bio/HVE (DAR / Cuivre) et pointage saisonniers TESA MSA',
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="ds-overview">
@@ -1114,13 +1198,13 @@ export const VineyardView: React.FC<{
           <div className="ds-eyebrow">
             <span className="ds-pulse" aria-hidden="true" />
             <span>
-              Cadastre IGN Puligny-Montrachet · {parcels.length} climats ({totalAreaHa.toFixed(2)} ha)
+              Cadastre IGN {territoryLabel} · {parcels.length} parcelles ({totalAreaHa.toFixed(2)} ha)
             </span>
           </div>
           <h1 className="ds-hero-title">Vignoble & Récolte</h1>
           <p className="ds-hero-sub">
             Repérez chaque parcelle au mètre près pour guider vos coupeurs dès 5 h du matin,
-            comptez les caisses au rang, déclenchez les bennes et pesez la vendange à l’arrivée au pressoir.
+            planifiez les coupes du jour, déclenchez les bennes et pesez la vendange à l’arrivée au pressoir.
           </p>
         </div>
 
@@ -1136,269 +1220,43 @@ export const VineyardView: React.FC<{
             </div>
             <p className="ds-next-desc">
               {untransportedCounts.length > 0
-                ? 'Groupez ces cagettes dans un transport pour les envoyer au pressoir avant que le raisin ne chauffe.'
-                : 'Utilisez le guidage GPS ±1 m ou importez votre livret parcellaire / CVI.'}
+                ? 'Groupez ces cagettes dans une navette pour les envoyer au pressoir avant que le raisin ne chauffe.'
+                : inTransitCount > 0
+                  ? 'Une remorque est en transit : passez au quai pour enregistrer le ticket de pesée Brut/Tare/Net.'
+                  : 'Utilisez le guidage GPS ±1 m ou importez votre livret parcellaire / CVI.'}
             </p>
           </div>
           {untransportedCounts.length > 0 && !restrictedFieldMode ? (
             <button
               type="button"
               className="ds-cta"
-              onClick={() => selectSubTabAndScroll('harvest')}
+              onClick={() => switchVineyardView('harvest')}
             >
               <span>Envoyer la vendange au pressoir</span>
+              <ArrowRight size={16} />
+            </button>
+          ) : inTransitCount > 0 && !restrictedFieldMode ? (
+            <button
+              type="button"
+              className="ds-cta"
+              onClick={() => switchVineyardView('reception')}
+            >
+              <span>Peser au quai de réception</span>
               <ArrowRight size={16} />
             </button>
           ) : (
             <button
               type="button"
               className="ds-cta"
-              onClick={() => selectSubTabAndScroll('atlas')}
+              onClick={() => switchVineyardView('map')}
             >
-              <span>Ouvrir la carte GPS des climats</span>
+              <span>Ouvrir la carte GPS des parcelles</span>
               <ArrowRight size={16} />
             </button>
           )}
         </div>
       </section>
 
-      {/* 2. GESTES TERRAIN EN 1 CLIC (4 TUILES VERBES) */}
-      <section className="ds-rise ds-rise-1" aria-label="Actions rapides vignoble">
-        <div className="ds-section-head">
-          <h2 className="ds-section-title">Que voulez-vous faire sur le terrain ?</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {!restrictedFieldMode && (
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={() => setShowLivretImportModal(true)}
-                title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
-              >
-                <BookOpen size={14} />
-                <span>📖 Importer Livret / CVI</span>
-              </button>
-            )}
-
-            {onToggleRestrictedMode && (
-              <button
-                type="button"
-                className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
-                onClick={onToggleRestrictedMode}
-                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour les vendangeurs et chauffeurs"
-              >
-                <Navigation size={14} />
-                <span>
-                  {restrictedFieldMode
-                    ? '🔒 Vue Restreinte Active (Quitter)'
-                    : '🚜 Mode Terrain (Vendangeurs & Chauffeurs)'}
-                </span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
-              onClick={() => setFieldMode((v) => !v)}
-              title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
-            >
-              <Sun size={14} />
-              <span>{fieldMode ? 'Mode Soleil Actif' : 'Mode Soleil'}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="ds-quick-grid-4">
-          <button
-            type="button"
-            className={`ds-tile ${subTab === 'atlas' ? 'is-recommended' : ''}`}
-            onClick={() => selectSubTabAndScroll('atlas')}
-          >
-            <span className="ds-tile-badge">Cadastre & GPS</span>
-            <div className="ds-icon-bubble ds-tone-forest">
-              <MapPin size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">1. Carte GPS & Livret ({parcels.length})</div>
-              <div className="ds-tile-sub">
-                Polygones cadastraux IGN, photos d’accès et navigation Waze/Maps
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className={`ds-tile ${subTab === 'harvest' ? 'is-recommended' : ''}`}
-            onClick={() => selectSubTabAndScroll('harvest')}
-          >
-            <span className="ds-tile-badge">Coupe & Bennes</span>
-            <div className="ds-icon-bubble ds-tone-gold">
-              <Calendar size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">2. Planning & Vendanges ({counts.length})</div>
-              <div className="ds-tile-sub">
-                Compter les caisses (+1/+5/+10), planifier Aujourd’hui / Demain
-              </div>
-            </div>
-          </button>
-
-          {!restrictedFieldMode ? (
-            <button
-              type="button"
-              className={`ds-tile ${subTab === 'reception' ? 'is-recommended' : ''}`}
-              onClick={() => selectSubTabAndScroll('reception')}
-            >
-              <span className="ds-tile-badge">Quai pressoir</span>
-              <div className="ds-icon-bubble ds-tone-grape">
-                <Scale size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">3. Quai & Pesées ({inTransitCount} en transit)</div>
-                <div className="ds-tile-sub">
-                  Peser Brut/Tare/Net et affecter les raisins à une cuve du chai
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ds-tile"
-              onClick={() => setFieldMode((v) => !v)}
-            >
-              <div className="ds-icon-bubble ds-tone-amber">
-                <Sun size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Contraste Plein Soleil</div>
-                <div className="ds-tile-sub">
-                  {fieldMode ? 'Mode extérieur activé' : 'Renforcer la lisibilité au soleil'}
-                </div>
-              </div>
-            </button>
-          )}
-
-          {!restrictedFieldMode && isAddonEnabled('phyto_tesa') ? (
-            <button
-              type="button"
-              className={`ds-tile ${subTab === 'phyto_tesa' ? 'is-recommended' : ''}`}
-              onClick={() => selectSubTabAndScroll('phyto_tesa')}
-            >
-              <span className="ds-tile-badge">Bio / HVE & MSA</span>
-              <div className="ds-icon-bubble ds-tone-amber">
-                <CheckCircle2 size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">4. Phyto Bio/HVE & TESA</div>
-                <div className="ds-tile-sub">
-                  Délai avant récolte (DAR), plafond cuivre 4 kg/ha et contrats saisonniers
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ds-tile"
-              onClick={() => setShowLivretImportModal(true)}
-            >
-              <div className="ds-icon-bubble ds-tone-ink">
-                <BookOpen size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Importer un Livret / CVI</div>
-                <div className="ds-tile-sub">
-                  Traduire automatiquement PDF, CSV Douanes ou GeoJSON en parcelles
-                </div>
-              </div>
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* 3. JAUGES VISUELLES DE RÉCOLTE */}
-      <section className="ds-stats ds-rise ds-rise-2" aria-label="Repères de vendange">
-        <div className="ds-stat">
-          <div className="ds-stat-top">
-            <span className="ds-icon-bubble ds-tone-forest">
-              <CheckCircle2 size={16} />
-            </span>
-            <span>Climats vendangés</span>
-          </div>
-          <div className="ds-stat-value">
-            {globalHarvestStats.doneCount}
-            <span className="ds-stat-unit">/ {parcels.length}</span>
-          </div>
-          <div className="ds-bar" aria-hidden="true">
-            <span style={{ width: `${donePct}%`, background: 'var(--color-forest)' }} />
-          </div>
-          <div className="ds-stat-foot">
-            {globalHarvestStats.inProgressCount} en cours · {globalHarvestStats.todoCount} à venir
-          </div>
-        </div>
-
-        <div className="ds-stat">
-          <div className="ds-stat-top">
-            <span className="ds-icon-bubble ds-tone-gold">
-              <Grape size={16} />
-            </span>
-            <span>Vendange coupée cumulée</span>
-          </div>
-          <div className="ds-stat-value">
-            {globalHarvestStats.kg.toLocaleString('fr-FR')}
-            <span className="ds-stat-unit">kg</span>
-          </div>
-          <div className="ds-bar" aria-hidden="true">
-            <span style={{ width: '68%', background: 'var(--color-gold-dark)' }} />
-          </div>
-          <div className="ds-stat-foot">
-            Soit {globalHarvestStats.caisses} cagettes (~{globalHarvestStats.hl} hL potentiels)
-          </div>
-        </div>
-
-        <div className="ds-stat">
-          <div className="ds-stat-top">
-            <span className="ds-icon-bubble ds-tone-amber">
-              <Truck size={16} />
-            </span>
-            <span>Logistique vers le pressoir</span>
-          </div>
-          <div className="ds-stat-value">
-            {untransportedCounts.length}
-            <span className="ds-stat-unit">lot(s) au rang</span>
-          </div>
-          <div className="ds-bar" aria-hidden="true">
-            <span
-              style={{
-                width: untransportedCounts.length > 0 ? '45%' : '100%',
-                background: untransportedCounts.length > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
-              }}
-            />
-          </div>
-          <div className="ds-stat-foot">
-            {inTransitCount} transport(s) actuellement en transit
-          </div>
-        </div>
-
-        <div className="ds-stat">
-          <div className="ds-stat-top">
-            <span className="ds-icon-bubble ds-tone-grape">
-              <Wine size={16} />
-            </span>
-            <span>Surface cadastrale suivie</span>
-          </div>
-          <div className="ds-stat-value">
-            {totalAreaHa.toFixed(2)}
-            <span className="ds-stat-unit">ha</span>
-          </div>
-          <div className="ds-bar" aria-hidden="true">
-            <span style={{ width: '100%', background: 'var(--color-grape)' }} />
-          </div>
-          <div className="ds-stat-foot">
-            Grand Cru, 1er Cru & Village · Puligny-Montrachet
-          </div>
-        </div>
-      </section>
-
-      {/* BANDEAU FEUILLE DE ROUTE DU JOUR : QUOI VENDANGER AUJOURD'HUI & S'Y RENDRE EN 1 CLIC */}
       {importedBannerMsg && (
         <div
           style={{
@@ -1425,220 +1283,187 @@ export const VineyardView: React.FC<{
           </button>
         </div>
       )}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #19211A 0%, #243025 100%)',
-          color: '#FAF8F5',
-          borderRadius: 'var(--radius-md)',
-          padding: '16px 20px',
-          border: '1.5px solid #F97316',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                background: '#F97316',
-                color: '#FFFFFF',
-                fontWeight: 800,
-                fontSize: '11.5px',
-                padding: '4px 10px',
-                borderRadius: '999px',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              🌅 Feuille de Route · Ordre de Coupe du Jour
-            </span>
-            <span style={{ fontSize: '13px', color: '#E2C799', fontWeight: 600 }}>
-              Cliquez sur « Y ALLER (MAPS) » pour lancer le guidage routier jusqu’à l’entrée des rangs
-            </span>
-          </div>
-          {tomorrowItems.length > 0 && (
-            <span style={{ fontSize: '12px', color: 'rgba(250,248,245,0.75)' }}>
-              Prévu ensuite :{' '}
-              <strong style={{ color: '#E2C799' }}>
-                {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Réf. #${t.pastilleNum})`).join(', ')}
-              </strong>
-            </span>
-          )}
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '12px' }}>
-          {todayPriorityItems.map((item) => {
-            const metrics = getParcelHarvestMetrics(item.parcel);
-            const isSelected = selectedParcel?.id === item.parcel.id;
-            return (
-              <div
-                key={item.parcel.id}
-                onClick={() => {
-                  setSelectedParcelId(item.parcel.id);
-                  setSubTab('atlas');
-                  scrollToSection('climat-inspector-card');
-                }}
-                style={{
-                  background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
-                  border: isSelected ? '2px solid #F97316' : '1px solid rgba(255,255,255,0.16)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                    <span
-                      style={{
-                        background: '#F97316',
-                        color: '#FFFFFF',
-                        fontWeight: 800,
-                        fontSize: '11px',
-                        padding: '1px 7px',
-                        borderRadius: '999px',
-                      }}
-                    >
-                      Réf. #{item.pastilleNum} {item.pageLivret ? `· Livret p.${item.pageLivret}` : ''}
-                    </span>
-                    <span style={{ fontSize: '11.5px', color: '#E2C799', fontWeight: 700 }}>
-                      {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer en premier'}
-                    </span>
-                  </div>
-                  <div className="serif-display" style={{ fontSize: '19px', fontWeight: 700, color: '#FFFFFF' }}>
-                    {item.parcel.name.replace(' — fictif', '')} ({item.parcel.code})
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'rgba(250,248,245,0.8)' }}>
-                    {item.nbRangs} · Cumul : <strong>{metrics.totalCaisses} caisses</strong> ({metrics.totalKg} kg)
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      adjustParcelUnit(item.parcel, unitMode === 'kg' ? 100 : unitMode === 'hl' ? 1 : 5);
-                    }}
-                    style={{
-                      background: 'rgba(255,255,255,0.14)',
-                      color: '#FFFFFF',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: '999px',
-                      padding: '8px 12px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {unitMode === 'kg' ? '+100 kg' : unitMode === 'hl' ? '+1 hL' : '+5 Caisses'}
-                  </button>
-                  <a
-                    href={item.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(ev) => ev.stopPropagation()}
-                    style={{
-                      background: '#10B981',
-                      color: '#FFFFFF',
-                      fontWeight: 800,
-                      fontSize: '12.5px',
-                      padding: '9px 14px',
-                      borderRadius: '999px',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                    }}
-                  >
-                    <Navigation size={14} />
-                    <span>Y ALLER (MAPS)</span>
-                  </a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div id="vineyard-workspace-anchor" />
-
-      {/* =====================================================================
-          SOUS-VUE 1 : VRAIE CARTE INTERACTIVE SATELLITE / CADASTRE IGN & LIVRET
-         ===================================================================== */}
-      {subTab === 'atlas' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Sélecteur de Niveau : Carte Satellite & Cadastre IGN (GPS) vs Livret Parcellaire & Vendanges */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span className="serif-display" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-ink)' }}>
-                  {atlasViewMode === 'map' ? '🗺️ Carte Satellite, Cadastre IGN & Pointage GPS' : '📖 Livret Parcellaire Numérique & Suivi Vendanges'}
-                </span>
-                <span className="badge badge-gold">
-                  {parcels.length} Climats répertoriés
-                </span>
-              </div>
-              <div style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                {atlasViewMode === 'map'
-                  ? 'Visualisation spatiale sur terrain : limites parcellaires IGN officielles, calage satellite et repères GPS.'
-                  : 'Répertoire agronomique officiel : fiches climat, sections cadastrales, caractéristiques dynamiques de vendange et filiation chai.'}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div className="segmented-control">
-                <button
-                  type="button"
-                  className={`segmented-btn ${atlasViewMode === 'map' ? 'active' : ''}`}
-                  onClick={() => setAtlasViewMode('map')}
-                  style={{ fontSize: '13px', padding: '6px 14px', fontWeight: 600 }}
-                >
-                  🗺️ Vue Carte & GPS
-                </button>
-                <button
-                  type="button"
-                  className={`segmented-btn ${atlasViewMode === 'livret' ? 'active' : ''}`}
-                  onClick={() => setAtlasViewMode('livret')}
-                  style={{ fontSize: '13px', padding: '6px 14px', fontWeight: 600 }}
-                >
-                  📖 Vue Livret & Vendanges
-                </button>
-              </div>
-
+      {/* 2. BARRE D'ESPACES MÉTIER VIGNOBLE (UN SEUL SÉLECTEUR CLAIR DIRECTEMENT AU-DESSUS DU CONTENU) */}
+      <SubNav
+        id="vineyard-subnav"
+        ariaLabel="Espaces de travail Vignoble et Récolte"
+        tabs={vineyardTabs}
+        active={effectiveView}
+        onChange={switchVineyardView}
+        trailing={
+          <>
+            {!restrictedFieldMode && (
               <button
                 type="button"
-                className="btn btn-sm btn-secondary"
+                className="btn btn-sm btn-primary"
                 onClick={() => setShowLivretImportModal(true)}
-                title="Importer un fichier Excel/CSV ou recalculer les parcelles depuis l'API Cadastre IGN"
+                title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
               >
-                <Upload size={13} />
-                <span>Importer Livret (Excel/IGN)</span>
+                <BookOpen size={14} />
+                <span>Importer Livret / CVI</span>
               </button>
-            </div>
-          </div>
+            )}
 
-          {atlasViewMode === 'map' ? (
-            <div className="grid-2">
+            {onToggleRestrictedMode && (
+              <button
+                type="button"
+                className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
+                onClick={onToggleRestrictedMode}
+                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour les vendangeurs et chauffeurs"
+              >
+                <Navigation size={14} />
+                <span>
+                  {restrictedFieldMode
+                    ? '🔒 Quitter Mode Terrain'
+                    : '🚜 Mode Terrain'}
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
+              onClick={() => setFieldMode((v) => !v)}
+              title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
+            >
+              <Sun size={14} />
+              <span>{fieldMode ? 'Soleil Actif' : 'Mode Soleil'}</span>
+            </button>
+          </>
+        }
+      />
+
+      {/* =====================================================================
+          SOUS-VUE 1 : CARTE SATELLITE / CADASTRE IGN & GUIDAGE GPS TERRAIN
+         ===================================================================== */}
+      {effectiveView === 'map' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Feuille de route GPS du jour (contextuelle à la Carte & Guidage terrain) */}
+          {todayPriorityItems.length > 0 && (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #19211A 0%, #243025 100%)',
+                color: '#FAF8F5',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 18px',
+                border: '1.5px solid #F97316',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      background: '#F97316',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '11px',
+                      padding: '3px 10px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    🌅 Feuille de Route GPS du Jour
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#E2C799', fontWeight: 600 }}>
+                    Touchez une parcelle pour centrer la carte ou « Y ALLER (MAPS) » pour guider le tracteur
+                  </span>
+                </div>
+                {tomorrowItems.length > 0 && (
+                  <span style={{ fontSize: '12px', color: 'rgba(250,248,245,0.78)' }}>
+                    Demain :{' '}
+                    <strong style={{ color: '#E2C799' }}>
+                      {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Réf. #${t.pastilleNum})`).join(', ')}
+                    </strong>
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                {todayPriorityItems.map((item) => {
+                  const metrics = getParcelHarvestMetrics(item.parcel);
+                  const isSelected = selectedParcel?.id === item.parcel.id;
+                  return (
+                    <div
+                      key={item.parcel.id}
+                      onClick={() => {
+                        setSelectedParcelId(item.parcel.id);
+                        scrollToSection('climat-inspector-card');
+                      }}
+                      style={{
+                        background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
+                        border: isSelected ? '2px solid #F97316' : '1px solid rgba(255,255,255,0.16)',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '10px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                          <span
+                            style={{
+                              background: '#F97316',
+                              color: '#FFFFFF',
+                              fontWeight: 800,
+                              fontSize: '11px',
+                              padding: '1px 7px',
+                              borderRadius: '999px',
+                            }}
+                          >
+                            Réf. #{item.pastilleNum} {item.pageLivret ? `· Livret p.${item.pageLivret}` : ''}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#E2C799', fontWeight: 700 }}>
+                            {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer en premier'}
+                          </span>
+                        </div>
+                        <div className="serif-display" style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF' }}>
+                          {item.parcel.name.replace(' — fictif', '')} ({item.parcel.code})
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'rgba(250,248,245,0.8)' }}>
+                          {item.nbRangs} · <strong>{metrics.totalCaisses} caisses</strong> ({metrics.totalKg} kg)
+                        </div>
+                      </div>
+
+                      <a
+                        href={item.googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(ev) => ev.stopPropagation()}
+                        style={{
+                          background: '#10B981',
+                          color: '#FFFFFF',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          padding: '8px 13px',
+                          borderRadius: '999px',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                        }}
+                      >
+                        <Navigation size={14} />
+                        <span>Y ALLER (MAPS)</span>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="grid-2">
           {/* Colonne Gauche : Vraie Carte Interactive Navigable (Zoom / Pan / GPS Flottant / Plein Écran) */}
           <div
             id="vineyard-map-card"
@@ -1663,7 +1488,7 @@ export const VineyardView: React.FC<{
                     justifyContent: 'center',
                   }}
                 >
-                  <BookOpen size={16} />
+                  <MapPin size={16} />
                 </div>
                 <div>
                   <h2 className="card-title" style={{ color: fieldMode ? '#FAF8F5' : undefined, fontSize: '18px' }}>
@@ -1683,7 +1508,7 @@ export const VineyardView: React.FC<{
               isEditingGpsPin={isEditingGpsPin}
               onToggleEditGpsPin={() => setIsEditingGpsPin((v) => !v)}
               onSetCustomGps={handleSetCustomGpsFromMap}
-              onOpenLivret={() => setAtlasViewMode('livret')}
+              onOpenLivret={() => switchVineyardView('livret')}
               fieldMode={fieldMode || restrictedFieldMode}
             />
 
@@ -1752,7 +1577,7 @@ export const VineyardView: React.FC<{
                     <button
                       type="button"
                       className="btn btn-sm btn-secondary"
-                      onClick={() => setAtlasViewMode('livret')}
+                      onClick={() => switchVineyardView('livret')}
                       title="Consulter la fiche complète de ce Climat dans le Livret Parcellaire"
                     >
                       <BookOpen size={13} />
@@ -1769,7 +1594,7 @@ export const VineyardView: React.FC<{
                     <button
                       type="button"
                       className="btn btn-sm btn-primary"
-                      onClick={() => selectSubTabAndScroll('harvest')}
+                      onClick={() => switchVineyardView('harvest')}
                     >
                       <Grape size={13} />
                       <span>Pilotage Vendange</span>
@@ -2081,11 +1906,14 @@ export const VineyardView: React.FC<{
               })}
             </div>
           </div>
+          </div>
         </div>
-      ) : (
-        /* =====================================================================
-           NIVEAU 2 : LIVRET PARCELLAIRE NUMÉRIQUE & SUIVI DYNAMIQUE DES VENDANGES
-           ===================================================================== */
+      )}
+
+      {/* =====================================================================
+          SOUS-VUE 2 : LIVRET PARCELLAIRE NUMÉRIQUE & SUIVI DYNAMIQUE DES VENDANGES
+         ===================================================================== */}
+      {effectiveView === 'livret' && (
         <div className="card animate-fade-in" style={{ padding: '20px' }}>
           {/* Header Livret */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -2129,7 +1957,7 @@ export const VineyardView: React.FC<{
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
-                onClick={() => setAtlasViewMode('map')}
+                onClick={() => switchVineyardView('map')}
               >
                 <MapPin size={13} />
                 <span>Voir la Carte GPS & Cadastre</span>
@@ -2138,36 +1966,50 @@ export const VineyardView: React.FC<{
           </div>
 
           {/* Bandeau KPI Livret */}
-          <div className="ds-overview" style={{ marginBottom: '16px' }}>
-            <div className="ds-tile">
-              <div className="ds-label">Climats répertoriés</div>
-              <div className="ds-val serif-display">{parcels.length}</div>
-              <div className="ds-sub">
-                {(parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0), 0) / 10000).toFixed(2)} ha au total
+          <section className="ds-stats" style={{ marginBottom: '16px' }} aria-label="Synthèse du livret parcellaire">
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-forest"><MapPin size={16} /></span>
+                <span>Parcelles répertoriées</span>
+              </div>
+              <div className="ds-stat-value">{parcels.length}</div>
+              <div className="ds-stat-foot">
+                {totalAreaHa.toFixed(2)} ha au total
               </div>
             </div>
-            <div className="ds-tile">
-              <div className="ds-label">Caisses récoltées</div>
-              <div className="ds-val serif-display" style={{ color: 'var(--color-forest)' }}>
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-gold"><Grape size={16} /></span>
+                <span>Caisses récoltées</span>
+              </div>
+              <div className="ds-stat-value" style={{ color: 'var(--color-forest)' }}>
                 {globalHarvestStats.caisses}
               </div>
-              <div className="ds-sub">Cumul terrain parcelles</div>
+              <div className="ds-stat-foot">Cumul terrain parcelles</div>
             </div>
-            <div className="ds-tile">
-              <div className="ds-label">Vendange pesée</div>
-              <div className="ds-val serif-display">
-                {globalHarvestStats.kg.toLocaleString('fr-FR')} kg
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-amber"><Scale size={16} /></span>
+                <span>Vendange pesée</span>
               </div>
-              <div className="ds-sub">Réception quai démo</div>
-            </div>
-            <div className="ds-tile">
-              <div className="ds-label">Volume en cuverie</div>
-              <div className="ds-val serif-display" style={{ color: 'var(--color-grape)' }}>
-                {globalHarvestStats.hl} hL
+              <div className="ds-stat-value">
+                {globalHarvestStats.kg.toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">kg</span>
               </div>
-              <div className="ds-sub">Moût & vin entonné</div>
+              <div className="ds-stat-foot">Bascule quai & estimé terrain</div>
             </div>
-          </div>
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-grape"><Wine size={16} /></span>
+                <span>Volume en cuverie</span>
+              </div>
+              <div className="ds-stat-value" style={{ color: 'var(--color-grape)' }}>
+                {globalHarvestStats.hl}
+                <span className="ds-stat-unit">hL</span>
+              </div>
+              <div className="ds-stat-foot">Moût & vin entonné</div>
+            </div>
+          </section>
 
           {/* Barre de Recherche et Filtres */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -2424,13 +2266,7 @@ export const VineyardView: React.FC<{
                         style={{ flex: 1, minWidth: '160px' }}
                         onClick={() => {
                           setSelectedParcelId(p.id);
-                          setAtlasViewMode('map');
-                          setTimeout(() => {
-                            const el = document.getElementById('vineyard-map-card');
-                            if (el && typeof el.scrollIntoView === 'function') {
-                              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                            }
-                          }, 50);
+                          switchVineyardView('map');
                         }}
                       >
                         <MapPin size={13} />
@@ -2452,7 +2288,7 @@ export const VineyardView: React.FC<{
                         className="btn btn-sm btn-secondary"
                         onClick={() => {
                           setSelectedParcelId(p.id);
-                          selectSubTabAndScroll('harvest');
+                          switchVineyardView('harvest');
                         }}
                         title="Accéder au pilotage vendange de cette parcelle"
                       >
@@ -2466,14 +2302,121 @@ export const VineyardView: React.FC<{
           </div>
         </div>
       )}
-    </div>
-  )}
 
       {/* =====================================================================
-          SOUS-VUE 2 : PLANNING VENDANGES (AUJOURD'HUI / DEMAIN / À VENIR) & TRI-UNITÉS (CAISSES / KG / HL)
+          SOUS-VUE 3 : PLANNING VENDANGES (AUJOURD'HUI / DEMAIN / À VENIR) & TRI-UNITÉS (CAISSES / KG / HL)
          ===================================================================== */}
-      {subTab === 'harvest' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {effectiveView === 'harvest' && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Alerte d'action immédiate au rang : départ navette vers le pressoir */}
+          {untransportedCounts.length > 0 && !restrictedFieldMode && (
+            <div className="ds-direct-bar" style={{ marginTop: 0 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '14.5px', color: 'var(--color-ink)' }}>
+                  🚚 {untransportedCounts.reduce((s, c) => s + c.quantity, 0)} cagettes coupées attendent au bout du rang
+                </div>
+                <div style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                  {untransportedCounts.length} lot(s) de caisses prêts à partir vers le quai de réception / pressoir.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                disabled={!canEditVineyard}
+                onClick={() => {
+                  setSelectedCountsForTransport(untransportedCounts.map((c) => c.id));
+                  setShowTransportModal(true);
+                }}
+              >
+                <Truck size={14} />
+                <span>Créer un transport ({untransportedCounts.length} comptages prêts)</span>
+              </button>
+            </div>
+          )}
+
+          {/* Jauges de progression des vendanges (uniquement sur cet écran Planning & Vendanges) */}
+          <section className="ds-stats" aria-label="Repères de vendange">
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-forest">
+                  <CheckCircle2 size={16} />
+                </span>
+                <span>Parcelles vendangées</span>
+              </div>
+              <div className="ds-stat-value">
+                {globalHarvestStats.doneCount}
+                <span className="ds-stat-unit">/ {parcels.length}</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span style={{ width: `${donePct}%`, background: 'var(--color-forest)' }} />
+              </div>
+              <div className="ds-stat-foot">
+                {globalHarvestStats.inProgressCount} en cours · {globalHarvestStats.todoCount} à venir
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-gold">
+                  <Grape size={16} />
+                </span>
+                <span>Vendange coupée cumulée</span>
+              </div>
+              <div className="ds-stat-value">
+                {globalHarvestStats.kg.toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">kg</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span style={{ width: '68%', background: 'var(--color-gold-dark)' }} />
+              </div>
+              <div className="ds-stat-foot">
+                Soit {globalHarvestStats.caisses} cagettes (~{globalHarvestStats.hl} hL potentiels)
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-amber">
+                  <Truck size={16} />
+                </span>
+                <span>Logistique vers le pressoir</span>
+              </div>
+              <div className="ds-stat-value">
+                {untransportedCounts.length}
+                <span className="ds-stat-unit">lot(s) au rang</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span
+                  style={{
+                    width: untransportedCounts.length > 0 ? '45%' : '100%',
+                    background: untransportedCounts.length > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
+                  }}
+                />
+              </div>
+              <div className="ds-stat-foot">
+                {inTransitCount} transport(s) actuellement en transit
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-grape">
+                  <Wine size={16} />
+                </span>
+                <span>Surface suivie</span>
+              </div>
+              <div className="ds-stat-value">
+                {totalAreaHa.toFixed(2)}
+                <span className="ds-stat-unit">ha</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span style={{ width: '100%', background: 'var(--color-grape)' }} />
+              </div>
+              <div className="ds-stat-foot">
+                {territoryLabel} · {parcels.length} parcelles
+              </div>
+            </div>
+          </section>
           {/* Tableau de Pilotage Quotidien inspiré de Parcelles-vendanges (Aujourd'hui / Demain / Jours à venir + Caisses / kg / hL) */}
           <div className="card">
             <div className="card-header">
@@ -2611,6 +2554,9 @@ export const VineyardView: React.FC<{
                 const meta = CLIMAT_METADATA[p.id] ?? DEFAULT_CLIMAT_META;
                 const track = getParcelTrack(p);
                 const metrics = getParcelHarvestMetrics(p);
+                const effPastille = track.customPastilleNum ?? meta.pastilleNum;
+                const effClass = track.customClassification ?? meta.classification;
+                const effNbRangs = track.customNbRangs ?? meta.nbRangs;
                 return (
                   <div
                     key={p.id}
@@ -2625,11 +2571,11 @@ export const VineyardView: React.FC<{
                       gap: '10px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span className="badge badge-amber">Pastille n°{meta.pastilleNum}</span>
-                          <span className={`badge ${getLevelBadgeClass(meta.classification)}`}>{meta.classification}</span>
+                          <span className="badge badge-amber">Pastille n°{effPastille}</span>
+                          <span className={`badge ${getLevelBadgeClass(effClass)}`}>{effClass}</span>
                           <select
                             aria-label={`Jour de vendange ${p.name}`}
                             value={track.daySlot}
@@ -2657,12 +2603,12 @@ export const VineyardView: React.FC<{
                           {p.name} ({p.code})
                         </div>
                         <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
-                          {meta.nbRangs} · {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : 'Surface inconnue'}
+                          {effNbRangs} · {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : 'Surface inconnue'}
                         </div>
                       </div>
 
-                      {/* Statut rapide en 1 clic */}
-                      <div style={{ display: 'flex', gap: '4px' }}>
+                      {/* Statut rapide en 1 clic + accès carte */}
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {(['a_faire', 'en_cours', 'vendange'] as const).map((st) => (
                           <button
                             key={st}
@@ -2687,10 +2633,21 @@ export const VineyardView: React.FC<{
                             {st === 'a_faire' ? 'À faire' : st === 'en_cours' ? 'En cours' : '✓ Vendangé'}
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className="ds-action-chip"
+                          title={`Localiser ${p.name} sur la carte GPS`}
+                          onClick={() => {
+                            setSelectedParcelId(p.id);
+                            switchVineyardView('map');
+                          }}
+                        >
+                          <MapPin size={11} /> Carte
+                        </button>
                       </div>
                     </div>
 
-                    {/* Compteurs Caisses / kg / hL + Boutons d'incrément selon l'unité choisie */}
+                    {/* Compteurs Caisses / kg / hL + Boutons d'incrément/correction selon l'unité choisie */}
                     <div
                       style={{
                         display: 'flex',
@@ -2713,6 +2670,9 @@ export const VineyardView: React.FC<{
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {unitMode === 'caisses' && (
                           <>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, -1)} disabled={track.extraCaisses <= 0} title="Retirer 1 caisse ajoutée">
+                              -1
+                            </button>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, 1)}>
                               +1 caisse
                             </button>
@@ -2723,6 +2683,9 @@ export const VineyardView: React.FC<{
                         )}
                         {unitMode === 'kg' && (
                           <>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, -50)} disabled={track.extraKg <= 0} title="Retirer 50 kg ajoutés">
+                              -50
+                            </button>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, 50)}>
                               +50 kg
                             </button>
@@ -2733,6 +2696,9 @@ export const VineyardView: React.FC<{
                         )}
                         {unitMode === 'hl' && (
                           <>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, -0.5)} disabled={track.extraHl <= 0} title="Retirer 0.5 hL ajouté">
+                              -0.5
+                            </button>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, 0.5)}>
                               +0.5 hL
                             </button>
@@ -2954,10 +2920,63 @@ export const VineyardView: React.FC<{
       )}
 
       {/* =====================================================================
-          SOUS-VUE 3 : QUAI DE RÉCEPTION & PESÉES AU CHAI
+          SOUS-VUE 4 : QUAI DE RÉCEPTION & PESÉES AU CHAI
          ===================================================================== */}
-      {subTab === 'reception' && (
-        <div className="grid-2 animate-fade-in">
+      {effectiveView === 'reception' && !restrictedFieldMode && (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Jauges spécifiques au Quai & Pressoir */}
+          <section className="ds-stats" aria-label="Repères du quai de réception">
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-amber"><Truck size={16} /></span>
+                <span>Navettes en transit</span>
+              </div>
+              <div className="ds-stat-value">{inTransitCount}</div>
+              <div className="ds-stat-foot">
+                {inTransitCount > 0 ? 'À peser dès l’arrivée au pressoir' : 'Aucune benne en route actuellement'}
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-forest"><Scale size={16} /></span>
+                <span>Bons de pesée enregistrés</span>
+              </div>
+              <div className="ds-stat-value">{receptions.length}</div>
+              <div className="ds-stat-foot">
+                Brut − Tare = Net traçable vers cuverie
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-grape"><Grape size={16} /></span>
+                <span>Tonnage net pesé</span>
+              </div>
+              <div className="ds-stat-value">
+                {totalWeighedKg.toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">kg</span>
+              </div>
+              <div className="ds-stat-foot">
+                Conversion kg → L jamais forcée automatiquement
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-gold"><CheckCircle2 size={16} /></span>
+                <span>Statut apports</span>
+              </div>
+              <div className="ds-stat-value" style={{ fontSize: '24px' }}>
+                {isAddonEnabled('negoce') ? 'Domaine + Négoce' : '100% Domaine'}
+              </div>
+              <div className="ds-stat-foot">
+                {isAddonEnabled('negoce') ? 'Séparation douanière active' : 'Récoltant propriétaire'}
+              </div>
+            </div>
+          </section>
+
+          <div className="grid-2">
           <div className="card">
             <div className="card-header">
               <div>
@@ -2970,49 +2989,65 @@ export const VineyardView: React.FC<{
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {transports.map((t) => (
-                <div
-                  key={t.id}
-                  className={t.status === 'in_transit' && canRecordReception ? 'ds-clickable-card' : undefined}
-                  onClick={() => {
-                    if (t.status === 'in_transit' && canRecordReception) {
-                      setShowReceptionModal(t.id);
-                    }
-                  }}
-                  style={{
-                    padding: '14px',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: t.status === 'in_transit' ? 'var(--color-amber-soft)' : 'var(--color-surface)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '14px' }}>
-                      {t.code} — Campagne {t.campaign}
+              {transports.map((t) => {
+                const totalCrates = t.lines.reduce((s, l) => s + l.quantity, 0);
+                const originNames = Array.from(
+                  new Set(
+                    t.lines
+                      .map((l) => parcelMap[l.parcelId]?.name.replace(' — fictif', '') ?? l.parcelId)
+                      .filter(Boolean)
+                  )
+                ).join(', ');
+                return (
+                  <div
+                    key={t.id}
+                    className={t.status === 'in_transit' && canRecordReception ? 'ds-clickable-card' : undefined}
+                    onClick={() => {
+                      if (t.status === 'in_transit' && canRecordReception) {
+                        openReceptionForTransport(t);
+                      }
+                    }}
+                    style={{
+                      padding: '14px',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '10px',
+                      flexWrap: 'wrap',
+                      background: t.status === 'in_transit' ? 'var(--color-amber-soft)' : 'var(--color-surface)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                        {t.code} — {originNames || `Campagne ${t.campaign}`}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                        Départ : {t.createdAt.slice(0, 16).replace('T', ' ')} · <strong>{totalCrates} caisses</strong> (~{(totalCrates * 18).toLocaleString('fr-FR')} kg est.)
+                      </div>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                      Départ : {t.createdAt.slice(0, 16).replace('T', ' ')} · {t.lines.length} lot(s) de caisses
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className={`badge ${t.status === 'received' ? 'badge-green' : 'badge-amber'}`}>
+                        {t.status === 'received' ? 'Réceptionné' : 'En transit'}
+                      </span>
+                      {t.status === 'in_transit' && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          disabled={!canRecordReception}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openReceptionForTransport(t);
+                          }}
+                        >
+                          Peser & Réceptionner
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className={`badge ${t.status === 'received' ? 'badge-green' : 'badge-amber'}`}>
-                      {t.status === 'received' ? 'Réceptionné' : 'En transit'}
-                    </span>
-                    {t.status === 'in_transit' && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        disabled={!canRecordReception}
-                        onClick={() => setShowReceptionModal(t.id)}
-                      >
-                        Peser & Réceptionner
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -3086,65 +3121,68 @@ export const VineyardView: React.FC<{
                    <span className="badge badge-green">Traçabilité Apporteurs</span>
                  </div>
 
-                 <table>
-                   <thead>
-                     <tr>
-                       <th>Contrat & Vigneron Apporteur</th>
-                       <th>Appellation & Climat</th>
-                       <th>Nature Apport</th>
-                       <th>Volume / Poids Reçu</th>
-                       <th>Cuve Négoce Dédiée</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     <tr>
-                       <td>
-                         <strong>CTR-NEG-2026-01</strong>
-                         <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                           Domaine Morel & Fils (Apporteur Partenaire)
-                         </div>
-                       </td>
-                       <td>Meursault Village · Les Narvaux</td>
-                       <td>
-                         <span className="badge badge-gold">Raisins entiers (Caissettes 18 kg)</span>
-                       </td>
-                       <td className="tabular" style={{ fontWeight: 700 }}>
-                         1 420 kg (Pressurage séparé)
-                       </td>
-                       <td>
-                         <span className="badge badge-grape">Cuve Inox C-04 (Isolement Négoce)</span>
-                       </td>
-                     </tr>
-                     <tr>
-                       <td>
-                         <strong>CTR-NEG-2026-02</strong>
-                         <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                           EARL des Combes (Apporteur Partenaire)
-                         </div>
-                       </td>
-                       <td>Puligny-Montrachet Village</td>
-                       <td>
-                         <span className="badge badge-green">Moût débourbé (Achat hL)</span>
-                       </td>
-                       <td className="tabular" style={{ fontWeight: 700 }}>
-                         11,40 hL (Ticket pont-bascule #892)
-                       </td>
-                       <td>
-                         <span className="badge badge-grape">Fûts F-12 à F-16 (Lot Négoce)</span>
-                       </td>
-                     </tr>
-                   </tbody>
-                 </table>
+                 <div className="table-wrap">
+                   <table>
+                     <thead>
+                       <tr>
+                         <th>Contrat & Vigneron Apporteur</th>
+                         <th>Appellation & Climat</th>
+                         <th>Nature Apport</th>
+                         <th>Volume / Poids Reçu</th>
+                         <th>Cuve Négoce Dédiée</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       <tr>
+                         <td>
+                           <strong>CTR-NEG-2026-01</strong>
+                           <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                             Domaine Morel & Fils (Apporteur Partenaire)
+                           </div>
+                         </td>
+                         <td>Meursault Village · Les Narvaux</td>
+                         <td>
+                           <span className="badge badge-gold">Raisins entiers (Caissettes 18 kg)</span>
+                         </td>
+                         <td className="tabular" style={{ fontWeight: 700 }}>
+                           1 420 kg (Pressurage séparé)
+                         </td>
+                         <td>
+                           <span className="badge badge-grape">Cuve Inox C-04 (Isolement Négoce)</span>
+                         </td>
+                       </tr>
+                       <tr>
+                         <td>
+                           <strong>CTR-NEG-2026-02</strong>
+                           <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                             EARL des Combes (Apporteur Partenaire)
+                           </div>
+                         </td>
+                         <td>Puligny-Montrachet Village</td>
+                         <td>
+                           <span className="badge badge-green">Moût débourbé (Achat hL)</span>
+                         </td>
+                         <td className="tabular" style={{ fontWeight: 700 }}>
+                           11,40 hL (Ticket pont-bascule #892)
+                         </td>
+                         <td>
+                           <span className="badge badge-grape">Fûts F-12 à F-16 (Lot Négoce)</span>
+                         </td>
+                       </tr>
+                     </tbody>
+                   </table>
+                 </div>
                </div>
              )}
            </div>
+          </div>
          </div>
        )}
 
        {/* =====================================================================
-           SOUS-VUE 4 : REGISTRE PHYTOSANITAIRE BIO/HVE (DAR) & POINTAGE TESA MSA
+           SOUS-VUE 5 : REGISTRE PHYTOSANITAIRE BIO/HVE (DAR) & POINTAGE TESA MSA
           ===================================================================== */}
-       {subTab === 'phyto_tesa' && !restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
+       {effectiveView === 'phyto_tesa' && !restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
          <PhytoAndTesaPanel parcels={parcels} />
        )}
 

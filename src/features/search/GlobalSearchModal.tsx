@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '../../app/store-context';
 import { lotVolumeMl, batchPosition } from '../../domain/selectors';
+import type { AssistantPrefillPayload } from '../ai/types';
 
 function normalizeAccents(str: string): string {
   return str
@@ -17,12 +18,14 @@ export interface SearchResultItem {
   subtitle: string;
   metric: string;
   targetTab: string;
+  prefill?: AssistantPrefillPayload;
 }
 
 export const GlobalSearchModal: React.FC<{
   onClose: () => void;
   onNavigate: (tab: string) => void;
-}> = ({ onClose, onNavigate }) => {
+  onNavigatePrefill?: (prefill: AssistantPrefillPayload) => void;
+}> = ({ onClose, onNavigate, onNavigatePrefill }) => {
   const { state } = useStore();
   const [query, setQuery] = useState('');
   const [filterKind, setFilterKind] = useState<string>('all');
@@ -46,6 +49,7 @@ export const GlobalSearchModal: React.FC<{
         subtitle: `Cépage : ${p.grape} · Propriétaire : ${p.owner}`,
         metric: p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : 'Surface inconnue (≠ 0)',
         targetTab: 'vineyard',
+        prefill: { tab: 'vineyard', subTab: 'atlas', parcelId: p.id },
       });
     }
 
@@ -60,12 +64,14 @@ export const GlobalSearchModal: React.FC<{
         subtitle: `Parcelle : ${parcel?.name ?? m.parcelId} · Campagne ${m.campaign}`,
         metric: m.status,
         targetTab: 'vineyard',
+        prefill: { tab: 'vineyard', subTab: 'harvest', parcelId: m.parcelId },
       });
     }
 
     // 3. Lots de vin (Identité distincte du contenant et de la cuvée)
     for (const l of Object.values(state.lots)) {
       const volL = lotVolumeMl(state, l.id) / 1000;
+      const lotTab = l.stage === 'aging' || l.stage === 'ready' ? 'aging' : 'cellar';
       items.push({
         id: `lot-${l.id}`,
         entityKind: 'Lot de vin',
@@ -73,7 +79,8 @@ export const GlobalSearchModal: React.FC<{
         title: `${l.code} — ${l.name}`,
         subtitle: `Millésime ${l.vintage} · Stade : ${l.stage} · Qualité : ${l.quality === 'released' ? 'Libéré' : 'Bloqué'}`,
         metric: `${volL.toLocaleString('fr-FR')} L`,
-        targetTab: l.stage === 'aging' || l.stage === 'ready' ? 'aging' : 'cellar',
+        targetTab: lotTab,
+        prefill: lotTab === 'cellar' ? { tab: 'cellar', lotId: l.id } : { tab: 'aging' },
       });
     }
 
@@ -82,6 +89,7 @@ export const GlobalSearchModal: React.FC<{
       const occ = state.occupancies[c.id];
       const usedL = (occ?.volumeMl ?? 0) / 1000;
       const capL = c.capacityMl / 1000;
+      const contTab = c.kind === 'barrel' ? 'aging' : 'cellar';
       items.push({
         id: `container-${c.id}`,
         entityKind: 'Contenant',
@@ -89,7 +97,11 @@ export const GlobalSearchModal: React.FC<{
         title: `${c.code} — ${c.location}`,
         subtitle: `Type : ${c.kind === 'barrel' ? 'Barrique chêne' : 'Cuve inox/béton'} · État : ${c.state}`,
         metric: `${usedL} / ${capL} L`,
-        targetTab: c.kind === 'barrel' ? 'aging' : 'cellar',
+        targetTab: contTab,
+        prefill:
+          contTab === 'cellar'
+            ? { tab: 'cellar', containerId: c.id, ...(occ ? { lotId: occ.lotId } : {}) }
+            : { tab: 'aging' },
       });
     }
 
@@ -105,6 +117,7 @@ export const GlobalSearchModal: React.FC<{
         subtitle: `Millésime ${b.vintage} · Lot vrac source : ${b.lotId ?? 'Préchargé'}`,
         metric: `${pos.available} dispo / ${b.physical} phys.`,
         targetTab: 'bottling',
+        prefill: { tab: 'bottling', subTab: 'stocks', batchCode: b.code },
       });
     }
 
@@ -118,6 +131,7 @@ export const GlobalSearchModal: React.FC<{
         subtitle: `Segment : ${c.kind === 'b2b' ? 'Professionnel B2B' : 'Particulier'} · Délai : ${c.paymentTermsDays}j`,
         metric: 'Client',
         targetTab: 'sales',
+        prefill: { tab: 'sales', subTab: 'orders' },
       });
     }
     for (const o of Object.values(state.orders)) {
@@ -130,6 +144,7 @@ export const GlobalSearchModal: React.FC<{
         subtitle: `Créée le ${o.createdAt.slice(0, 10)} · Statut : ${o.status}`,
         metric: `${o.lines.reduce((s, l) => s + l.quantity, 0)} bout.`,
         targetTab: 'sales',
+        prefill: { tab: 'sales', subTab: 'orders', orderId: o.id },
       });
     }
 
@@ -201,7 +216,11 @@ export const GlobalSearchModal: React.FC<{
               <button
                 key={item.id}
                 onClick={() => {
-                  onNavigate(item.targetTab);
+                  if (item.prefill && onNavigatePrefill) {
+                    onNavigatePrefill(item.prefill);
+                  } else {
+                    onNavigate(item.targetTab);
+                  }
                   onClose();
                 }}
                 style={{

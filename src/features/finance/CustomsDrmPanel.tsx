@@ -168,7 +168,8 @@ ${drmLines
           </div>
         )}
 
-        <table className="table">
+        <div className="table-wrap">
+          <table className="table">
           <thead>
             <tr>
               <th>Code INAOC & Appellation</th>
@@ -213,7 +214,8 @@ ${drmLines
               );
             })}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {/* Registre des Documents d'Accompagnement (DAE / DSA — EMCS GAMMA) */}
@@ -224,52 +226,54 @@ ${drmLines
             Suivi des Titres de Mouvement (DAE Export & DSA / CRD France — Illustratif)
           </h3>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Réf. Document EMCS / GAMMA</th>
-              <th>Type</th>
-              <th>Destinataire</th>
-              <th>Volume & Colisage</th>
-              <th>Régime d’Accises</th>
-              <th>Statut Apurement</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="tabular">
-                <strong>26FR02100489200018421</strong>
-              </td>
-              <td>
-                <span className="badge badge-gold">DAE (e-AD Export)</span>
-              </td>
-              <td>Comptoir Nordique (Importateur UE / Export)</td>
-              <td className="tabular">180 cols (1,35 hL)</td>
-              <td>Suspension de droits</td>
-              <td>
-                <span className="badge badge-green">
-                  <CheckCircle2 size={11} /> Apuré à destination
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td className="tabular">
-                <strong>DSA-2026-10-089</strong>
-              </td>
-              <td>
-                <span className="badge badge-grape">DSA / Facture CRD</span>
-              </td>
-              <td>Table des Coteaux (CHR France)</td>
-              <td className="tabular">120 cols (0,90 hL)</td>
-              <td>Droits acquittés (3,98 €/hL)</td>
-              <td>
-                <span className="badge badge-green">
-                  <CheckCircle2 size={11} /> Livré & Acquitté
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Réf. Document EMCS / GAMMA</th>
+                <th>Type</th>
+                <th>Destinataire</th>
+                <th>Volume & Colisage</th>
+                <th>Régime d’Accises</th>
+                <th>Statut Apurement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="tabular">
+                  <strong>26FR02100489200018421</strong>
+                </td>
+                <td>
+                  <span className="badge badge-gold">DAE (e-AD Export)</span>
+                </td>
+                <td>Comptoir Nordique (Importateur UE / Export)</td>
+                <td className="tabular">180 cols (1,35 hL)</td>
+                <td>Suspension de droits</td>
+                <td>
+                  <span className="badge badge-green">
+                    <CheckCircle2 size={11} /> Apuré à destination
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="tabular">
+                  <strong>DSA-2026-10-089</strong>
+                </td>
+                <td>
+                  <span className="badge badge-grape">DSA / Facture CRD</span>
+                </td>
+                <td>Table des Coteaux (CHR France)</td>
+                <td className="tabular">120 cols (0,90 hL)</td>
+                <td>Droits acquittés (3,98 €/hL)</td>
+                <td>
+                  <span className="badge badge-green">
+                    <CheckCircle2 size={11} /> Livré & Acquitté
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

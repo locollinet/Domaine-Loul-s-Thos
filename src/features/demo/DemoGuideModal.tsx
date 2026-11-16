@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
 import { useStore } from '../../app/store-context';
 import { localDb } from '../../infra/db';
+import type { AssistantPrefillPayload } from '../ai/types';
 
 export const DemoGuideModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: string) => void;
-}> = ({ isOpen, onClose, onNavigate }) => {
+  onNavigatePrefill?: (prefill: AssistantPrefillPayload) => void;
+}> = ({ isOpen, onClose, onNavigate, onNavigatePrefill }) => {
   const { state, dispatch } = useStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [executing, setExecuting] = useState(false);
 
   if (!isOpen || !state) return null;
 
-  const steps = [
+  const steps: {
+    num: number;
+    title: string;
+    tab: string;
+    prefill?: AssistantPrefillPayload;
+    desc: string;
+    actionLabel?: string;
+    action?: () => Promise<void>;
+  }[] = [
     {
       num: 1,
       title: 'Vue d’ensemble & 5 horizons millésimes',
@@ -24,30 +34,35 @@ export const DemoGuideModal: React.FC<{
       num: 2,
       title: 'Vignoble & Parcelles sans GPS inventé',
       tab: 'vineyard',
+      prefill: { tab: 'vineyard', subTab: 'atlas' },
       desc: 'Examiner le schéma parcellaire, les accès réels décrits et les missions de terrain.',
     },
     {
       num: 3,
       title: 'Comptages de récolte & Pesées nettes',
       tab: 'vineyard',
+      prefill: { tab: 'vineyard', subTab: 'harvest' },
       desc: 'Constater que les caisses de récolte ne deviennent pas automatiquement des litres. Pesée brute − tare = net.',
     },
     {
       num: 4,
       title: 'Chai & Cinétique de fermentation 2026',
       tab: 'cellar',
+      prefill: { tab: 'cellar' },
       desc: 'Consulter la courbe de densité réelle sans interpolation mensongère (trou visible après le 17 octobre).',
     },
     {
       num: 5,
       title: 'Élevage 2024 en barriques',
       tab: 'aging',
+      prefill: { tab: 'aging' },
       desc: 'Vérifier la conservation des volumes dans le parc à fûts F-01 (120 L) et F-02 (80 L).',
     },
     {
       num: 6,
       title: 'Assemblage 2025 (Essai puis Exécution)',
       tab: 'aging',
+      prefill: { tab: 'aging' },
       desc: 'Prévisualiser l’essai sans consommer de vin, puis exécuter 300 L de A + 200 L de B vers le lot enfant de 500 L.',
       actionLabel: 'Exécuter l’assemblage 2025',
       action: async () => {
@@ -72,6 +87,7 @@ export const DemoGuideModal: React.FC<{
       num: 7,
       title: 'Mise en bouteilles & BOM matières sèches',
       tab: 'bottling',
+      prefill: { tab: 'bottling', subTab: 'stocks' },
       desc: 'Consommer 500 L de vin, 660 bouteilles, bouchons et étiquettes, 110 cartons de 6, et tracer 5 L de perte déclarée.',
       actionLabel: 'Exécuter la mise de 660 bouteilles',
       action: async () => {
@@ -99,6 +115,7 @@ export const DemoGuideModal: React.FC<{
       num: 8,
       title: 'Vente, Réservation & Expédition',
       tab: 'sales',
+      prefill: { tab: 'sales', subTab: 'orders' },
       desc: 'Commander 120 bouteilles, expédier 72. Constater : physique 588, réservé 48, disponible 540.',
       actionLabel: 'Commander 120 & livrer 72',
       action: async () => {
@@ -138,6 +155,7 @@ export const DemoGuideModal: React.FC<{
       num: 9,
       title: 'Facture démo & Encaissement simulé',
       tab: 'finance',
+      prefill: { tab: 'finance', subTab: 'finance' },
       desc: 'Facturer les 72 bouteilles à 20 € HT (1 440 € HT + 288 € TVA = 1 728 € TTC), encaisser 1 000 €, solde 728 €.',
       actionLabel: 'Émettre facture & paiement 1000 €',
       action: async () => {
@@ -169,11 +187,20 @@ export const DemoGuideModal: React.FC<{
       num: 10,
       title: 'Traçabilité complète & Fin du scénario',
       tab: 'traceability',
+      prefill: { tab: 'traceability' },
       desc: 'Depuis la livraison, remonter à la mise M25, aux lots 2025 A et B, puis aux parcelles des Hauts Rangs et de la Combe Claire.',
     },
   ];
 
   const active = steps[currentStep - 1]!;
+
+  const goStep = (step: (typeof steps)[number]) => {
+    if (step.prefill && onNavigatePrefill) {
+      onNavigatePrefill(step.prefill);
+    } else {
+      onNavigate(step.tab);
+    }
+  };
 
   const handleStepAction = async () => {
     if (!active.action) return;
@@ -209,7 +236,7 @@ export const DemoGuideModal: React.FC<{
               key={s.num}
               onClick={() => {
                 setCurrentStep(s.num);
-                onNavigate(s.tab);
+                goStep(s);
               }}
               style={{
                 flex: 1,
@@ -258,7 +285,7 @@ export const DemoGuideModal: React.FC<{
             onClick={() => {
               const prev = currentStep - 1;
               setCurrentStep(prev);
-              onNavigate(steps[prev - 1]!.tab);
+              goStep(steps[prev - 1]!);
             }}
           >
             ← Étape précédente
@@ -266,7 +293,7 @@ export const DemoGuideModal: React.FC<{
 
           <button
             className="btn btn-secondary"
-            onClick={() => onNavigate(active.tab)}
+            onClick={() => goStep(active)}
           >
             Aller au module ({active.tab})
           </button>
@@ -277,7 +304,7 @@ export const DemoGuideModal: React.FC<{
             onClick={() => {
               const next = currentStep + 1;
               setCurrentStep(next);
-              onNavigate(steps[next - 1]!.tab);
+              goStep(steps[next - 1]!);
             }}
           >
             Étape suivante →

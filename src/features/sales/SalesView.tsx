@@ -15,13 +15,16 @@ import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { AllocationsAndPrimeursPanel } from './AllocationsAndPrimeursPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+
+type SalesTabId = 'orders' | 'allocations';
 
 export const SalesView: React.FC<{
   prefill?: Extract<AssistantPrefillPayload, { tab: 'sales' }>;
 }> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
-  const [subTab, setSubTab] = useState<'orders' | 'allocations'>('orders');
+  const [subTab, setSubTab] = useState<SalesTabId>('orders');
 
   // Create Order Modal
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -49,6 +52,18 @@ export const SalesView: React.FC<{
     if (typeof p.quantity === 'number') setOrderQty(String(p.quantity));
     if (typeof p.asQuote === 'boolean') setAsQuote(p.asQuote);
     if (p.openModal === 'order') setShowOrderModal(true);
+    if (p.openModal === 'ship' && state) {
+      const targetOrder =
+        (p.orderId ? state.orders[p.orderId] : undefined) ??
+        Object.values(state.orders).find(
+          (o) => o.status === 'confirmed' || o.status === 'partially_shipped'
+        );
+      if (targetOrder) {
+        setShowShipModal(targetOrder.id);
+        setShipLineId(targetOrder.lines[0]?.id ?? '');
+        setShipQty(String(targetOrder.lines[0]?.reserved ?? 0));
+      }
+    }
   });
 
   if (!state) return null;
@@ -143,15 +158,26 @@ export const SalesView: React.FC<{
   };
 
   const showAllocationsAddon = isAddonEnabled('allocations');
-  const effectiveSubTab = showAllocationsAddon ? subTab : 'orders';
+  const effectiveSubTab: SalesTabId = showAllocationsAddon ? subTab : 'orders';
+
+  const switchSalesTab = (next: SalesTabId) => {
+    setSubTab(next);
+    scrollSubNavIntoView('sales-subnav');
+  };
 
   const handleConvertAllocationToOrder = async (
     customerId: string,
     qty: number,
     unitPriceEur: number
   ) => {
-    const targetBatch = batches[0];
+    const requestedQty = Math.min(qty, 24);
+    const targetBatch =
+      batches.find((b) => batchPosition(state, b).available >= requestedQty) ??
+      batches.find((b) => batchPosition(state, b).available > 0) ??
+      batches[0];
     if (!targetBatch) return;
+    const avail = batchPosition(state, targetBatch).available;
+    const finalQty = avail > 0 ? Math.min(requestedQty, avail) : requestedQty;
     try {
       await dispatch({
         type: 'order.create',
@@ -162,7 +188,7 @@ export const SalesView: React.FC<{
             {
               skuId: targetBatch.skuId,
               batchId: targetBatch.id,
-              quantity: Math.min(qty, 24),
+              quantity: finalQty,
               unitPriceHtCents: Math.round(unitPriceEur * 100),
             },
           ],
@@ -223,7 +249,9 @@ export const SalesView: React.FC<{
             <p className="ds-next-desc">
               {ordersToShip.length > 0
                 ? `Dossier ${ordersToShip[0]!.code} (${state.customers[ordersToShip[0]!.customerId]?.name}) : les bouteilles sont réservées et prêtes sur palette.`
-                : 'Créez une nouvelle commande ferme ou préparez vos allocations annuelles.'}
+                : showAllocationsAddon
+                  ? 'Créez une nouvelle commande ferme ou gérez vos allocations annuelles.'
+                  : 'Créez un devis ou une commande ferme directement sur votre stock disponible vendable.'}
             </p>
           </div>
           {ordersToShip.length > 0 ? (
@@ -253,121 +281,79 @@ export const SalesView: React.FC<{
         </div>
       </section>
 
-      {/* 2. GESTES COMMERCIAUX RAPIDES */}
-      <section className="ds-rise ds-rise-1" aria-label="Gestes commerciaux">
-        <div className="ds-section-head">
-          <h2 className="ds-section-title">Que souhaitez-vous faire ?</h2>
-          {showAllocationsAddon && (
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={`segmented-btn ${effectiveSubTab === 'orders' ? 'active' : ''}`}
-                onClick={() => setSubTab('orders')}
-              >
-                <Award size={14} />
-                <span>1. Commandes & Livraisons ({orders.length})</span>
-              </button>
-              <button
-                type="button"
-                className={`segmented-btn ${effectiveSubTab === 'allocations' ? 'active' : ''}`}
-                onClick={() => setSubTab('allocations')}
-              >
-                <Crown size={14} />
-                <span>2. Allocations & Quotas Grands Crus</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="ds-quick-grid-3">
-          <button
-            type="button"
-            className="ds-tile is-recommended"
-            onClick={() => {
-              setAsQuote(false);
-              setShowOrderModal(true);
-            }}
-          >
-            <span className="ds-tile-badge">Réservation auto</span>
-            <div className="ds-icon-bubble ds-tone-forest">
-              <Plus size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">+ Nouvelle commande ou devis</div>
-              <div className="ds-tile-sub">
-                Bloque les bouteilles sur le stock disponible vendable
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className="ds-tile"
-            onClick={() => {
-              if (ordersToShip[0]) {
-                const ord = ordersToShip[0];
-                setShowShipModal(ord.id);
-                setShipLineId(ord.lines[0]?.id ?? '');
-                setShipQty(String(ord.lines[0]?.reserved ?? 0));
-              } else {
-                setSubTab('orders');
-              }
-            }}
-          >
-            <div className="ds-icon-bubble ds-tone-gold">
-              <Truck size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">Expédier une commande (BL)</div>
-              <div className="ds-tile-sub">
-                {ordersToShip.length > 0
-                  ? `${ordersToShip.length} commande(s) prête(s) au départ`
-                  : 'Sortie physique de cave & bon de livraison'}
-              </div>
-            </div>
-          </button>
-
-          {showAllocationsAddon ? (
+      {/* 2. NAVIGATION D'ESPACES COMMERCIAUX + ACTIONS RAPIDES */}
+      <SubNav
+        id="sales-subnav"
+        ariaLabel="Espaces Ventes et Allocations"
+        tabs={[
+          {
+            id: 'orders',
+            label: '🛍️ Commandes & Livraisons',
+            icon: Award,
+            count: ordersToShip.length > 0 ? `${ordersToShip.length} à expédier` : orders.length,
+            alert: ordersToShip.length > 0,
+            hint: 'Devis, commandes fermes avec réservation de stock, expéditions (BL) et retours',
+          },
+          ...(showAllocationsAddon
+            ? [
+                {
+                  id: 'allocations' as const,
+                  label: '👑 Allocations & Quotas Grands Crus',
+                  icon: Crown,
+                  hint: 'Répartir les quotas annuels entre restaurateurs, cavistes et importateurs',
+                },
+              ]
+            : []),
+        ] satisfies SubNavTab<SalesTabId>[]}
+        active={effectiveSubTab}
+        onChange={switchSalesTab}
+        trailing={
+          <>
             <button
               type="button"
-              className={`ds-tile ${effectiveSubTab === 'allocations' ? 'is-recommended' : ''}`}
-              onClick={() => setSubTab(effectiveSubTab === 'allocations' ? 'orders' : 'allocations')}
-            >
-              <span className="ds-tile-badge">Cuvées rares</span>
-              <div className="ds-icon-bubble ds-tone-grape">
-                <Crown size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Gérer les allocations Grands Crus</div>
-                <div className="ds-tile-sub">
-                  Répartir vos quotas annuels entre restaurateurs et importateurs
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ds-tile"
+              className="btn btn-sm btn-primary"
               onClick={() => {
-                if (shipments[0]) {
-                  setShowReturnModal(shipments[0].id);
-                  setReturnBatchId(shipments[0].lines[0]?.batchId ?? '');
-                }
+                setAsQuote(false);
+                setShowOrderModal(true);
               }}
             >
-              <div className="ds-icon-bubble ds-tone-amber">
-                <RotateCcw size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Enregistrer un retour client</div>
-                <div className="ds-tile-sub">
-                  Isoler automatiquement les bouteilles retournées en quarantaine
-                </div>
-              </div>
+              <Plus size={14} />
+              <span>Nouvelle commande / devis</span>
             </button>
-          )}
-        </div>
-      </section>
+
+            {ordersToShip.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => {
+                  const ord = ordersToShip[0]!;
+                  setShowShipModal(ord.id);
+                  setShipLineId(ord.lines[0]?.id ?? '');
+                  setShipQty(String(ord.lines[0]?.reserved ?? 0));
+                }}
+              >
+                <Truck size={14} />
+                <span>Expédier ({ordersToShip.length})</span>
+              </button>
+            )}
+
+            {shipments.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => {
+                  const s = shipments[0]!;
+                  setShowReturnModal(s.id);
+                  setReturnBatchId(s.lines[0]?.batchId ?? '');
+                }}
+              >
+                <RotateCcw size={14} />
+                <span>Retour client</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {effectiveSubTab === 'allocations' && showAllocationsAddon ? (
         <AllocationsAndPrimeursPanel
@@ -559,12 +545,15 @@ export const SalesView: React.FC<{
                                     : 'Annulée'}
                           </span>
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             {o.status === 'quote' && (
                               <button
                                 className="btn btn-sm btn-primary"
-                                onClick={() => handleConfirmOrder(o.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConfirmOrder(o.id);
+                                }}
                               >
                                 Confirmer
                               </button>
@@ -572,7 +561,8 @@ export const SalesView: React.FC<{
                             {(o.status === 'confirmed' || o.status === 'partially_shipped') && (
                               <button
                                 className="btn btn-sm btn-accent"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setShowShipModal(o.id);
                                   setShipLineId(o.lines[0]?.id ?? '');
                                   const rem = o.lines[0]?.reserved ?? 0;
@@ -585,7 +575,10 @@ export const SalesView: React.FC<{
                             {(o.status === 'quote' || o.status === 'confirmed') && (
                               <button
                                 className="btn btn-sm btn-secondary"
-                                onClick={() => handleCancelOrder(o.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelOrder(o.id);
+                                }}
                               >
                                 Annuler
                               </button>
@@ -650,10 +643,11 @@ export const SalesView: React.FC<{
                             <span className="badge badge-amber">À facturer</span>
                           )}
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <button
                             className="btn btn-sm btn-secondary"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setShowReturnModal(s.id);
                               setReturnBatchId(s.lines[0]?.batchId ?? '');
                             }}
@@ -668,9 +662,11 @@ export const SalesView: React.FC<{
               </table>
             </div>
           </div>
+        </>
+      )}
 
-          {/* Modal Créer Commande / Devis */}
-          {showOrderModal && (
+      {/* Modal Créer Commande / Devis (accessible depuis tout sous-onglet) */}
+      {showOrderModal && (
             <div className="modal-backdrop" onClick={() => setShowOrderModal(false)}>
               <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
@@ -769,82 +765,177 @@ export const SalesView: React.FC<{
           )}
 
           {/* Modal Livraison */}
-          {showShipModal && (
-            <div className="modal-backdrop" onClick={() => setShowShipModal(null)}>
-              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                  Expédition & Bon de livraison
-                </h2>
-                <form onSubmit={handleShipOrder}>
-                  <div className="form-group">
-                    <label className="form-label">Quantité livrée</label>
-                    <input
-                      type="number"
-                      min="1"
-                      className="form-input"
-                      value={shipQty}
-                      onChange={(e) => setShipQty(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '16px' }}>
-                    Cette opération déstocke immédiatement le stock physique et solde la réservation correspondante.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowShipModal(null)}>
-                      Annuler
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      Valider l’expédition
-                    </button>
-                  </div>
-                </form>
+          {showShipModal && (() => {
+            const shippingOrder = state.orders[showShipModal];
+            const shippingLine = shippingOrder?.lines.find((l) => l.id === shipLineId) ?? shippingOrder?.lines[0];
+            return (
+              <div className="modal-backdrop" onClick={() => setShowShipModal(null)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
+                    Expédition & Bon de livraison
+                  </h2>
+                  <form onSubmit={handleShipOrder}>
+                    {ordersToShip.length > 0 && (
+                      <div className="form-group">
+                        <label className="form-label">Commande à expédier</label>
+                        <select
+                          className="form-select"
+                          value={showShipModal}
+                          onChange={(e) => {
+                            const nextOrd = state.orders[e.target.value];
+                            setShowShipModal(e.target.value);
+                            const nextLine = nextOrd?.lines.find((l) => l.reserved > 0) ?? nextOrd?.lines[0];
+                            setShipLineId(nextLine?.id ?? '');
+                            setShipQty(String(nextLine?.reserved ?? 0));
+                          }}
+                        >
+                          {ordersToShip.map((o) => {
+                            const cust = state.customers[o.customerId];
+                            const rem = o.lines.reduce((s, l) => s + l.reserved, 0);
+                            return (
+                              <option key={o.id} value={o.id}>
+                                {o.code} · {cust?.name ?? o.customerId} ({rem} cols réservés)
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+                    {shippingOrder && shippingOrder.lines.length > 1 && (
+                      <div className="form-group">
+                        <label className="form-label">Ligne de commande</label>
+                        <select
+                          className="form-select"
+                          value={shippingLine?.id ?? ''}
+                          onChange={(e) => {
+                            const nextLine = shippingOrder.lines.find((l) => l.id === e.target.value);
+                            setShipLineId(e.target.value);
+                            setShipQty(String(nextLine?.reserved ?? 0));
+                          }}
+                        >
+                          {shippingOrder.lines.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {state.skus[l.skuId]?.label ?? l.skuId} ({l.reserved} réservés)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label">Quantité livrée</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={shippingLine?.reserved || undefined}
+                        className="form-input"
+                        value={shipQty}
+                        onChange={(e) => setShipQty(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '16px' }}>
+                      Cette opération déstocke immédiatement le stock physique et solde la réservation correspondante.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setShowShipModal(null)}>
+                        Annuler
+                      </button>
+                      <button type="submit" className="btn btn-primary">
+                        Valider l’expédition
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Modal Retour Client */}
-          {showReturnModal && (
-            <div className="modal-backdrop" onClick={() => setShowReturnModal(null)}>
-              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                  Enregistrer un retour client en quarantaine
-                </h2>
-                <form onSubmit={handleReturnReceive}>
-                  <div className="form-group">
-                    <label className="form-label">Nombre de bouteilles retournées</label>
-                    <input
-                      type="number"
-                      min="1"
-                      className="form-input"
-                      value={returnQty}
-                      onChange={(e) => setReturnQty(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Motif du retour</label>
-                    <textarea
-                      className="form-textarea"
-                      value={returnReason}
-                      onChange={(e) => setReturnReason(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowReturnModal(null)}>
-                      Annuler
-                    </button>
-                    <button type="submit" className="btn btn-accent">
-                      Placer en quarantaine
-                    </button>
-                  </div>
-                </form>
+          {showReturnModal && (() => {
+            const retShipment = state.shipments[showReturnModal];
+            return (
+              <div className="modal-backdrop" onClick={() => setShowReturnModal(null)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
+                    Enregistrer un retour client en quarantaine
+                  </h2>
+                  <form onSubmit={handleReturnReceive}>
+                    {shipments.length > 0 && (
+                      <div className="form-group">
+                        <label className="form-label">Bon de livraison concerné</label>
+                        <select
+                          className="form-select"
+                          value={showReturnModal}
+                          onChange={(e) => {
+                            const nextShip = state.shipments[e.target.value];
+                            setShowReturnModal(e.target.value);
+                            setReturnBatchId(nextShip?.lines[0]?.batchId ?? '');
+                          }}
+                        >
+                          {shipments.map((s) => {
+                            const ord = state.orders[s.orderId];
+                            const cust = ord ? state.customers[ord.customerId] : undefined;
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {s.code} · {cust?.name ?? ord?.code ?? s.orderId}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+                    {retShipment && retShipment.lines.length > 1 && (
+                      <div className="form-group">
+                        <label className="form-label">Lot retourné</label>
+                        <select
+                          className="form-select"
+                          value={returnBatchId}
+                          onChange={(e) => setReturnBatchId(e.target.value)}
+                        >
+                          {retShipment.lines.map((l) => {
+                            const b = state.batches[l.batchId];
+                            return (
+                              <option key={l.batchId} value={l.batchId}>
+                                {b?.code ?? l.batchId} ({l.quantity} livrés)
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label">Nombre de bouteilles retournées</label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="form-input"
+                        value={returnQty}
+                        onChange={(e) => setReturnQty(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Motif du retour</label>
+                      <textarea
+                        className="form-textarea"
+                        value={returnReason}
+                        onChange={(e) => setReturnReason(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setShowReturnModal(null)}>
+                        Annuler
+                      </button>
+                      <button type="submit" className="btn btn-accent">
+                        Placer en quarantaine
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            );
+          })()}
     </div>
   );
 };

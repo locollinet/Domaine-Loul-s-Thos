@@ -481,54 +481,56 @@ export const PhytoAndTesaPanel: React.FC<{ parcels: Parcel[] }> = ({ parcels }) 
               </button>
             </form>
 
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Parcelle</th>
-                  <th>Catégorie</th>
-                  <th>Intrant / Intervention enregistrée</th>
-                  <th>Dose constatée</th>
-                  <th>Cuivre métal</th>
-                  <th>DAR & ZNT</th>
-                  <th>Statut Vendange</th>
-                </tr>
-              </thead>
-              <tbody>
-                {phytoList.map((row) => (
-                  <tr key={row.id}>
-                    <td className="tabular">{row.date}</td>
-                    <td>
-                      <strong>{row.parcelCode}</strong> · {row.parcelName}
-                    </td>
-                    <td>
-                      <span className="badge badge-green">{row.category}</span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{row.product}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                        {row.operator} · {row.weatherNote}
-                      </div>
-                    </td>
-                    <td className="tabular">{row.dosePerHa}</td>
-                    <td className="tabular">
-                      {row.copperMetalKgHa > 0 ? `${row.copperMetalKgHa.toFixed(2)} kg/ha` : '—'}
-                    </td>
-                    <td className="tabular">
-                      DAR {row.darDays} j · ZNT {row.zntMeters} m
-                    </td>
-                    <td>
-                      <span
-                        className="badge badge-green"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <CheckCircle2 size={12} /> DAR Purgé (Coupe autorisée)
-                      </span>
-                    </td>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Parcelle</th>
+                    <th>Catégorie</th>
+                    <th>Intrant / Intervention enregistrée</th>
+                    <th>Dose constatée</th>
+                    <th>Cuivre métal</th>
+                    <th>DAR & ZNT</th>
+                    <th>Statut Vendange</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {phytoList.map((row) => (
+                    <tr key={row.id}>
+                      <td className="tabular">{row.date}</td>
+                      <td>
+                        <strong>{row.parcelCode}</strong> · {row.parcelName}
+                      </td>
+                      <td>
+                        <span className="badge badge-green">{row.category}</span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{row.product}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                          {row.operator} · {row.weatherNote}
+                        </div>
+                      </td>
+                      <td className="tabular">{row.dosePerHa}</td>
+                      <td className="tabular">
+                        {row.copperMetalKgHa > 0 ? `${row.copperMetalKgHa.toFixed(2)} kg/ha` : '—'}
+                      </td>
+                      <td className="tabular">
+                        DAR {row.darDays} j · ZNT {row.zntMeters} m
+                      </td>
+                      <td>
+                        <span
+                          className="badge badge-green"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <CheckCircle2 size={12} /> DAR Purgé (Coupe autorisée)
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       ) : (
@@ -558,68 +560,70 @@ export const PhytoAndTesaPanel: React.FC<{ parcels: Parcel[] }> = ({ parcels }) 
             </button>
           </div>
 
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Saisonnier</th>
-                <th>Rôle & Équipe Terrain</th>
-                <th>Contrat</th>
-                <th>Heures Pointées</th>
-                <th>Productivité (Caisses)</th>
-                <th>Repas & Logement</th>
-                <th>Brut Estimé (Illustratif)</th>
-                <th>Pointage Rapide (+1 Journée)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workers.map((w) => {
-                const totalGross = (w.hoursWorked * w.hourlyGrossEur).toFixed(2);
-                return (
-                  <tr key={w.id}>
-                    <td>
-                      <strong>{w.name}</strong>
-                    </td>
-                    <td>
-                      <div>{w.role}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>{w.team}</div>
-                    </td>
-                    <td>
-                      <span className="badge badge-gold">{w.contractType}</span>
-                    </td>
-                    <td className="tabular" style={{ fontWeight: 700 }}>
-                      {w.hoursWorked} h
-                    </td>
-                    <td className="tabular">
-                      {w.cratesPicked > 0 ? `${w.cratesPicked} caisses` : 'Forfait horaire'}
-                    </td>
-                    <td>
-                      <span className="badge badge-green">
-                        {w.mealIncluded ? 'Panier Midi' : 'Sans repas'}
-                        {w.lodgingIncluded ? ' + Hébergé' : ''}
-                      </span>
-                    </td>
-                    <td className="tabular" style={{ fontWeight: 700 }}>
-                      {totalGross} €
-                      <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)' }}>
-                        ({w.hourlyGrossEur.toFixed(2)} €/h)
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-secondary"
-                        onClick={() =>
-                          handleAddWorkerHours(w.id, 8, w.role === 'Coupeur' ? 28 : 0)
-                        }
-                      >
-                        + 1 Journée (8h)
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Saisonnier</th>
+                  <th>Rôle & Équipe Terrain</th>
+                  <th>Contrat</th>
+                  <th>Heures Pointées</th>
+                  <th>Productivité (Caisses)</th>
+                  <th>Repas & Logement</th>
+                  <th>Brut Estimé (Illustratif)</th>
+                  <th>Pointage Rapide (+1 Journée)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workers.map((w) => {
+                  const totalGross = (w.hoursWorked * w.hourlyGrossEur).toFixed(2);
+                  return (
+                    <tr key={w.id}>
+                      <td>
+                        <strong>{w.name}</strong>
+                      </td>
+                      <td>
+                        <div>{w.role}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>{w.team}</div>
+                      </td>
+                      <td>
+                        <span className="badge badge-gold">{w.contractType}</span>
+                      </td>
+                      <td className="tabular" style={{ fontWeight: 700 }}>
+                        {w.hoursWorked} h
+                      </td>
+                      <td className="tabular">
+                        {w.cratesPicked > 0 ? `${w.cratesPicked} caisses` : 'Forfait horaire'}
+                      </td>
+                      <td>
+                        <span className="badge badge-green">
+                          {w.mealIncluded ? 'Panier Midi' : 'Sans repas'}
+                          {w.lodgingIncluded ? ' + Hébergé' : ''}
+                        </span>
+                      </td>
+                      <td className="tabular" style={{ fontWeight: 700 }}>
+                        {totalGross} €
+                        <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)' }}>
+                          ({w.hourlyGrossEur.toFixed(2)} €/h)
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() =>
+                            handleAddWorkerHours(w.id, 8, w.role === 'Coupeur' ? 28 : 0)
+                          }
+                        >
+                          + 1 Journée (8h)
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -208,70 +208,72 @@ export const AllocationsAndPrimeursPanel: React.FC<AllocationsAndPrimeursPanelPr
           </select>
         </div>
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Client Allocataire & Canal</th>
-              <th>Cuvée & Millésime</th>
-              <th>Format de Flacon</th>
-              <th>Quota Alloué</th>
-              <th>Déjà Prélevé</th>
-              <th>Reste à Convertir</th>
-              <th>Tarif Canal HT</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => {
-              const remaining = Math.max(0, row.allocatedCols - row.claimedCols);
-              return (
-                <tr key={row.id}>
-                  <td>
-                    <strong>{row.customerName.replace(' — fictif', '')}</strong>
-                    <div>
-                      <span className="badge badge-gold" style={{ fontSize: '10px' }}>
-                        {row.channel}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <strong>{row.cuveeLabel}</strong>
-                    <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                      Millésime {row.vintage}
-                    </div>
-                  </td>
-                  <td>
-                    <span className="badge badge-grape">{row.formatLabel}</span>
-                  </td>
-                  <td className="tabular" style={{ fontWeight: 700 }}>
-                    {row.allocatedCols}
-                  </td>
-                  <td className="tabular">{row.claimedCols}</td>
-                  <td className="tabular" style={{ fontWeight: 700, color: remaining > 0 ? 'var(--color-burgundy)' : '#1A5E42' }}>
-                    {remaining} col(s)
-                  </td>
-                  <td className="tabular">{row.unitPriceHtEur.toFixed(2)} € HT</td>
-                  <td>
-                    {remaining > 0 && batches.length > 0 ? (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary"
-                        onClick={() => void handleClaimRemaining(row)}
-                      >
-                        <Plus size={13} />
-                        <span>Convertir en commande ({remaining})</span>
-                      </button>
-                    ) : (
-                      <span className="badge badge-green">
-                        <CheckCircle2 size={11} /> Quota soldé
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Client Allocataire & Canal</th>
+                <th>Cuvée & Millésime</th>
+                <th>Format de Flacon</th>
+                <th>Quota Alloué</th>
+                <th>Déjà Prélevé</th>
+                <th>Reste à Convertir</th>
+                <th>Tarif Canal HT</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => {
+                const remaining = Math.max(0, row.allocatedCols - row.claimedCols);
+                return (
+                  <tr key={row.id}>
+                    <td>
+                      <strong>{row.customerName.replace(' — fictif', '')}</strong>
+                      <div>
+                        <span className="badge badge-gold" style={{ fontSize: '10px' }}>
+                          {row.channel}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <strong>{row.cuveeLabel}</strong>
+                      <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                        Millésime {row.vintage}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge badge-grape">{row.formatLabel}</span>
+                    </td>
+                    <td className="tabular" style={{ fontWeight: 700 }}>
+                      {row.allocatedCols}
+                    </td>
+                    <td className="tabular">{row.claimedCols}</td>
+                    <td className="tabular" style={{ fontWeight: 700, color: remaining > 0 ? 'var(--color-burgundy)' : '#1A5E42' }}>
+                      {remaining} col(s)
+                    </td>
+                    <td className="tabular">{row.unitPriceHtEur.toFixed(2)} € HT</td>
+                    <td>
+                      {remaining > 0 && batches.length > 0 ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => void handleClaimRemaining(row)}
+                        >
+                          <Plus size={13} />
+                          <span>Convertir en commande ({remaining})</span>
+                        </button>
+                      ) : (
+                        <span className="badge badge-green">
+                          <CheckCircle2 size={11} /> Quota soldé
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

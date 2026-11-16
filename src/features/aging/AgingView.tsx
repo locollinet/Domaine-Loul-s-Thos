@@ -51,6 +51,59 @@ export const AgingView: React.FC<{
 
   if (!state) return null;
 
+  const availableContainers = Object.values(state.containers).filter(
+    (c) => c.state === 'available' && !state.occupancies[c.id]
+  );
+  const effectiveDestContainerId = availableContainers.some((c) => c.id === destContainerId)
+    ? destContainerId
+    : (availableContainers[0]?.id ?? '');
+
+  const lotA = state.lots['lot-2025-a'];
+  const lotB = state.lots['lot-2025-b'];
+  const occA =
+    (state.occupancies['tank-02']?.lotId === 'lot-2025-a'
+      ? state.occupancies['tank-02']
+      : lotOccupancies(state, 'lot-2025-a')[0]) ?? null;
+  const occB =
+    (state.occupancies['tank-03']?.lotId === 'lot-2025-b'
+      ? state.occupancies['tank-03']
+      : lotOccupancies(state, 'lot-2025-b')[0]) ?? null;
+  const contA = occA ? state.containers[occA.containerId] : null;
+  const contB = occB ? state.containers[occB.containerId] : null;
+  const availALitres = occA ? Math.round(occA.volumeMl / 1000) : 0;
+  const availBLitres = occB ? Math.round(occB.volumeMl / 1000) : 0;
+
+  const transferOccs = lotOccupancies(state, transferLotId);
+  const effectiveFromCont = transferOccs.some((o) => o.containerId === transferFromCont)
+    ? transferFromCont
+    : (transferOccs[0]?.containerId ?? '');
+  const transferDestConts = Object.values(state.containers).filter(
+    (c) => c.id !== effectiveFromCont && c.state === 'available'
+  );
+  const effectiveToCont = transferDestConts.some((c) => c.id === transferToCont)
+    ? transferToCont
+    : (transferDestConts[0]?.id ?? '');
+
+  const selectTransferLot = (lotId: string, preferredFromCont?: string) => {
+    setTransferLotId(lotId);
+    const occs = lotOccupancies(state, lotId);
+    const chosenOcc =
+      (preferredFromCont ? occs.find((o) => o.containerId === preferredFromCont) : undefined) ??
+      occs[0];
+    const nextFrom = chosenOcc?.containerId ?? '';
+    setTransferFromCont(nextFrom);
+    if (chosenOcc) {
+      setTransferVolL(String(Math.min(50, Math.max(1, Math.round(chosenOcc.volumeMl / 1000)))));
+    }
+    const candidateDest = Object.values(state.containers).filter(
+      (c) => c.id !== nextFrom && c.state === 'available'
+    );
+    if (!candidateDest.some((c) => c.id === transferToCont)) {
+      const preferredEmptyBarrel = candidateDest.find((c) => !state.occupancies[c.id]);
+      setTransferToCont((preferredEmptyBarrel ?? candidateDest[0])?.id ?? '');
+    }
+  };
+
   // Compute live blend preview (pure simulation without side-effects)
   let blendPreviewData = null;
   let blendPreviewError = null;
@@ -58,14 +111,14 @@ export const AgingView: React.FC<{
   try {
     const volA_ml = Math.round(parseFloat(inputA_vol || '0') * 1000);
     const volB_ml = Math.round(parseFloat(inputB_vol || '0') * 1000);
-    if (volA_ml > 0 && volB_ml > 0) {
+    if (volA_ml > 0 && volB_ml > 0 && occA && occB && effectiveDestContainerId) {
       blendPreviewData = previewBlend(state, {
         name: blendName,
         cuveeId: 'cuvee-red',
-        destinationContainerId: destContainerId,
+        destinationContainerId: effectiveDestContainerId,
         inputs: [
-          { lotId: 'lot-2025-a', containerId: 'tank-02', volumeMl: volA_ml },
-          { lotId: 'lot-2025-b', containerId: 'tank-03', volumeMl: volB_ml },
+          { lotId: 'lot-2025-a', containerId: occA.containerId, volumeMl: volA_ml },
+          { lotId: 'lot-2025-b', containerId: occB.containerId, volumeMl: volB_ml },
         ],
       });
     }
@@ -74,6 +127,7 @@ export const AgingView: React.FC<{
   }
 
   const handleExecuteBlend = async () => {
+    if (!occA || !occB || !effectiveDestContainerId) return;
     const volA_ml = Math.round(parseFloat(inputA_vol) * 1000);
     const volB_ml = Math.round(parseFloat(inputB_vol) * 1000);
     try {
@@ -82,10 +136,10 @@ export const AgingView: React.FC<{
         payload: {
           name: blendName,
           cuveeId: 'cuvee-red',
-          destinationContainerId: destContainerId,
+          destinationContainerId: effectiveDestContainerId,
           inputs: [
-            { lotId: 'lot-2025-a', containerId: 'tank-02', volumeMl: volA_ml },
-            { lotId: 'lot-2025-b', containerId: 'tank-03', volumeMl: volB_ml },
+            { lotId: 'lot-2025-a', containerId: occA.containerId, volumeMl: volA_ml },
+            { lotId: 'lot-2025-b', containerId: occB.containerId, volumeMl: volB_ml },
           ],
         },
       });
@@ -97,6 +151,7 @@ export const AgingView: React.FC<{
 
   const handleExecuteTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!effectiveFromCont || !effectiveToCont) return;
     const volMl = Math.round(parseFloat(transferVolL) * 1000);
     const lossMl = Math.round(parseFloat(transferLossL) * 1000);
     try {
@@ -105,8 +160,8 @@ export const AgingView: React.FC<{
           type: 'cellar.topping',
           payload: {
             lotId: transferLotId,
-            sourceContainerId: transferFromCont,
-            targetContainerId: transferToCont,
+            sourceContainerId: effectiveFromCont,
+            targetContainerId: effectiveToCont,
             volumeMl: volMl,
           },
         });
@@ -115,8 +170,8 @@ export const AgingView: React.FC<{
           type: 'cellar.transfer',
           payload: {
             lotId: transferLotId,
-            fromContainerId: transferFromCont,
-            toContainerId: transferToCont,
+            fromContainerId: effectiveFromCont,
+            toContainerId: effectiveToCont,
             volumeMl: volMl,
             lossMl: lossMl,
             reason: transferReason.trim() || 'Soutirage d’élevage',
@@ -148,9 +203,6 @@ export const AgingView: React.FC<{
 
   const lotsReadyForBlend = Object.values(state.lots).filter(
     (l) => l.stage === 'ready' || l.stage === 'aging'
-  );
-  const availableContainers = Object.values(state.containers).filter(
-    (c) => c.state === 'available' && !state.occupancies[c.id]
   );
 
   // Calculs pour jauges visuelles
@@ -200,8 +252,9 @@ export const AgingView: React.FC<{
             <div className="ds-next-label">Action recommandée au chai</div>
             <div className="ds-next-title">Assembler les deux cuvées Rouges 2025</div>
             <p className="ds-next-desc">
-              Les lots <em>Les Hauts Rangs</em> (600 L) et <em>La Combe Claire</em> (400 L) sont
-              prêts. Testez votre proportion idéale sans toucher au stock.
+              {availALitres > 0 && availBLitres > 0
+                ? <>Les lots <em>{lotA?.name ?? 'Les Hauts Rangs'}</em> ({availALitres} L) et <em>{lotB?.name ?? 'La Combe Claire'}</em> ({availBLitres} L) sont prêts. Testez votre proportion idéale sans toucher au stock.</>
+                : 'Testez vos assemblages à blanc ou planifiez un soutirage d’élevage avec traçabilité des lies.'}
             </p>
           </div>
           <button
@@ -377,8 +430,7 @@ export const AgingView: React.FC<{
                   key={l.id}
                   className="ds-clickable-card"
                   onClick={() => {
-                    setTransferLotId(l.id);
-                    setTransferFromCont(firstContId);
+                    selectTransferLot(l.id, firstContId);
                     setShowTransferModal(true);
                   }}
                   style={{
@@ -444,8 +496,7 @@ export const AgingView: React.FC<{
                         className="ds-action-chip"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setTransferLotId(l.id);
-                          setTransferFromCont(firstContId);
+                          selectTransferLot(l.id, firstContId);
                           setShowTransferModal(true);
                         }}
                       >
@@ -497,9 +548,7 @@ export const AgingView: React.FC<{
                   className="ds-barrel-card ds-clickable-card"
                   onClick={() => {
                     if (occ) {
-                      setTransferLotId(occ.lotId);
-                      setTransferFromCont(c.id);
-                      setTransferVolL(String(Math.min(50, occ.volumeMl / 1000)));
+                      selectTransferLot(occ.lotId, c.id);
                     } else {
                       setTransferToCont(c.id);
                     }
@@ -634,7 +683,7 @@ export const AgingView: React.FC<{
               ) : (
                 <select
                   className="form-select"
-                  value={destContainerId}
+                  value={effectiveDestContainerId}
                   onChange={(e) => setDestContainerId(e.target.value)}
                 >
                   {availableContainers.map((c) => (
@@ -652,7 +701,7 @@ export const AgingView: React.FC<{
                   Proportions de l’assemblage (entrées)
                 </span>
                 <span className="badge badge-grape tabular">
-                  {pctA}% Hauts Rangs · {pctB}% Combe Claire
+                  {pctA}% {lotA?.name ?? 'Hauts Rangs'} · {pctB}% {lotB?.name ?? 'Combe Claire'}
                 </span>
               </div>
 
@@ -664,13 +713,15 @@ export const AgingView: React.FC<{
 
               <div className="grid-2">
                 <div>
-                  <label className="form-label">L25-R-A (Hauts Rangs) — en C-02 (600 L dispo)</label>
+                  <label className="form-label">
+                    {lotA?.code ?? 'L25-R-A'} ({lotA?.name ?? 'Hauts Rangs'}) — en {contA?.code ?? '—'} ({availALitres} L dispo)
+                  </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <input
                       type="number"
                       step="1"
                       min="1"
-                      max="600"
+                      max={availALitres || undefined}
                       className="form-input"
                       value={inputA_vol}
                       onChange={(e) => setInputA_vol(e.target.value)}
@@ -680,13 +731,15 @@ export const AgingView: React.FC<{
                 </div>
 
                 <div>
-                  <label className="form-label">L25-R-B (Combe Claire) — en C-03 (400 L dispo)</label>
+                  <label className="form-label">
+                    {lotB?.code ?? 'L25-R-B'} ({lotB?.name ?? 'Combe Claire'}) — en {contB?.code ?? '—'} ({availBLitres} L dispo)
+                  </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <input
                       type="number"
                       step="1"
                       min="1"
-                      max="400"
+                      max={availBLitres || undefined}
                       className="form-input"
                       value={inputB_vol}
                       onChange={(e) => setInputB_vol(e.target.value)}
@@ -704,7 +757,7 @@ export const AgingView: React.FC<{
                   ✓ Résultat de la simulation d’essai
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
-                  Volume total assemblé : <strong>{blendPreviewData.totalMl / 1000} L</strong> (dans {state.containers[destContainerId]?.code})
+                  Volume total assemblé : <strong>{blendPreviewData.totalMl / 1000} L</strong> (dans {state.containers[effectiveDestContainerId]?.code ?? '—'})
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
                   Coût connu alloué au lot enfant : <strong>{(blendPreviewData.cost.knownCents / 100).toLocaleString('fr-FR')} €</strong>
@@ -783,7 +836,7 @@ export const AgingView: React.FC<{
                 <select
                   className="form-select"
                   value={transferLotId}
-                  onChange={(e) => setTransferLotId(e.target.value)}
+                  onChange={(e) => selectTransferLot(e.target.value)}
                 >
                   {Object.values(state.lots).map((l) => (
                     <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
@@ -795,9 +848,8 @@ export const AgingView: React.FC<{
                 <div className="form-group">
                   <label className="form-label">Contenant source</label>
                   {(() => {
-                    const occs = lotOccupancies(state, transferLotId);
-                    if (occs.length <= 1) {
-                      const o = occs[0];
+                    if (transferOccs.length <= 1) {
+                      const o = transferOccs[0];
                       const cont = o ? state.containers[o.containerId] : null;
                       return (
                         <div
@@ -818,10 +870,10 @@ export const AgingView: React.FC<{
                     return (
                       <select
                         className="form-select"
-                        value={transferFromCont}
+                        value={effectiveFromCont}
                         onChange={(e) => setTransferFromCont(e.target.value)}
                       >
-                        {occs.map((o) => (
+                        {transferOccs.map((o) => (
                           <option key={o.containerId} value={o.containerId}>
                             {state.containers[o.containerId]?.code} ({o.volumeMl / 1000} L dispo)
                           </option>
@@ -834,10 +886,7 @@ export const AgingView: React.FC<{
                 <div className="form-group">
                   <label className="form-label">Contenant destination</label>
                   {(() => {
-                    const destConts = Object.values(state.containers).filter(
-                      (c) => c.id !== transferFromCont && c.state === 'available'
-                    );
-                    if (destConts.length <= 1) {
+                    if (transferDestConts.length <= 1) {
                       return (
                         <div
                           style={{
@@ -850,17 +899,17 @@ export const AgingView: React.FC<{
                             color: 'var(--color-ink)',
                           }}
                         >
-                          {destConts[0] ? `${destConts[0].code} (${destConts[0].capacityMl / 1000} L cap.)` : 'Aucun contenant disponible'}
+                          {transferDestConts[0] ? `${transferDestConts[0].code} (${transferDestConts[0].capacityMl / 1000} L cap.)` : 'Aucun contenant disponible'}
                         </div>
                       );
                     }
                     return (
                       <select
                         className="form-select"
-                        value={transferToCont}
+                        value={effectiveToCont}
                         onChange={(e) => setTransferToCont(e.target.value)}
                       >
-                        {destConts.map((c) => (
+                        {transferDestConts.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.code} ({c.capacityMl / 1000} L cap.)
                           </option>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Package, Plus, Scissors, Building2 } from 'lucide-react';
 import type { BottlingBatch, Sku, DomainState } from '../../domain/types';
 import { batchPosition } from '../../domain/selectors';
@@ -128,12 +128,14 @@ interface CellarBottleMapPanelProps {
   state: DomainState;
   batches: BottlingBatch[];
   skus: Record<string, Sku>;
+  focusedBatchCode?: string;
 }
 
 export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
   state,
   batches,
   skus,
+  focusedBatchCode,
 }) => {
   const [slots, setSlots] = useState<BottleSlotRecord[]>(() => {
     try {
@@ -168,6 +170,21 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | SaleUrgencyLevel>('all');
   const [selectedSlotId, setSelectedSlotId] = useState<string>(DEFAULT_EXTRA_SLOTS[0]?.id ?? '');
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusedBatchCode) return;
+    const match = slots.find((s) => s.batchCode === focusedBatchCode);
+    if (match) {
+      setSelectedSlotId(match.id);
+      setUrgencyFilter('all');
+    } else {
+      const generatedId = `slot-${batches.find((b) => b.code === focusedBatchCode)?.id ?? ''}`;
+      if (generatedId !== 'slot-') {
+        setSelectedSlotId(generatedId);
+        setUrgencyFilter('all');
+      }
+    }
+  }, [focusedBatchCode, slots, batches]);
 
   // Modale d'ajout d'une Zone / Entrepôt ou Travée / Palox sur-mesure
   const [showAddStructureModal, setShowAddStructureModal] = useState(false);
@@ -828,56 +845,58 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
           </div>
         </div>
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Priorité de Vente</th>
-              <th>Date Cible Écoulement</th>
-              <th>Lot & Cuvée</th>
-              <th>Zone & Rangement Physique</th>
-              <th>Habillage</th>
-              <th>Dispo / Physique</th>
-              <th>Fenêtre Sommelier</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSlots.map((s) => (
-              <tr
-                key={s.id}
-                onClick={() => setSelectedSlotId(s.id)}
-                style={{
-                  cursor: 'pointer',
-                  background:
-                    activeSlot?.id === s.id ? 'rgba(196, 164, 122, 0.12)' : undefined,
-                }}
-              >
-                <td>{renderUrgencyBadge(s.urgency)}</td>
-                <td className="tabular" style={{ fontWeight: 700 }}>
-                  {s.prioritySellByDate}
-                </td>
-                <td>
-                  <strong>
-                    {s.cuveeLabel} ({s.vintage})
-                  </strong>
-                  <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                    Lot {s.batchCode} · {s.formatLabel}
-                  </div>
-                </td>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{s.rackCode}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>{s.zone}</div>
-                </td>
-                <td>
-                  <span className="badge badge-gold">{s.dressingState}</span>
-                </td>
-                <td className="tabular" style={{ fontWeight: 700 }}>
-                  {s.availableBottles} / {s.physicalBottles} cols
-                </td>
-                <td style={{ fontSize: '12px' }}>{s.sommelierPeakWindow}</td>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Priorité de Vente</th>
+                <th>Date Cible Écoulement</th>
+                <th>Lot & Cuvée</th>
+                <th>Zone & Rangement Physique</th>
+                <th>Habillage</th>
+                <th>Dispo / Physique</th>
+                <th>Fenêtre Sommelier</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredSlots.map((s) => (
+                <tr
+                  key={s.id}
+                  onClick={() => setSelectedSlotId(s.id)}
+                  style={{
+                    cursor: 'pointer',
+                    background:
+                      activeSlot?.id === s.id ? 'rgba(196, 164, 122, 0.12)' : undefined,
+                  }}
+                >
+                  <td>{renderUrgencyBadge(s.urgency)}</td>
+                  <td className="tabular" style={{ fontWeight: 700 }}>
+                    {s.prioritySellByDate}
+                  </td>
+                  <td>
+                    <strong>
+                      {s.cuveeLabel} ({s.vintage})
+                    </strong>
+                    <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                      Lot {s.batchCode} · {s.formatLabel}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{s.rackCode}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>{s.zone}</div>
+                  </td>
+                  <td>
+                    <span className="badge badge-gold">{s.dressingState}</span>
+                  </td>
+                  <td className="tabular" style={{ fontWeight: 700 }}>
+                    {s.availableBottles} / {s.physicalBottles} cols
+                  </td>
+                  <td style={{ fontSize: '12px' }}>{s.sommelierPeakWindow}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modale 1 : Ajouter une Zone / Bâtiment ou un Palox / Travée sur-mesure */}

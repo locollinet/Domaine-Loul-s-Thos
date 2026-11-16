@@ -14,13 +14,16 @@ import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { CustomsDrmPanel } from './CustomsDrmPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+
+type FinanceTabId = 'finance' | 'drm' | 'horizon_2027';
 
 export const FinanceView: React.FC<{
   prefill?: Extract<AssistantPrefillPayload, { tab: 'finance' }>;
 }> = ({ prefill }) => {
   const { state, dispatch } = useStore();
   const { isAddonEnabled } = useModuleConfig();
-  const [subTab, setSubTab] = useState<'finance' | 'drm'>('finance');
+  const [subTab, setSubTab] = useState<FinanceTabId>('finance');
 
   // Payment Modal
   const [showPayModal, setShowPayModal] = useState<string | null>(null); // invoiceId
@@ -104,7 +107,12 @@ export const FinanceView: React.FC<{
   };
 
   const showDrmAddon = isAddonEnabled('drm_douanes');
-  const effectiveSubTab = showDrmAddon ? subTab : 'finance';
+  const effectiveSubTab: FinanceTabId = subTab === 'drm' && !showDrmAddon ? 'finance' : subTab;
+
+  const switchFinanceTab = (next: FinanceTabId) => {
+    setSubTab(next);
+    scrollSubNavIntoView('finance-subnav');
+  };
 
   // Calculs synthétiques pour jauges visuelles
   const financeTotals = invoices.reduce(
@@ -140,6 +148,41 @@ export const FinanceView: React.FC<{
     effectiveBudgetLines.reduce((a, b) => a + b.amountCents, 0) / 100
   );
 
+  const forecastInEur = Math.round(
+    forecast.filter((f) => f.direction === 'in').reduce((s, f) => s + f.amountCents, 0) / 100
+  );
+  const forecastOutEur = Math.round(
+    forecast.filter((f) => f.direction === 'out').reduce((s, f) => s + f.amountCents, 0) / 100
+  );
+
+  const financeTabs: SubNavTab<FinanceTabId>[] = [
+    {
+      id: 'finance',
+      label: '🧾 Facturation & Règlements',
+      icon: Receipt,
+      count: unInvoicedShipments.length > 0 ? `${unInvoicedShipments.length} à facturer` : invoices.length,
+      alert: unInvoicedShipments.length > 0,
+      hint: 'Factures émises depuis les BL, encaissements et avoirs',
+    },
+    ...(showDrmAddon
+      ? [
+          {
+            id: 'drm' as const,
+            label: '🏛️ DRM Douanes (CIEL) & DAE',
+            icon: Landmark,
+            hint: 'Balance mensuelle en hectolitres (hL) et registres DAE / DSA',
+          },
+        ]
+      : []),
+    {
+      id: 'horizon_2027',
+      label: '🌱 Trésorerie & Horizon 2027',
+      icon: Sprout,
+      count: `${projectTotalEur.toLocaleString('fr-FR')} €`,
+      hint: 'Échéancier de trésorerie prévisionnelle et budget de replantation 2027',
+    },
+  ];
+
   return (
     <div className="ds-overview">
       {/* 1. BANNIÈRE PILOTAGE, DOUANES & FINANCE */}
@@ -169,7 +212,9 @@ export const FinanceView: React.FC<{
             <p className="ds-next-desc">
               {unInvoicedShipments.length > 0
                 ? `L’expédition ${unInvoicedShipments[0]!.code} est partie : créez sa facture en 1 clic sans toucher au stock.`
-                : 'Pointez un règlement reçu ou vérifiez la balance DRM du mois.'}
+                : showDrmAddon
+                  ? 'Pointez un règlement reçu ou vérifiez la balance DRM du mois.'
+                  : 'Consultez l’échéancier de trésorerie ou ajustez le budget 2027.'}
             </p>
           </div>
           {unInvoicedShipments.length > 0 ? (
@@ -199,9 +244,9 @@ export const FinanceView: React.FC<{
             <button
               type="button"
               className="ds-cta"
-              onClick={() => setSubTab(showDrmAddon ? 'drm' : 'finance')}
+              onClick={() => switchFinanceTab(showDrmAddon ? 'drm' : 'horizon_2027')}
             >
-              <span>Voir la balance DRM</span>
+              <span>{showDrmAddon ? 'Voir la balance DRM' : 'Préparer l’horizon 2027'}</span>
               <ArrowRight size={16} />
             </button>
           )}
@@ -215,315 +260,71 @@ export const FinanceView: React.FC<{
         </div>
       </div>
 
-      {/* 2. CHOIX DE L'ATELIER ADMINISTRATIF */}
-      <section className="ds-rise ds-rise-1" aria-label="Ateliers administratifs et douaniers">
-        <div className="ds-section-head">
-          <h2 className="ds-section-title">Que souhaitez-vous consulter ?</h2>
-          {showDrmAddon && (
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={`segmented-btn ${effectiveSubTab === 'finance' ? 'active' : ''}`}
-                onClick={() => setSubTab('finance')}
-              >
-                <TrendingUp size={14} />
-                <span>1. Facturation, Trésorerie & Budget 2027</span>
-              </button>
-              <button
-                type="button"
-                className={`segmented-btn ${effectiveSubTab === 'drm' ? 'active' : ''}`}
-                onClick={() => setSubTab('drm')}
-              >
-                <Landmark size={14} />
-                <span>2. DRM Douanes (CIEL) & DAE/DSA</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="ds-quick-grid-3">
-          <button
-            type="button"
-            className={`ds-tile ${effectiveSubTab === 'finance' ? 'is-recommended' : ''}`}
-            onClick={() => setSubTab('finance')}
-          >
-            <span className="ds-tile-badge">Factures & Solde</span>
-            <div className="ds-icon-bubble ds-tone-forest">
-              <Receipt size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">Suivre les factures et règlements</div>
-              <div className="ds-tile-sub">
-                Émettre une facture depuis un BL, pointer un virement ou créer un avoir
-              </div>
-            </div>
-          </button>
-
-          {showDrmAddon && (
-            <button
-              type="button"
-              className={`ds-tile ${effectiveSubTab === 'drm' ? 'is-recommended' : ''}`}
-              onClick={() => setSubTab('drm')}
-            >
-              <span className="ds-tile-badge">Douanes hL</span>
-              <div className="ds-icon-bubble ds-tone-gold">
-                <Landmark size={20} strokeWidth={1.9} />
-              </div>
-              <div>
-                <div className="ds-tile-label">Contrôler la DRM mensuelle (CIEL)</div>
-                <div className="ds-tile-sub">
-                  Balance automatique en hectolitres et registre des capsules CRD
-                </div>
-              </div>
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="ds-tile"
-            onClick={() => setSubTab('finance')}
-          >
-            <div className="ds-icon-bubble ds-tone-grape">
-              <Sprout size={20} strokeWidth={1.9} />
-            </div>
-            <div>
-              <div className="ds-tile-label">Préparer l’horizon 2027</div>
-              <div className="ds-tile-sub">
-                Échéancier de trésorerie et budget de replantation « Vigne du Moulin »
-              </div>
-            </div>
-          </button>
-        </div>
-      </section>
+      {/* 2. BARRE D'ONGLETS MÉTIER (CHACUN AFFICHE SON ESPACE DÉDIÉ JUSTE EN DESSOUS) */}
+      <SubNav
+        id="finance-subnav"
+        ariaLabel="Espaces Pilotage, DRM Douanes et Horizon 2027"
+        tabs={financeTabs}
+        active={effectiveSubTab}
+        onChange={switchFinanceTab}
+      />
 
       {effectiveSubTab === 'drm' && showDrmAddon ? (
         <CustomsDrmPanel state={state} />
-      ) : (
-        <>
-          {/* 3. JAUGES VISUELLES FINANCIÈRES */}
-          <section className="ds-stats ds-rise ds-rise-2" aria-label="Repères financiers">
+      ) : effectiveSubTab === 'horizon_2027' ? (
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* Jauges Prévisions & Budget 2027 */}
+          <section className="ds-stats" aria-label="Repères trésorerie et horizon 2027">
             <div className="ds-stat">
               <div className="ds-stat-top">
-                <span className="ds-icon-bubble ds-tone-ink">
-                  <Receipt size={16} />
-                </span>
-                <span>Total facturé TTC</span>
-              </div>
-              <div className="ds-stat-value">
-                {Math.round(financeTotals.ttc / 100).toLocaleString('fr-FR')}
-                <span className="ds-stat-unit">€</span>
-              </div>
-              <div className="ds-bar" aria-hidden="true">
-                <span style={{ width: `${paidPct}%`, background: 'var(--color-forest)' }} />
-              </div>
-              <div className="ds-stat-foot">
-                Sur {invoices.length} facture(s) émise(s)
-              </div>
-            </div>
-
-            <div className="ds-stat">
-              <div className="ds-stat-top">
-                <span className="ds-icon-bubble ds-tone-forest">
-                  <CheckCircle2 size={16} />
-                </span>
-                <span>Déjà encaissé</span>
+                <span className="ds-icon-bubble ds-tone-forest"><TrendingUp size={16} /></span>
+                <span>Entrées prévisionnelles</span>
               </div>
               <div className="ds-stat-value" style={{ color: 'var(--color-forest)' }}>
-                {Math.round(financeTotals.paid / 100).toLocaleString('fr-FR')}
+                +{forecastInEur.toLocaleString('fr-FR')}
                 <span className="ds-stat-unit">€</span>
               </div>
-              <div className="ds-bar" aria-hidden="true">
-                <span style={{ width: `${paidPct}%`, background: 'var(--color-forest)' }} />
-              </div>
-              <div className="ds-stat-foot">
-                {paidPct}% du montant facturé réglé
-              </div>
+              <div className="ds-stat-foot">Hypothèses & commandes attendues</div>
             </div>
 
             <div className="ds-stat">
               <div className="ds-stat-top">
-                <span className="ds-icon-bubble ds-tone-amber">
-                  <AlertCircle size={16} />
-                </span>
-                <span>Reste à encaisser</span>
+                <span className="ds-icon-bubble ds-tone-amber"><AlertCircle size={16} /></span>
+                <span>Sorties engagées & estimées</span>
               </div>
               <div className="ds-stat-value">
-                {Math.round(financeTotals.due / 100).toLocaleString('fr-FR')}
+                -{forecastOutEur.toLocaleString('fr-FR')}
                 <span className="ds-stat-unit">€</span>
               </div>
-              <div className="ds-bar" aria-hidden="true">
-                <span
-                  style={{
-                    width: `${100 - paidPct}%`,
-                    background: financeTotals.due > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
-                  }}
-                />
-              </div>
-              <div className="ds-stat-foot">
-                {unpaidInvoices.length} facture(s) ouverte(s)
-              </div>
+              <div className="ds-stat-foot">Fournitures commandées & acomptes</div>
             </div>
 
             <div className="ds-stat">
               <div className="ds-stat-top">
-                <span className="ds-icon-bubble ds-tone-grape">
-                  <Sprout size={16} />
-                </span>
+                <span className="ds-icon-bubble ds-tone-grape"><Sprout size={16} /></span>
                 <span>Budget Plantation 2027</span>
               </div>
               <div className="ds-stat-value">
                 {projectTotalEur.toLocaleString('fr-FR')}
                 <span className="ds-stat-unit">€</span>
               </div>
-              <div className="ds-bar" aria-hidden="true">
-                <span style={{ width: '100%', background: 'var(--color-grape)' }} />
+              <div className="ds-stat-foot">Scénario Vigne du Moulin (modifiable)</div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-ink"><Receipt size={16} /></span>
+                <span>Solde net prévisionnel</span>
               </div>
-              <div className="ds-stat-foot">
-                Renouvellement Vigne du Moulin (scénario)
+              <div className="ds-stat-value">
+                {(forecastInEur - forecastOutEur).toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">€</span>
               </div>
+              <div className="ds-stat-foot">Certain ≠ Engagé ≠ Estimé</div>
             </div>
           </section>
 
-          {/* 4. TABLEAU DES FACTURES */}
-          <div className="ds-panel ds-rise ds-rise-3">
-            <div className="ds-section-head">
-              <div>
-                <h2 className="ds-section-title">Factures de démonstration</h2>
-                <span className="ds-section-meta">
-                  Émises à partir des bons de livraison effectifs sans double déstockage
-                </span>
-              </div>
-              <span className="badge badge-green">{invoices.length} facture(s)</span>
-            </div>
-
-            {unInvoicedShipments.length > 0 && (
-              <div
-                style={{
-                  marginBottom: '14px',
-                  padding: '12px 14px',
-                  background: 'var(--color-amber-soft)',
-                  border: '1px solid #EED7B5',
-                  borderRadius: 'var(--radius-md)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                }}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
-                  ⚡ {unInvoicedShipments.length} livraison(s) expédiée(s) en attente de facturation :
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {unInvoicedShipments.map((s) => (
-                    <button
-                      key={s.id}
-                      className="btn btn-sm btn-primary"
-                      onClick={() => handleCreateInvoice(s.id)}
-                    >
-                      Facturer {s.code}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Numéro</th>
-                    <th>Client</th>
-                    <th>Date / Échéance</th>
-                    <th>Total TTC</th>
-                    <th>Progression règlement</th>
-                    <th>Règlements reçus</th>
-                    <th>Solde restant dû</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv) => {
-                    const cust = state.customers[inv.customerId];
-                    const bal = invoiceBalance(state, inv.id);
-                    const invPaidPct = inv.ttcCents > 0 ? Math.min(100, Math.round((bal.paid / inv.ttcCents) * 100)) : 0;
-                    return (
-                      <tr
-                        key={inv.id}
-                        className={bal.balance > 0 ? 'ds-clickable-row' : undefined}
-                        onClick={() => {
-                          if (bal.balance > 0) {
-                            setShowPayModal(inv.id);
-                            setPayAmountEur((bal.balance / 100).toFixed(2));
-                          }
-                        }}
-                      >
-                        <td style={{ fontWeight: 700 }}>{inv.code}</td>
-                        <td style={{ fontWeight: 600 }}>{cust?.name ?? inv.customerId}</td>
-                        <td style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-                          Émise le {inv.issuedAt}
-                          <br />
-                          Échéance : {inv.dueAt}
-                        </td>
-                        <td className="tabular" style={{ fontWeight: 700 }}>
-                          {(inv.ttcCents / 100).toLocaleString('fr-FR')} €
-                          <div style={{ fontSize: '11px', fontWeight: 400, color: 'var(--color-ink-muted)' }}>
-                            HT : {(inv.htCents / 100).toLocaleString('fr-FR')} €
-                          </div>
-                        </td>
-                        <td style={{ minWidth: '130px' }}>
-                          <div className="ds-bar">
-                            <span style={{ width: `${invPaidPct}%`, background: 'var(--color-forest)' }} />
-                          </div>
-                          <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', marginTop: '3px' }}>
-                            {invPaidPct}% réglé
-                          </div>
-                        </td>
-                        <td className="tabular" style={{ color: 'var(--color-forest)', fontWeight: 600 }}>
-                          {(bal.paid / 100).toLocaleString('fr-FR')} €
-                        </td>
-                        <td
-                          className="tabular"
-                          style={{
-                            fontWeight: 700,
-                            color: bal.balance > 0 ? 'var(--color-crimson)' : 'var(--color-forest)',
-                          }}
-                        >
-                          {(bal.balance / 100).toLocaleString('fr-FR')} €
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            {bal.balance > 0 && (
-                              <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => {
-                                  setShowPayModal(inv.id);
-                                  setPayAmountEur((bal.balance / 100).toFixed(2));
-                                }}
-                              >
-                                Encaisser
-                              </button>
-                            )}
-                            <button
-                              className="btn btn-sm btn-secondary"
-                              onClick={() => {
-                                setShowCreditModal(inv.id);
-                              }}
-                            >
-                              Avoir
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* 5. TRÉSORERIE PRÉVISIONNELLE & PROJET 2027 */}
-          <div className="ds-split ds-rise ds-rise-4">
+          <div className="ds-split">
             {/* Cash Forecast Schedule */}
             <div className="ds-panel">
               <div className="ds-section-head">
@@ -675,96 +476,327 @@ export const FinanceView: React.FC<{
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        <>
+          {/* 3. JAUGES VISUELLES FINANCIÈRES (FACTURATION & RÈGLEMENTS) */}
+          <section className="ds-stats ds-rise ds-rise-2" aria-label="Repères financiers">
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-ink">
+                  <Receipt size={16} />
+                </span>
+                <span>Total facturé TTC</span>
+              </div>
+              <div className="ds-stat-value">
+                {Math.round(financeTotals.ttc / 100).toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">€</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span style={{ width: `${paidPct}%`, background: 'var(--color-forest)' }} />
+              </div>
+              <div className="ds-stat-foot">
+                Sur {invoices.length} facture(s) émise(s)
+              </div>
+            </div>
 
-          {/* Modal Règlement */}
-          {showPayModal && (
-            <div className="modal-backdrop" onClick={() => setShowPayModal(null)}>
-              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                  Enregistrer un règlement reçu
-                </h2>
-                <form onSubmit={handleRecordPayment}>
-                  <div className="form-group">
-                    <label className="form-label">Montant perçu (€ TTC)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      className="form-input"
-                      value={payAmountEur}
-                      onChange={(e) => setPayAmountEur(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Mode de règlement</label>
-                    <select
-                      className="form-select"
-                      value={payMethod}
-                      onChange={(e) => setPayMethod(e.target.value as 'virement-simulé' | 'chèque-simulé')}
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-forest">
+                  <CheckCircle2 size={16} />
+                </span>
+                <span>Déjà encaissé</span>
+              </div>
+              <div className="ds-stat-value" style={{ color: 'var(--color-forest)' }}>
+                {Math.round(financeTotals.paid / 100).toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">€</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span style={{ width: `${paidPct}%`, background: 'var(--color-forest)' }} />
+              </div>
+              <div className="ds-stat-foot">
+                {paidPct}% du montant facturé réglé
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-amber">
+                  <AlertCircle size={16} />
+                </span>
+                <span>Reste à encaisser</span>
+              </div>
+              <div className="ds-stat-value">
+                {Math.round(financeTotals.due / 100).toLocaleString('fr-FR')}
+                <span className="ds-stat-unit">€</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span
+                  style={{
+                    width: `${100 - paidPct}%`,
+                    background: financeTotals.due > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
+                  }}
+                />
+              </div>
+              <div className="ds-stat-foot">
+                {unpaidInvoices.length} facture(s) ouverte(s)
+              </div>
+            </div>
+
+            <div className="ds-stat">
+              <div className="ds-stat-top">
+                <span className="ds-icon-bubble ds-tone-grape">
+                  <TrendingUp size={16} />
+                </span>
+                <span>Livraisons à facturer</span>
+              </div>
+              <div className="ds-stat-value">
+                {unInvoicedShipments.length}
+                <span className="ds-stat-unit">BL</span>
+              </div>
+              <div className="ds-bar" aria-hidden="true">
+                <span
+                  style={{
+                    width: unInvoicedShipments.length > 0 ? '50%' : '100%',
+                    background: unInvoicedShipments.length > 0 ? 'var(--color-amber)' : 'var(--color-forest)',
+                  }}
+                />
+              </div>
+              <div className="ds-stat-foot">
+                {unInvoicedShipments.length > 0 ? 'Prêt à facturer sans double déstockage' : 'Tous les BL sont facturés'}
+              </div>
+            </div>
+          </section>
+
+          {/* 4. TABLEAU DES FACTURES */}
+          <div className="ds-panel ds-rise ds-rise-3">
+            <div className="ds-section-head">
+              <div>
+                <h2 className="ds-section-title">Factures de démonstration</h2>
+                <span className="ds-section-meta">
+                  Émises à partir des bons de livraison effectifs sans double déstockage
+                </span>
+              </div>
+              <span className="badge badge-green">{invoices.length} facture(s)</span>
+            </div>
+
+            {unInvoicedShipments.length > 0 && (
+              <div
+                style={{
+                  marginBottom: '14px',
+                  padding: '12px 14px',
+                  background: 'var(--color-amber-soft)',
+                  border: '1px solid #EED7B5',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+                  ⚡ {unInvoicedShipments.length} livraison(s) expédiée(s) en attente de facturation :
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {unInvoicedShipments.map((s) => (
+                    <button
+                      key={s.id}
+                      className="btn btn-sm btn-primary"
+                      onClick={() => handleCreateInvoice(s.id)}
                     >
-                      <option value="virement-simulé">Virement bancaire (simulé)</option>
-                      <option value="chèque-simulé">Chèque (simulé)</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(null)}>
-                      Annuler
+                      Facturer {s.code}
                     </button>
-                    <button type="submit" className="btn btn-primary">
-                      Valider l’encaissement
-                    </button>
-                  </div>
-                </form>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Modal Avoir */}
-          {showCreditModal && (
-            <div className="modal-backdrop" onClick={() => setShowCreditModal(null)}>
-              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                  Émettre un avoir de démonstration
-                </h2>
-                <form onSubmit={handleCreditNote}>
-                  <div className="form-group">
-                    <label className="form-label">Montant de l’avoir (€ HT)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      className="form-input"
-                      value={creditHtEur}
-                      onChange={(e) => setCreditHtEur(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Motif commercial de l’avoir</label>
-                    <textarea
-                      className="form-textarea"
-                      value={creditReason}
-                      onChange={(e) => setCreditReason(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-                    Note : L’avoir financier ne réintègre aucun stock physique de bouteilles.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowCreditModal(null)}>
-                      Annuler
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      Créer l’avoir
-                    </button>
-                  </div>
-                </form>
-              </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Numéro</th>
+                    <th>Client</th>
+                    <th>Date / Échéance</th>
+                    <th>Total TTC</th>
+                    <th>Progression règlement</th>
+                    <th>Règlements reçus</th>
+                    <th>Solde restant dû</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => {
+                    const cust = state.customers[inv.customerId];
+                    const bal = invoiceBalance(state, inv.id);
+                    const invPaidPct = inv.ttcCents > 0 ? Math.min(100, Math.round((bal.paid / inv.ttcCents) * 100)) : 0;
+                    return (
+                      <tr
+                        key={inv.id}
+                        className={bal.balance > 0 ? 'ds-clickable-row' : undefined}
+                        onClick={() => {
+                          if (bal.balance > 0) {
+                            setShowPayModal(inv.id);
+                            setPayAmountEur((bal.balance / 100).toFixed(2));
+                          }
+                        }}
+                      >
+                        <td style={{ fontWeight: 700 }}>{inv.code}</td>
+                        <td style={{ fontWeight: 600 }}>{cust?.name ?? inv.customerId}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+                          Émise le {inv.issuedAt}
+                          <br />
+                          Échéance : {inv.dueAt}
+                        </td>
+                        <td className="tabular" style={{ fontWeight: 700 }}>
+                          {(inv.ttcCents / 100).toLocaleString('fr-FR')} €
+                          <div style={{ fontSize: '11px', fontWeight: 400, color: 'var(--color-ink-muted)' }}>
+                            HT : {(inv.htCents / 100).toLocaleString('fr-FR')} €
+                          </div>
+                        </td>
+                        <td style={{ minWidth: '130px' }}>
+                          <div className="ds-bar">
+                            <span style={{ width: `${invPaidPct}%`, background: 'var(--color-forest)' }} />
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--color-ink-muted)', marginTop: '3px' }}>
+                            {invPaidPct}% réglé
+                          </div>
+                        </td>
+                        <td className="tabular" style={{ color: 'var(--color-forest)', fontWeight: 600 }}>
+                          {(bal.paid / 100).toLocaleString('fr-FR')} €
+                        </td>
+                        <td
+                          className="tabular"
+                          style={{
+                            fontWeight: 700,
+                            color: bal.balance > 0 ? 'var(--color-crimson)' : 'var(--color-forest)',
+                          }}
+                        >
+                          {(bal.balance / 100).toLocaleString('fr-FR')} €
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            {bal.balance > 0 && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                onClick={() => {
+                                  setShowPayModal(inv.id);
+                                  setPayAmountEur((bal.balance / 100).toFixed(2));
+                                }}
+                              >
+                                Encaisser
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => {
+                                setShowCreditModal(inv.id);
+                              }}
+                            >
+                              Avoir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </>
+      )}
+
+      {/* Modal Règlement (toujours accessible) */}
+      {showPayModal && (
+        <div className="modal-backdrop" onClick={() => setShowPayModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
+              Enregistrer un règlement reçu
+            </h2>
+            <form onSubmit={handleRecordPayment}>
+              <div className="form-group">
+                <label className="form-label">Montant perçu (€ TTC)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  className="form-input"
+                  value={payAmountEur}
+                  onChange={(e) => setPayAmountEur(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mode de règlement</label>
+                <select
+                  className="form-select"
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value as 'virement-simulé' | 'chèque-simulé')}
+                >
+                  <option value="virement-simulé">Virement bancaire (simulé)</option>
+                  <option value="chèque-simulé">Chèque (simulé)</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(null)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Valider l’encaissement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Avoir (toujours accessible) */}
+      {showCreditModal && (
+        <div className="modal-backdrop" onClick={() => setShowCreditModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
+              Émettre un avoir de démonstration
+            </h2>
+            <form onSubmit={handleCreditNote}>
+              <div className="form-group">
+                <label className="form-label">Montant de l’avoir (€ HT)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  className="form-input"
+                  value={creditHtEur}
+                  onChange={(e) => setCreditHtEur(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Motif commercial de l’avoir</label>
+                <textarea
+                  className="form-textarea"
+                  value={creditReason}
+                  onChange={(e) => setCreditReason(e.target.value)}
+                  required
+                />
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
+                Note : L’avoir financier ne réintègre aucun stock physique de bouteilles.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreditModal(null)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Créer l’avoir
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
