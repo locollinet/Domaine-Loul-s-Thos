@@ -21,15 +21,21 @@ export interface SubNavTab<T extends string> {
   alert?: boolean;
 }
 
+/**
+ * Fait défiler doucement jusqu'à la barre d'onglets UNIQUEMENT si elle est sortie
+ * de la zone visible (utile depuis un bouton situé plus bas dans la page).
+ * Ne provoque jamais de recentrage brutal si la barre est déjà visible à l'écran.
+ */
 export function scrollSubNavIntoView(anchorId: string): void {
   setTimeout(() => {
     try {
       const el = document.getElementById(anchorId);
       if (!el || typeof el.getBoundingClientRect !== 'function') return;
-      const top = el.getBoundingClientRect().top;
-      // On ne déplace l'écran que si la barre est masquée en haut ou trop basse sous le pli
-      if (top < 64 || top > window.innerHeight * 0.45) {
-        el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      const rect = el.getBoundingClientRect();
+      const isHiddenAbove = rect.top < 64;
+      const isHiddenBelow = rect.bottom > window.innerHeight - 24;
+      if (isHiddenAbove || isHiddenBelow) {
+        el.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
       }
     } catch {
       // Ignore in test environment
@@ -55,8 +61,8 @@ export function SubNav<T extends string>({
   const listRef = useRef<HTMLDivElement>(null);
 
   const select = (next: T) => {
+    // L'utilisateur vient de cliquer directement sur l'onglet : ne jamais déplacer l'écran sous son curseur.
     onChange(next);
-    scrollSubNavIntoView(id);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

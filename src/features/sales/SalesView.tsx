@@ -15,7 +15,7 @@ import { useModuleConfig } from '../modules/ModuleConfigContext';
 import { AllocationsAndPrimeursPanel } from './AllocationsAndPrimeursPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
-import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+import { SubNav, type SubNavTab } from '../../ui/SubNav';
 import { Modal } from '../../ui/Modal';
 
 type SalesTabId = 'orders' | 'allocations';
@@ -161,11 +161,6 @@ export const SalesView: React.FC<{
   const showAllocationsAddon = isAddonEnabled('allocations');
   const effectiveSubTab: SalesTabId = showAllocationsAddon ? subTab : 'orders';
 
-  const switchSalesTab = (next: SalesTabId) => {
-    setSubTab(next);
-    scrollSubNavIntoView('sales-subnav');
-  };
-
   const handleConvertAllocationToOrder = async (
     customerId: string,
     qty: number,
@@ -307,7 +302,7 @@ export const SalesView: React.FC<{
             : []),
         ] satisfies SubNavTab<SalesTabId>[]}
         active={effectiveSubTab}
-        onChange={switchSalesTab}
+        onChange={setSubTab}
         trailing={
           <>
             <button

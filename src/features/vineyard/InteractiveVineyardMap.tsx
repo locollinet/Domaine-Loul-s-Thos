@@ -275,7 +275,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     });
   }, [items, selectedParcelId, isEditingGpsPin, selectedItem, onSelectParcel, onSetCustomGps]);
 
-  // Smoothly fly to selected parcel when selection or coordinates actually change
+  // Recentrage fluide uniquement si la parcelle sélectionnée est hors du cadre visible (sans zoom brutal)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!isMapAlive(map) || !selectedItem) return;
@@ -286,9 +286,26 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     const hadPreviousTarget = lastCenteredKeyRef.current !== null;
     lastCenteredKeyRef.current = targetKey;
 
-    map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 17), {
-      animate: hadPreviousTarget,
-    });
+    if (!hadPreviousTarget) {
+      map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 16), {
+        animate: false,
+      });
+      return;
+    }
+
+    const currentZoom = map.getZoom();
+    const paddedBounds = map.getBounds().pad(-0.12);
+    const isAlreadyInView = paddedBounds.contains([selectedItem.lat, selectedItem.lng]);
+
+    if (isAlreadyInView && currentZoom >= 15) {
+      return;
+    }
+
+    if (currentZoom < 15) {
+      map.flyTo([selectedItem.lat, selectedItem.lng], 16, { duration: 0.65, easeLinearity: 0.25 });
+    } else {
+      map.panTo([selectedItem.lat, selectedItem.lng], { animate: true, duration: 0.55, easeLinearity: 0.25 });
+    }
   }, [selectedParcelId, selectedItem]);
 
   // Invalidate map size when toggling fullscreen or terrain focus height

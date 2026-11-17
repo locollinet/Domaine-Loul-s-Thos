@@ -699,8 +699,11 @@ export const CellarView: React.FC<{
                     }
                     setTimeout(() => {
                       const el = document.getElementById(lot ? 'cellar-lot-inspector' : 'cellar-container-action-bar');
-                      if (el && typeof el.scrollIntoView === 'function') {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      if (el && typeof el.getBoundingClientRect === 'function' && typeof el.scrollIntoView === 'function') {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top > window.innerHeight - 48 || rect.bottom < 64) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                       }
                     }, 40);
                   }}
@@ -1462,7 +1465,7 @@ export const CellarView: React.FC<{
                 value={correctMeasVal}
                 onChange={(e) => setCorrectMeasVal(e.target.value)}
                 required
-                autoFocus
+                data-autofocus
               />
               <span className="input-unit-cap">{showCorrectMeas.unit}</span>
             </div>
@@ -1595,7 +1598,7 @@ export const CellarView: React.FC<{
               onChange={(e) => setTastingNote(e.target.value)}
               placeholder="Ex : Équilibre frais, fin de fermentation alcoolique à surveiller"
               required
-              autoFocus
+              data-autofocus
             />
           </div>
         </Modal>
@@ -1629,7 +1632,7 @@ export const CellarView: React.FC<{
               value={qualityReason}
               onChange={(e) => setQualityReason(e.target.value)}
               required
-              autoFocus
+              data-autofocus
             />
           </div>
         </Modal>

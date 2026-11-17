@@ -1283,7 +1283,7 @@ export const VineyardView: React.FC<{
         ariaLabel="Espaces de travail Vignoble et Récolte"
         tabs={vineyardTabs}
         active={effectiveView}
-        onChange={switchVineyardView}
+        onChange={setActiveView}
       />
 
       {/* =====================================================================
@@ -3112,7 +3112,7 @@ export const VineyardView: React.FC<{
                 value={countQuantity}
                 onChange={(e) => setCountQuantity(e.target.value)}
                 required
-                autoFocus
+                data-autofocus
               />
               <span className="input-unit-cap">caisses</span>
             </div>
@@ -3309,7 +3309,7 @@ export const VineyardView: React.FC<{
               onChange={(e) => setObsText(e.target.value)}
               placeholder="Ex : État sanitaire irréprochable, pellicules croquantes, pépins bruns..."
               required
-              autoFocus
+              data-autofocus
             />
           </div>
           <div className="form-grid-3">

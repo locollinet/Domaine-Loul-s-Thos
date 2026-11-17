@@ -197,7 +197,7 @@ export const BottlingView: React.FC<{
             : []),
         ] satisfies SubNavTab<BottlingTabId>[]}
         active={effectiveSubTab}
-        onChange={(next) => switchBottlingTab(next)}
+        onChange={(next) => setSubTab(next)}
         trailing={
           <button
             type="button"

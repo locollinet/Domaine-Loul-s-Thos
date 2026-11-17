@@ -576,8 +576,11 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
                           setSelectedSlotId(slot.id);
                           setTimeout(() => {
                             const el = document.getElementById('bottle-slot-inspector');
-                            if (el && typeof el.scrollIntoView === 'function') {
-                              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            if (el && typeof el.getBoundingClientRect === 'function' && typeof el.scrollIntoView === 'function') {
+                              const rect = el.getBoundingClientRect();
+                              if (rect.top > window.innerHeight - 48 || rect.bottom < 64) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                              }
                             }
                           }, 40);
                         }}

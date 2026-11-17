@@ -61,10 +61,12 @@ const AppInner: React.FC = () => {
   const [showModuleConfigurator, setShowModuleConfigurator] = useState<boolean>(false);
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
-  // Remonter automatiquement en haut de l'écran lors d'un changement d'onglet principal
+  // Remonter doucement en haut uniquement si l'utilisateur était défilé plus bas
   useEffect(() => {
     try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.scrollY > 24) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch {
       // Ignore in test environment
     }

@@ -267,7 +267,7 @@ export const FinanceView: React.FC<{
         ariaLabel="Espaces Pilotage, DRM Douanes et Horizon 2027"
         tabs={financeTabs}
         active={effectiveSubTab}
-        onChange={switchFinanceTab}
+        onChange={setSubTab}
       />
 
       {effectiveSubTab === 'drm' && showDrmAddon ? (

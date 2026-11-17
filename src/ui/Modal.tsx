@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 export interface ModalProps {
@@ -30,6 +30,8 @@ export const Modal: React.FC<ModalProps> = ({
   footerNote,
   children,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -40,6 +42,14 @@ export const Modal: React.FC<ModalProps> = ({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    // Focus sans provoquer de défilement brutal de l'arrière-plan sous Safari
+    const target = dialogRef.current?.querySelector<HTMLElement>('[data-autofocus]');
+    if (target && typeof target.focus === 'function') {
+      target.focus({ preventScroll: true });
+    }
+  }, []);
 
   const bodyAndFooter = (
     <>
@@ -58,6 +68,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div
+        ref={dialogRef}
         className="modal-content ds-modal"
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
