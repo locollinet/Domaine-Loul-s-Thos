@@ -16,6 +16,7 @@ import { AllocationsAndPrimeursPanel } from './AllocationsAndPrimeursPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+import { Modal } from '../../ui/Modal';
 
 type SalesTabId = 'orders' | 'allocations';
 
@@ -666,187 +667,217 @@ export const SalesView: React.FC<{
       )}
 
       {/* Modal Créer Commande / Devis (accessible depuis tout sous-onglet) */}
-      {showOrderModal && (
-            <div className="modal-backdrop" onClick={() => setShowOrderModal(false)}>
-              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                  Créer un devis ou une commande ferme
-                </h2>
-                <form onSubmit={handleCreateOrder}>
-                  <div className="form-group">
-                    <label className="form-label">Client</label>
-                    <select
-                      className="form-select"
-                      value={selectedCustId}
-                      onChange={(e) => setSelectedCustId(e.target.value)}
-                    >
-                      {Object.values(state.customers).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.kind === 'b2b' ? 'B2B' : 'Particulier'}) — {c.city}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+      {showOrderModal && (() => {
+        const totalHt = (parseFloat(orderQty) || 0) * (parseFloat(orderPriceEur) || 0);
+        return (
+          <Modal
+            eyebrow="Ventes & Réservations"
+            title="Créer un devis ou une commande ferme"
+            subtitle="Une commande ferme protège immédiatement le stock disponible contre la survente."
+            onClose={() => setShowOrderModal(false)}
+            onSubmit={handleCreateOrder}
+            maxWidth="580px"
+            footerNote={
+              <span>
+                Total estimé : <strong className="tabular" style={{ color: 'var(--color-forest)' }}>{totalHt.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</strong>
+              </span>
+            }
+            footer={
+              <>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {asQuote ? 'Créer le devis' : 'Confirmer et réserver le stock'}
+                </button>
+              </>
+            }
+          >
+            <div className="form-group">
+              <label className="form-label">Client</label>
+              <select
+                className="form-select"
+                value={selectedCustId}
+                onChange={(e) => setSelectedCustId(e.target.value)}
+              >
+                {Object.values(state.customers).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.kind === 'b2b' ? 'B2B' : 'Particulier'}) — {c.city}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Lot de bouteilles commandé</label>
-                    <select
-                      className="form-select"
-                      value={activeBatchId}
-                      onChange={(e) => {
-                        setSelectedBatchId(e.target.value);
-                        const b = state.batches[e.target.value];
-                        if (b) {
-                          const price = state.priceList[b.skuId] ?? 2000;
-                          setOrderPriceEur(String(price / 100));
-                        }
-                      }}
-                    >
-                      {batches.map((b) => {
-                        const pos = batchPosition(state, b);
-                        return (
-                          <option key={b.id} value={b.id}>
-                            {b.code} · {state.skus[b.skuId]?.label} ({pos.available} dispo)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+            <div className="form-group">
+              <label className="form-label">Lot de bouteilles commandé</label>
+              <select
+                className="form-select"
+                value={activeBatchId}
+                onChange={(e) => {
+                  setSelectedBatchId(e.target.value);
+                  const b = state.batches[e.target.value];
+                  if (b) {
+                    const price = state.priceList[b.skuId] ?? 2000;
+                    setOrderPriceEur(String(price / 100));
+                  }
+                }}
+              >
+                {batches.map((b) => {
+                  const pos = batchPosition(state, b);
+                  return (
+                    <option key={b.id} value={b.id}>
+                      {b.code} · {state.skus[b.skuId]?.label} ({pos.available} dispo)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
 
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Quantité de bouteilles</label>
-                      <input
-                        type="number"
-                        min="1"
-                        className="form-input"
-                        value={orderQty}
-                        onChange={(e) => setOrderQty(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Prix unitaire HT (€)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="form-input"
-                        value={orderPriceEur}
-                        onChange={(e) => setOrderPriceEur(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="checkbox"
-                      id="asQuoteCheck"
-                      checked={asQuote}
-                      onChange={(e) => setAsQuote(e.target.checked)}
-                    />
-                    <label htmlFor="asQuoteCheck" style={{ fontSize: '13px' }}>
-                      Enregistrer comme <strong>simple devis</strong> (aucune réservation de stock)
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowOrderModal(false)}>
-                      Annuler
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      {asQuote ? 'Créer le devis' : 'Confirmer et réserver le stock'}
-                    </button>
-                  </div>
-                </form>
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">Quantité de bouteilles</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input tabular"
+                    value={orderQty}
+                    onChange={(e) => setOrderQty(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">cols</span>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Prix unitaire</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="form-input tabular"
+                    value={orderPriceEur}
+                    onChange={(e) => setOrderPriceEur(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">€ HT</span>
+                </div>
               </div>
             </div>
-          )}
+
+            <label
+              htmlFor="asQuoteCheck"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                background: 'var(--color-surface-soft)',
+                borderRadius: '10px',
+                border: '1px solid var(--color-border)',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              <input
+                type="checkbox"
+                id="asQuoteCheck"
+                checked={asQuote}
+                onChange={(e) => setAsQuote(e.target.checked)}
+              />
+              <span>
+                Enregistrer comme <strong>simple devis</strong> (aucune réservation de stock)
+              </span>
+            </label>
+          </Modal>
+        );
+      })()}
 
           {/* Modal Livraison */}
           {showShipModal && (() => {
             const shippingOrder = state.orders[showShipModal];
             const shippingLine = shippingOrder?.lines.find((l) => l.id === shipLineId) ?? shippingOrder?.lines[0];
             return (
-              <div className="modal-backdrop" onClick={() => setShowShipModal(null)}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                    Expédition & Bon de livraison
-                  </h2>
-                  <form onSubmit={handleShipOrder}>
-                    {ordersToShip.length > 0 && (
-                      <div className="form-group">
-                        <label className="form-label">Commande à expédier</label>
-                        <select
-                          className="form-select"
-                          value={showShipModal}
-                          onChange={(e) => {
-                            const nextOrd = state.orders[e.target.value];
-                            setShowShipModal(e.target.value);
-                            const nextLine = nextOrd?.lines.find((l) => l.reserved > 0) ?? nextOrd?.lines[0];
-                            setShipLineId(nextLine?.id ?? '');
-                            setShipQty(String(nextLine?.reserved ?? 0));
-                          }}
-                        >
-                          {ordersToShip.map((o) => {
-                            const cust = state.customers[o.customerId];
-                            const rem = o.lines.reduce((s, l) => s + l.reserved, 0);
-                            return (
-                              <option key={o.id} value={o.id}>
-                                {o.code} · {cust?.name ?? o.customerId} ({rem} cols réservés)
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-                    {shippingOrder && shippingOrder.lines.length > 1 && (
-                      <div className="form-group">
-                        <label className="form-label">Ligne de commande</label>
-                        <select
-                          className="form-select"
-                          value={shippingLine?.id ?? ''}
-                          onChange={(e) => {
-                            const nextLine = shippingOrder.lines.find((l) => l.id === e.target.value);
-                            setShipLineId(e.target.value);
-                            setShipQty(String(nextLine?.reserved ?? 0));
-                          }}
-                        >
-                          {shippingOrder.lines.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {state.skus[l.skuId]?.label ?? l.skuId} ({l.reserved} réservés)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="form-group">
-                      <label className="form-label">Quantité livrée</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={shippingLine?.reserved || undefined}
-                        className="form-input"
-                        value={shipQty}
-                        onChange={(e) => setShipQty(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '16px' }}>
-                      Cette opération déstocke immédiatement le stock physique et solde la réservation correspondante.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <button type="button" className="btn btn-secondary" onClick={() => setShowShipModal(null)}>
-                        Annuler
-                      </button>
-                      <button type="submit" className="btn btn-primary">
-                        Valider l’expédition
-                      </button>
-                    </div>
-                  </form>
+              <Modal
+                eyebrow="Expédition & Logistique"
+                title="Expédition & Bon de livraison"
+                subtitle="Cette opération déstocke immédiatement le stock physique et solde la réservation correspondante."
+                onClose={() => setShowShipModal(null)}
+                onSubmit={handleShipOrder}
+                maxWidth="540px"
+                footer={
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowShipModal(null)}>
+                      Annuler
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Valider l’expédition
+                    </button>
+                  </>
+                }
+              >
+                {ordersToShip.length > 0 && (
+                  <div className="form-group">
+                    <label className="form-label">Commande à expédier</label>
+                    <select
+                      className="form-select"
+                      value={showShipModal}
+                      onChange={(e) => {
+                        const nextOrd = state.orders[e.target.value];
+                        setShowShipModal(e.target.value);
+                        const nextLine = nextOrd?.lines.find((l) => l.reserved > 0) ?? nextOrd?.lines[0];
+                        setShipLineId(nextLine?.id ?? '');
+                        setShipQty(String(nextLine?.reserved ?? 0));
+                      }}
+                    >
+                      {ordersToShip.map((o) => {
+                        const cust = state.customers[o.customerId];
+                        const rem = o.lines.reduce((s, l) => s + l.reserved, 0);
+                        return (
+                          <option key={o.id} value={o.id}>
+                            {o.code} · {cust?.name ?? o.customerId} ({rem} cols réservés)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+                {shippingOrder && shippingOrder.lines.length > 1 && (
+                  <div className="form-group">
+                    <label className="form-label">Ligne de commande</label>
+                    <select
+                      className="form-select"
+                      value={shippingLine?.id ?? ''}
+                      onChange={(e) => {
+                        const nextLine = shippingOrder.lines.find((l) => l.id === e.target.value);
+                        setShipLineId(e.target.value);
+                        setShipQty(String(nextLine?.reserved ?? 0));
+                      }}
+                    >
+                      {shippingOrder.lines.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {state.skus[l.skuId]?.label ?? l.skuId} ({l.reserved} réservés)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Quantité livrée</label>
+                  <div className="input-with-unit">
+                    <input
+                      type="number"
+                      min="1"
+                      max={shippingLine?.reserved || undefined}
+                      className="form-input tabular"
+                      value={shipQty}
+                      onChange={(e) => setShipQty(e.target.value)}
+                      required
+                    />
+                    <span className="input-unit-cap">cols</span>
+                  </div>
                 </div>
-              </div>
+              </Modal>
             );
           })()}
 
@@ -854,86 +885,91 @@ export const SalesView: React.FC<{
           {showReturnModal && (() => {
             const retShipment = state.shipments[showReturnModal];
             return (
-              <div className="modal-backdrop" onClick={() => setShowReturnModal(null)}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                    Enregistrer un retour client en quarantaine
-                  </h2>
-                  <form onSubmit={handleReturnReceive}>
-                    {shipments.length > 0 && (
-                      <div className="form-group">
-                        <label className="form-label">Bon de livraison concerné</label>
-                        <select
-                          className="form-select"
-                          value={showReturnModal}
-                          onChange={(e) => {
-                            const nextShip = state.shipments[e.target.value];
-                            setShowReturnModal(e.target.value);
-                            setReturnBatchId(nextShip?.lines[0]?.batchId ?? '');
-                          }}
-                        >
-                          {shipments.map((s) => {
-                            const ord = state.orders[s.orderId];
-                            const cust = ord ? state.customers[ord.customerId] : undefined;
-                            return (
-                              <option key={s.id} value={s.id}>
-                                {s.code} · {cust?.name ?? ord?.code ?? s.orderId}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-                    {retShipment && retShipment.lines.length > 1 && (
-                      <div className="form-group">
-                        <label className="form-label">Lot retourné</label>
-                        <select
-                          className="form-select"
-                          value={returnBatchId}
-                          onChange={(e) => setReturnBatchId(e.target.value)}
-                        >
-                          {retShipment.lines.map((l) => {
-                            const b = state.batches[l.batchId];
-                            return (
-                              <option key={l.batchId} value={l.batchId}>
-                                {b?.code ?? l.batchId} ({l.quantity} livrés)
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-                    <div className="form-group">
-                      <label className="form-label">Nombre de bouteilles retournées</label>
-                      <input
-                        type="number"
-                        min="1"
-                        className="form-input"
-                        value={returnQty}
-                        onChange={(e) => setReturnQty(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Motif du retour</label>
-                      <textarea
-                        className="form-textarea"
-                        value={returnReason}
-                        onChange={(e) => setReturnReason(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <button type="button" className="btn btn-secondary" onClick={() => setShowReturnModal(null)}>
-                        Annuler
-                      </button>
-                      <button type="submit" className="btn btn-accent">
-                        Placer en quarantaine
-                      </button>
-                    </div>
-                  </form>
+              <Modal
+                eyebrow="Qualité & Retours"
+                title="Enregistrer un retour client en quarantaine"
+                subtitle="Les bouteilles retournées sont isolées en quarantaine avant décision de remise en stock ou rebut."
+                onClose={() => setShowReturnModal(null)}
+                onSubmit={handleReturnReceive}
+                maxWidth="540px"
+                footer={
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowReturnModal(null)}>
+                      Annuler
+                    </button>
+                    <button type="submit" className="btn btn-accent">
+                      Placer en quarantaine
+                    </button>
+                  </>
+                }
+              >
+                {shipments.length > 0 && (
+                  <div className="form-group">
+                    <label className="form-label">Bon de livraison concerné</label>
+                    <select
+                      className="form-select"
+                      value={showReturnModal}
+                      onChange={(e) => {
+                        const nextShip = state.shipments[e.target.value];
+                        setShowReturnModal(e.target.value);
+                        setReturnBatchId(nextShip?.lines[0]?.batchId ?? '');
+                      }}
+                    >
+                      {shipments.map((s) => {
+                        const ord = state.orders[s.orderId];
+                        const cust = ord ? state.customers[ord.customerId] : undefined;
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {s.code} · {cust?.name ?? ord?.code ?? s.orderId}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+                {retShipment && retShipment.lines.length > 1 && (
+                  <div className="form-group">
+                    <label className="form-label">Lot retourné</label>
+                    <select
+                      className="form-select"
+                      value={returnBatchId}
+                      onChange={(e) => setReturnBatchId(e.target.value)}
+                    >
+                      {retShipment.lines.map((l) => {
+                        const b = state.batches[l.batchId];
+                        return (
+                          <option key={l.batchId} value={l.batchId}>
+                            {b?.code ?? l.batchId} ({l.quantity} livrés)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">Nombre de bouteilles retournées</label>
+                  <div className="input-with-unit">
+                    <input
+                      type="number"
+                      min="1"
+                      className="form-input tabular"
+                      value={returnQty}
+                      onChange={(e) => setReturnQty(e.target.value)}
+                      required
+                    />
+                    <span className="input-unit-cap">cols</span>
+                  </div>
                 </div>
-              </div>
+                <div className="form-group">
+                  <label className="form-label">Motif du retour</label>
+                  <textarea
+                    className="form-textarea"
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    required
+                  />
+                </div>
+              </Modal>
             );
           })()}
     </div>

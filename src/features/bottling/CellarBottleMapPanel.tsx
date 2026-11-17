@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Package, Plus, Scissors, Building2 } from 'lucide-react';
 import type { BottlingBatch, Sku, DomainState } from '../../domain/types';
 import { batchPosition } from '../../domain/selectors';
+import { Modal } from '../../ui/Modal';
 
 export type SaleUrgencyLevel = 'urgent' | 'high' | 'resting' | 'oenotheque';
 
@@ -901,148 +902,149 @@ export const CellarBottleMapPanel: React.FC<CellarBottleMapPanelProps> = ({
 
       {/* Modale 1 : Ajouter une Zone / Bâtiment ou un Palox / Travée sur-mesure */}
       {showAddStructureModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddStructureModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, fontSize: '20px' }}>
-              Configurer l’Architecture de votre Chai à Bouteilles / Entrepôt
-            </h3>
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Adaptez les zones et les travées à la topologie exacte du domaine (Cave voûtée, bâtiment climatisé, entrepôt logistique déporté, palox 500 ou 600 cols).
-            </p>
-            <form onSubmit={handleAddCustomStructure}>
-              <div className="form-group">
-                <label className="form-label">Nouvelle Zone / Bâtiment de stockage</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newZoneName}
-                  onChange={(e) => setNewZoneName(e.target.value)}
-                  placeholder="Ex: Zone E · Entrepôt Climatisé Beaune (13°C)"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Nouvelle Allée / Travée / Palox / Alvéole</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newRackName}
-                  onChange={(e) => setNewRackName(e.target.value)}
-                  placeholder="Ex: Entrepôt Beaune · Allée 1 · Palox #E-01"
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowAddStructureModal(false)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <Plus size={14} />
-                  <span>Ajouter au plan de cave</span>
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Plan de cave à bouteilles"
+          title="Configurer l’architecture de stockage"
+          subtitle="Adaptez les zones et les travées à la topologie exacte du domaine (Cave voûtée, bâtiment climatisé, entrepôt logistique déporté, palox)."
+          onClose={() => setShowAddStructureModal(false)}
+          onSubmit={handleAddCustomStructure}
+          maxWidth="580px"
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAddStructureModal(false)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                <Plus size={14} />
+                <span>Ajouter au plan de cave</span>
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Nouvelle Zone / Bâtiment de stockage</label>
+            <input
+              type="text"
+              className="form-input"
+              value={newZoneName}
+              onChange={(e) => setNewZoneName(e.target.value)}
+              placeholder="Ex: Zone E · Entrepôt Climatisé Beaune (13°C)"
+            />
           </div>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Nouvelle Allée / Travée / Palox / Alvéole</label>
+            <input
+              type="text"
+              className="form-input"
+              value={newRackName}
+              onChange={(e) => setNewRackName(e.target.value)}
+              placeholder="Ex: Entrepôt Beaune · Allée 1 · Palox #E-01"
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modale 2 : Scinder (Split) un lot sur un autre emplacement simultané */}
       {splitTargetSlot && (
-        <div className="modal-backdrop" onClick={() => setSplitTargetSlot(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0, fontSize: '20px' }}>
-              Scinder / Répartir le lot {splitTargetSlot.batchCode} ({splitTargetSlot.cuveeLabel})
-            </h3>
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Transférez une partie des <strong>{splitTargetSlot.availableBottles} bouteilles</strong> disponibles de{' '}
-              <code>{splitTargetSlot.rackCode}</code> vers un second emplacement (ex: habillage partiel sur palette ou réassort caveau) tout en conservant le solde dans le palox d’origine.
-            </p>
-            <form onSubmit={handleExecuteSplit}>
-              <div className="form-group">
-                <label className="form-label">
-                  Quantité à prélever et déplacer (max {splitTargetSlot.availableBottles - 1} cols)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={splitTargetSlot.availableBottles - 1}
-                  className="form-input tabular"
-                  value={splitQty}
-                  onChange={(e) => setSplitQty(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Zone de destination</label>
-                <select
-                  className="form-select"
-                  value={splitDestZone}
-                  onChange={(e) => setSplitDestZone(e.target.value)}
-                >
-                  {zones.map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Emplacement précis (Palox / Palette / Casier)</label>
-                <select
-                  className="form-select"
-                  value={splitDestRack}
-                  onChange={(e) => setSplitDestRack(e.target.value)}
-                >
-                  {racks.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">État d’habillage de la fraction déplacée</label>
-                <select
-                  className="form-select"
-                  value={splitDressing}
-                  onChange={(e) =>
-                    setSplitDressing(e.target.value as BottleSlotRecord['dressingState'])
-                  }
-                >
-                  <option value="Habillé CRD France (Cartons de 6)">
-                    Habillé CRD France (Cartons de 6)
-                  </option>
-                  <option value="Habillé Export Neutre (Cartons)">
-                    Habillé Export Neutre (Cartons)
-                  </option>
-                  <option value="Caisse Bois Origine (CBO)">Caisse Bois Origine (CBO)</option>
-                  <option value="Tiré-Bouché Nu (Palox Fil 600 cols)">
-                    Tiré-Bouché Nu (Palox Fil 600 cols)
-                  </option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setSplitTargetSlot(null)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <Scissors size={14} />
-                  <span>Valider la répartition multi-emplacements</span>
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Répartition multi-emplacements"
+          title={`Scinder le lot ${splitTargetSlot.batchCode} (${splitTargetSlot.cuveeLabel})`}
+          subtitle={`Transférez une fraction des ${splitTargetSlot.availableBottles} bouteilles disponibles de ${splitTargetSlot.rackCode} vers un second emplacement.`}
+          onClose={() => setSplitTargetSlot(null)}
+          onSubmit={handleExecuteSplit}
+          maxWidth="580px"
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setSplitTargetSlot(null)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                <Scissors size={14} />
+                <span>Valider la répartition multi-emplacements</span>
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">
+              Quantité à prélever et déplacer (max {splitTargetSlot.availableBottles - 1} cols)
+            </label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                min={1}
+                max={splitTargetSlot.availableBottles - 1}
+                className="form-input tabular"
+                value={splitQty}
+                onChange={(e) => setSplitQty(e.target.value)}
+                required
+              />
+              <span className="input-unit-cap">cols</span>
+            </div>
           </div>
-        </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Zone de destination</label>
+              <select
+                className="form-select"
+                value={splitDestZone}
+                onChange={(e) => setSplitDestZone(e.target.value)}
+              >
+                {zones.map((z) => (
+                  <option key={z} value={z}>
+                    {z}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Emplacement précis (Palox / Palette)</label>
+              <select
+                className="form-select"
+                value={splitDestRack}
+                onChange={(e) => setSplitDestRack(e.target.value)}
+              >
+                {racks.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">État d’habillage de la fraction déplacée</label>
+            <select
+              className="form-select"
+              value={splitDressing}
+              onChange={(e) =>
+                setSplitDressing(e.target.value as BottleSlotRecord['dressingState'])
+              }
+            >
+              <option value="Habillé CRD France (Cartons de 6)">
+                Habillé CRD France (Cartons de 6)
+              </option>
+              <option value="Habillé Export Neutre (Cartons)">
+                Habillé Export Neutre (Cartons)
+              </option>
+              <option value="Caisse Bois Origine (CBO)">Caisse Bois Origine (CBO)</option>
+              <option value="Tiré-Bouché Nu (Palox Fil 600 cols)">
+                Tiré-Bouché Nu (Palox Fil 600 cols)
+              </option>
+            </select>
+          </div>
+        </Modal>
       )}
     </div>
   );

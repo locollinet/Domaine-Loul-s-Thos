@@ -32,8 +32,30 @@ describe('App & UI Navigation (L0 - L7)', () => {
     // Navigate to Vignoble & Récolte
     fireEvent.click(screen.getByRole('button', { name: /Vignoble & Récolte/i }));
     expect(screen.getByText(/Carte Satellite Interactive, Cadastre IGN & GPS Terrain/i)).toBeInTheDocument();
+    expect(screen.getByText(/À vendanger aujourd’hui/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /🗺️ Vue Carte & GPS/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /📖 Vue Livret & Vendanges/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /📅 Planning & Vendanges/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /⚖️ Quai & Pesées/i })).toBeInTheDocument();
+
+    // Toggle Vue Terrain and confirm tabs + sidebar remain stable (no separate window)
+    fireEvent.click(screen.getByRole('button', { name: /Vue Terrain/i }));
+    expect(screen.getByRole('button', { name: /Vue Terrain Active/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /⚖️ Quai & Pesées/i })).toBeInTheDocument();
+    expect(screen.getByText(/Trois Coteaux/i)).toBeInTheDocument();
+
+    // Switch to Planning & Vendanges and check mission counting as vineyard_manager
+    const roleSelect = screen.getByLabelText(/Rôle prévisualisé/i);
+    fireEvent.change(roleSelect, { target: { value: 'vineyard_manager' } });
+    fireEvent.click(screen.getByRole('button', { name: /📅 Planning & Vendanges/i }));
+    expect(screen.getByText(/Pilotage des Parcelles à Vendanger/i)).toBeInTheDocument();
+    const countMissionBtns = screen.getAllByRole('button', { name: /Compter \(Mission\)/i });
+    expect(countMissionBtns.length).toBeGreaterThan(0);
+    fireEvent.click(countMissionBtns[0]!);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Ajouter un comptage/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Fermer la fenêtre/i }));
+    fireEvent.change(roleSelect, { target: { value: 'cellar_master' } });
 
     // Switch to Livret Parcellaire Numérique
     fireEvent.click(screen.getByRole('button', { name: /📖 Vue Livret & Vendanges/i }));
@@ -44,6 +66,16 @@ describe('App & UI Navigation (L0 - L7)', () => {
     // Cross-navigate back to Cadastre & GPS
     fireEvent.click(screen.getAllByRole('button', { name: /Localiser sur Cadastre & GPS/i })[0]!);
     expect(screen.getByText(/Carte Satellite Interactive, Cadastre IGN & GPS Terrain/i)).toBeInTheDocument();
+
+    // Navigate to Matières sèches & Achats and check upgraded PO modal
+    fireEvent.click(screen.getByRole('button', { name: /Matières sèches & Achats/i }));
+    const commanderBtns = screen.getAllByRole('button', { name: /\+ Commander/i });
+    fireEvent.click(commanderBtns[0]!);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Nouvelle commande fournisseur/i)).toBeInTheDocument();
+    expect(screen.getByText(/Total estimé/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Fermer la fenêtre/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     // Navigate to Chai & Vinification
     fireEvent.click(screen.getByRole('button', { name: /Chai & Vinification/i }));

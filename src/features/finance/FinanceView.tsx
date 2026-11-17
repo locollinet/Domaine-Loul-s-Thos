@@ -15,6 +15,7 @@ import { CustomsDrmPanel } from './CustomsDrmPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+import { Modal } from '../../ui/Modal';
 
 type FinanceTabId = 'finance' | 'drm' | 'horizon_2027';
 
@@ -712,91 +713,100 @@ export const FinanceView: React.FC<{
 
       {/* Modal Règlement (toujours accessible) */}
       {showPayModal && (
-        <div className="modal-backdrop" onClick={() => setShowPayModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Enregistrer un règlement reçu
-            </h2>
-            <form onSubmit={handleRecordPayment}>
-              <div className="form-group">
-                <label className="form-label">Montant perçu (€ TTC)</label>
+        <Modal
+          eyebrow="Trésorerie & Facturation"
+          title="Enregistrer un règlement reçu"
+          subtitle="Rattachement du paiement client à la facture sélectionnée."
+          onClose={() => setShowPayModal(null)}
+          onSubmit={handleRecordPayment}
+          maxWidth="500px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Valider l’encaissement
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Montant perçu</label>
+              <div className="input-with-unit">
                 <input
                   type="number"
                   step="0.01"
                   min="0.01"
-                  className="form-input"
+                  className="form-input tabular"
                   value={payAmountEur}
                   onChange={(e) => setPayAmountEur(e.target.value)}
                   required
                 />
+                <span className="input-unit-cap">€ TTC</span>
               </div>
-              <div className="form-group">
-                <label className="form-label">Mode de règlement</label>
-                <select
-                  className="form-select"
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as 'virement-simulé' | 'chèque-simulé')}
-                >
-                  <option value="virement-simulé">Virement bancaire (simulé)</option>
-                  <option value="chèque-simulé">Chèque (simulé)</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Valider l’encaissement
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Mode de règlement</label>
+              <select
+                className="form-select"
+                value={payMethod}
+                onChange={(e) => setPayMethod(e.target.value as 'virement-simulé' | 'chèque-simulé')}
+              >
+                <option value="virement-simulé">Virement bancaire (simulé)</option>
+                <option value="chèque-simulé">Chèque (simulé)</option>
+              </select>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal Avoir (toujours accessible) */}
       {showCreditModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreditModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Émettre un avoir de démonstration
-            </h2>
-            <form onSubmit={handleCreditNote}>
-              <div className="form-group">
-                <label className="form-label">Montant de l’avoir (€ HT)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="form-input"
-                  value={creditHtEur}
-                  onChange={(e) => setCreditHtEur(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Motif commercial de l’avoir</label>
-                <textarea
-                  className="form-textarea"
-                  value={creditReason}
-                  onChange={(e) => setCreditReason(e.target.value)}
-                  required
-                />
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-                Note : L’avoir financier ne réintègre aucun stock physique de bouteilles.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreditModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Créer l’avoir
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Facturation client"
+          title="Émettre un avoir de démonstration"
+          subtitle="L’avoir financier ajuste le solde comptable sans réintégrer de stock physique."
+          onClose={() => setShowCreditModal(null)}
+          onSubmit={handleCreditNote}
+          maxWidth="520px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCreditModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Créer l’avoir
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Montant de l’avoir</label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="form-input tabular"
+                value={creditHtEur}
+                onChange={(e) => setCreditHtEur(e.target.value)}
+                required
+              />
+              <span className="input-unit-cap">€ HT</span>
+            </div>
           </div>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Motif commercial de l’avoir</label>
+            <textarea
+              className="form-textarea"
+              value={creditReason}
+              onChange={(e) => setCreditReason(e.target.value)}
+              required
+            />
+          </div>
+        </Modal>
       )}
     </div>
   );

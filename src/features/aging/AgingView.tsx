@@ -13,6 +13,7 @@ import { previewBlend } from '../../domain/commands/cellar';
 import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { Modal } from '../../ui/Modal';
 
 export const AgingView: React.FC<{
   prefill?: Extract<AssistantPrefillPayload, { tab: 'aging' }>;
@@ -638,143 +639,15 @@ export const AgingView: React.FC<{
 
       {/* Modal Assemblage (Essai & Exécution) */}
       {showBlendModal && (
-        <div className="modal-backdrop" onClick={() => setShowBlendModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
-                Assemblage des lots 2025
-              </h2>
-              <span className="badge badge-green">Simulateur & Exécution atomique</span>
-            </div>
-
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '16px' }}>
-              Cet écran permet d’abord de <strong>prévisualiser l’essai</strong> sans consommer aucune goutte de stock, puis de déclencher l’opération réelle.
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Nom du lot enfant résultant</label>
-              <input
-                type="text"
-                className="form-input"
-                value={blendName}
-                onChange={(e) => setBlendName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Contenant de destination (cuve vide disponible)</label>
-              {availableContainers.length <= 1 ? (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    background: 'var(--color-surface-soft)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    color: 'var(--color-ink)',
-                  }}
-                >
-                  {availableContainers[0]
-                    ? `${availableContainers[0].code} · ${availableContainers[0].location} (Capacité ${availableContainers[0].capacityMl / 1000} L)`
-                    : 'Aucune cuve disponible'}
-                </div>
-              ) : (
-                <select
-                  className="form-select"
-                  value={effectiveDestContainerId}
-                  onChange={(e) => setDestContainerId(e.target.value)}
-                >
-                  {availableContainers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code} · {c.location} (Capacité {c.capacityMl / 1000} L)
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '14px', marginBottom: '16px', background: 'var(--color-surface-soft)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700 }}>
-                  Proportions de l’assemblage (entrées)
-                </span>
-                <span className="badge badge-grape tabular">
-                  {pctA}% {lotA?.name ?? 'Hauts Rangs'} · {pctB}% {lotB?.name ?? 'Combe Claire'}
-                </span>
-              </div>
-
-              {/* Barre visuelle de répartition entre les 2 cuvées */}
-              <div className="ds-bar" style={{ height: '10px', marginBottom: '12px' }} aria-hidden="true">
-                <span style={{ width: `${pctA}%`, background: 'var(--color-grape)' }} />
-                <span style={{ width: `${pctB}%`, background: 'var(--color-gold-dark)' }} />
-              </div>
-
-              <div className="grid-2">
-                <div>
-                  <label className="form-label">
-                    {lotA?.code ?? 'L25-R-A'} ({lotA?.name ?? 'Hauts Rangs'}) — en {contA?.code ?? '—'} ({availALitres} L dispo)
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      max={availALitres || undefined}
-                      className="form-input"
-                      value={inputA_vol}
-                      onChange={(e) => setInputA_vol(e.target.value)}
-                    />
-                    <span>L</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">
-                    {lotB?.code ?? 'L25-R-B'} ({lotB?.name ?? 'Combe Claire'}) — en {contB?.code ?? '—'} ({availBLitres} L dispo)
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      max={availBLitres || undefined}
-                      className="form-input"
-                      value={inputB_vol}
-                      onChange={(e) => setInputB_vol(e.target.value)}
-                    />
-                    <span>L</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Trial calculation output */}
-            {blendPreviewData && (
-              <div style={{ border: '1px solid #C2DCC8', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--color-forest-soft)', marginBottom: '16px' }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--color-forest)', marginBottom: '6px' }}>
-                  ✓ Résultat de la simulation d’essai
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
-                  Volume total assemblé : <strong>{blendPreviewData.totalMl / 1000} L</strong> (dans {state.containers[effectiveDestContainerId]?.code ?? '—'})
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
-                  Coût connu alloué au lot enfant : <strong>{(blendPreviewData.cost.knownCents / 100).toLocaleString('fr-FR')} €</strong>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
-                  Reliquats conservés : L25-R-A aura {300000 / 1000} L (400 €) · L25-R-B aura {200000 / 1000} L (300 €)
-                </div>
-              </div>
-            )}
-
-            {blendPreviewError && (
-              <div className="alert alert-error">
-                {blendPreviewError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <Modal
+          eyebrow="Élevage & Assemblage"
+          badge={<span className="badge badge-green">Simulateur & Exécution atomique</span>}
+          title="Assemblage des lots 2025"
+          subtitle="Prévisualisez l’essai sans consommer aucune goutte de stock, puis déclenchez l’opération réelle."
+          onClose={() => setShowBlendModal(false)}
+          maxWidth="640px"
+          footer={
+            <>
               <button type="button" className="btn btn-secondary" onClick={() => setShowBlendModal(false)}>
                 Annuler
               </button>
@@ -786,252 +659,379 @@ export const AgingView: React.FC<{
               >
                 Exécuter l’assemblage réel
               </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Nom du lot enfant résultant</label>
+            <input
+              type="text"
+              className="form-input"
+              value={blendName}
+              onChange={(e) => setBlendName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Contenant de destination (cuve vide disponible)</label>
+            {availableContainers.length <= 1 ? (
+              <div
+                style={{
+                  padding: '9px 13px',
+                  background: 'var(--color-surface-soft)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  color: 'var(--color-ink)',
+                }}
+              >
+                {availableContainers[0]
+                  ? `${availableContainers[0].code} · ${availableContainers[0].location} (Capacité ${availableContainers[0].capacityMl / 1000} L)`
+                  : 'Aucune cuve disponible'}
+              </div>
+            ) : (
+              <select
+                className="form-select"
+                value={effectiveDestContainerId}
+                onChange={(e) => setDestContainerId(e.target.value)}
+              >
+                {availableContainers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} · {c.location} (Capacité {c.capacityMl / 1000} L)
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '14px', marginBottom: '16px', background: 'var(--color-surface-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700 }}>
+                Proportions de l’assemblage (entrées)
+              </span>
+              <span className="badge badge-grape tabular">
+                {pctA}% {lotA?.name ?? 'Hauts Rangs'} · {pctB}% {lotB?.name ?? 'Combe Claire'}
+              </span>
+            </div>
+
+            {/* Barre visuelle de répartition entre les 2 cuvées */}
+            <div className="ds-bar" style={{ height: '10px', marginBottom: '12px' }} aria-hidden="true">
+              <span style={{ width: `${pctA}%`, background: 'var(--color-grape)' }} />
+              <span style={{ width: `${pctB}%`, background: 'var(--color-gold-dark)' }} />
+            </div>
+
+            <div className="form-grid-2">
+              <div>
+                <label className="form-label">
+                  {lotA?.code ?? 'L25-R-A'} ({lotA?.name ?? 'Hauts Rangs'}) — en {contA?.code ?? '—'} ({availALitres} L dispo)
+                </label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max={availALitres || undefined}
+                    className="form-input tabular"
+                    value={inputA_vol}
+                    onChange={(e) => setInputA_vol(e.target.value)}
+                  />
+                  <span className="input-unit-cap">L</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">
+                  {lotB?.code ?? 'L25-R-B'} ({lotB?.name ?? 'Combe Claire'}) — en {contB?.code ?? '—'} ({availBLitres} L dispo)
+                </label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max={availBLitres || undefined}
+                    className="form-input tabular"
+                    value={inputB_vol}
+                    onChange={(e) => setInputB_vol(e.target.value)}
+                  />
+                  <span className="input-unit-cap">L</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Trial calculation output */}
+          {blendPreviewData && (
+            <div style={{ border: '1px solid #C2DCC8', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--color-forest-soft)' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--color-forest)', marginBottom: '6px' }}>
+                ✓ Résultat de la simulation d’essai
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
+                Volume total assemblé : <strong>{blendPreviewData.totalMl / 1000} L</strong> (dans {state.containers[effectiveDestContainerId]?.code ?? '—'})
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-ink)' }}>
+                Coût connu alloué au lot enfant : <strong>{(blendPreviewData.cost.knownCents / 100).toLocaleString('fr-FR')} €</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '4px' }}>
+                Reliquats conservés : L25-R-A aura {300000 / 1000} L (400 €) · L25-R-B aura {200000 / 1000} L (300 €)
+              </div>
+            </div>
+          )}
+
+          {blendPreviewError && (
+            <div className="alert alert-error" style={{ marginTop: '12px', marginBottom: 0 }}>
+              {blendPreviewError}
+            </div>
+          )}
+        </Modal>
       )}
 
       {/* Modal Transfert & Ouillage */}
       {showTransferModal && (
-        <div className="modal-backdrop" onClick={() => setShowTransferModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
-                {transferMode === 'topping' ? 'Ouillage de fût' : 'Transfert de vin / Soutirage'}
-              </h2>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${transferMode === 'transfer' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    setTransferMode('transfer');
-                    setTransferReason('Soutirage d’aération / Élimination des lies');
-                  }}
-                >
-                  Soutirage
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${transferMode === 'topping' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    setTransferMode('topping');
-                    setTransferLossL('0');
-                    setTransferReason('Ouillage périodique du chai');
-                  }}
-                >
-                  Ouillage
-                </button>
+        <Modal
+          eyebrow="Mouvements de cave"
+          title={transferMode === 'topping' ? 'Ouillage de fût' : 'Transfert de vin / Soutirage'}
+          subtitle={
+            transferMode === 'topping'
+              ? 'L’ouillage compense l’évaporation naturelle (part des anges) en complétant le fût avec le même lot, sans perte matière.'
+              : 'Le soutirage permet de décanter le vin propre et d’isoler les lies ou bourbes avec une perte tracée.'
+          }
+          onClose={() => setShowTransferModal(false)}
+          onSubmit={handleExecuteTransfer}
+          maxWidth="620px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                {transferMode === 'topping' ? 'Valider l’ouillage' : 'Valider le transfert'}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>Type d’opération :</span>
+            <div className="segmented-control">
+              <button
+                type="button"
+                className={`segmented-btn ${transferMode === 'transfer' ? 'active' : ''}`}
+                onClick={() => {
+                  setTransferMode('transfer');
+                  setTransferReason('Soutirage d’aération / Élimination des lies');
+                }}
+              >
+                Soutirage
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${transferMode === 'topping' ? 'active' : ''}`}
+                onClick={() => {
+                  setTransferMode('topping');
+                  setTransferLossL('0');
+                  setTransferReason('Ouillage périodique du chai');
+                }}
+              >
+                Ouillage
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Lot concerné</label>
+            <select
+              className="form-select"
+              value={transferLotId}
+              onChange={(e) => selectTransferLot(e.target.value)}
+            >
+              {Object.values(state.lots).map((l) => (
+                <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Contenant source</label>
+              {(() => {
+                if (transferOccs.length <= 1) {
+                  const o = transferOccs[0];
+                  const cont = o ? state.containers[o.containerId] : null;
+                  return (
+                    <div
+                      style={{
+                        padding: '9px 13px',
+                        background: 'var(--color-surface-soft)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '10px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: 'var(--color-ink)',
+                      }}
+                    >
+                      {cont && o ? `${cont.code} (${o.volumeMl / 1000} L disponibles)` : 'Aucun contenant source'}
+                    </div>
+                  );
+                }
+                return (
+                  <select
+                    className="form-select"
+                    value={effectiveFromCont}
+                    onChange={(e) => setTransferFromCont(e.target.value)}
+                  >
+                    {transferOccs.map((o) => (
+                      <option key={o.containerId} value={o.containerId}>
+                        {state.containers[o.containerId]?.code} ({o.volumeMl / 1000} L dispo)
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Contenant destination</label>
+              {(() => {
+                if (transferDestConts.length <= 1) {
+                  return (
+                    <div
+                      style={{
+                        padding: '9px 13px',
+                        background: 'var(--color-surface-soft)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '10px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: 'var(--color-ink)',
+                      }}
+                    >
+                      {transferDestConts[0] ? `${transferDestConts[0].code} (${transferDestConts[0].capacityMl / 1000} L cap.)` : 'Aucun contenant disponible'}
+                    </div>
+                  );
+                }
+                return (
+                  <select
+                    className="form-select"
+                    value={effectiveToCont}
+                    onChange={(e) => setTransferToCont(e.target.value)}
+                  >
+                    {transferDestConts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} ({c.capacityMl / 1000} L cap.)
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">
+                {transferMode === 'topping' ? 'Volume d’ouillage' : 'Volume transféré'}
+              </label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  className="form-input tabular"
+                  value={transferVolL}
+                  onChange={(e) => setTransferVolL(e.target.value)}
+                  required
+                />
+                <span className="input-unit-cap">L</span>
               </div>
             </div>
 
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              {transferMode === 'topping'
-                ? 'L’ouillage compense l’évaporation naturelle (part des anges) en complétant le fût avec le même lot, sans perte matière.'
-                : 'Le soutirage permet de décanter le vin propre et d’isoler les lies ou bourbes avec une perte tracée.'}
-            </p>
-
-            <form onSubmit={handleExecuteTransfer}>
+            {transferMode === 'transfer' ? (
               <div className="form-group">
-                <label className="form-label">Lot concerné</label>
-                <select
-                  className="form-select"
-                  value={transferLotId}
-                  onChange={(e) => selectTransferLot(e.target.value)}
-                >
-                  {Object.values(state.lots).map((l) => (
-                    <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Contenant source</label>
-                  {(() => {
-                    if (transferOccs.length <= 1) {
-                      const o = transferOccs[0];
-                      const cont = o ? state.containers[o.containerId] : null;
-                      return (
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            background: 'var(--color-surface-soft)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-sm)',
-                            fontWeight: 600,
-                            fontSize: '13px',
-                            color: 'var(--color-ink)',
-                          }}
-                        >
-                          {cont && o ? `${cont.code} (${o.volumeMl / 1000} L disponibles)` : 'Aucun contenant source'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        className="form-select"
-                        value={effectiveFromCont}
-                        onChange={(e) => setTransferFromCont(e.target.value)}
-                      >
-                        {transferOccs.map((o) => (
-                          <option key={o.containerId} value={o.containerId}>
-                            {state.containers[o.containerId]?.code} ({o.volumeMl / 1000} L dispo)
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Contenant destination</label>
-                  {(() => {
-                    if (transferDestConts.length <= 1) {
-                      return (
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            background: 'var(--color-surface-soft)',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-sm)',
-                            fontWeight: 600,
-                            fontSize: '13px',
-                            color: 'var(--color-ink)',
-                          }}
-                        >
-                          {transferDestConts[0] ? `${transferDestConts[0].code} (${transferDestConts[0].capacityMl / 1000} L cap.)` : 'Aucun contenant disponible'}
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        className="form-select"
-                        value={effectiveToCont}
-                        onChange={(e) => setTransferToCont(e.target.value)}
-                      >
-                        {transferDestConts.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.code} ({c.capacityMl / 1000} L cap.)
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">
-                    {transferMode === 'topping' ? 'Volume d’ouillage (L)' : 'Volume transféré (L)'}
-                  </label>
+                <label className="form-label">Perte explicite tracée</label>
+                <div className="input-with-unit">
                   <input
                     type="number"
                     step="0.1"
-                    min="0.1"
-                    className="form-input"
-                    value={transferVolL}
-                    onChange={(e) => setTransferVolL(e.target.value)}
+                    min="0"
+                    className="form-input tabular"
+                    value={transferLossL}
+                    onChange={(e) => setTransferLossL(e.target.value)}
                     required
                   />
+                  <span className="input-unit-cap">L</span>
                 </div>
-
-                {transferMode === 'transfer' ? (
-                  <div className="form-group">
-                    <label className="form-label">Perte explicite tracée (L)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      className="form-input"
-                      value={transferLossL}
-                      onChange={(e) => setTransferLossL(e.target.value)}
-                      required
-                    />
-                  </div>
-                ) : (
-                  <div className="form-group">
-                    <label className="form-label">Perte</label>
-                    <div style={{ padding: '9px 12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--color-forest)', fontWeight: 600 }}>
-                      ✓ 0 L (compensation de l’évaporation)
-                    </div>
-                  </div>
-                )}
               </div>
-
+            ) : (
               <div className="form-group">
-                <label className="form-label">Motif de l’opération</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={transferReason}
-                  onChange={(e) => setTransferReason(e.target.value)}
-                  required
-                />
+                <label className="form-label">Perte</label>
+                <div style={{ padding: '10px 13px', background: 'var(--color-forest-soft)', border: '1px solid var(--color-forest-border)', borderRadius: '10px', fontSize: '12.5px', color: 'var(--color-forest)', fontWeight: 600 }}>
+                  ✓ 0 L (compensation de l’évaporation)
+                </div>
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {transferMode === 'topping' ? 'Valider l’ouillage' : 'Valider le transfert'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
-        </div>
+
+          <div className="form-group">
+            <label className="form-label">Motif de l’opération</label>
+            <input
+              type="text"
+              className="form-input"
+              value={transferReason}
+              onChange={(e) => setTransferReason(e.target.value)}
+              required
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modal Bâtonnage des lies fines */}
       {showBatonnageModal && (
-        <div className="modal-backdrop" onClick={() => setShowBatonnageModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>
-              Bâtonnage des lies fines
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Remise en suspension manuelle des lies fines pour nourrir le vin, développer le gras et apporter une protection antioxydante naturelle sans intrant chimique.
-            </p>
-            <form onSubmit={handleExecuteBatonnage}>
-              <div className="form-group">
-                <label className="form-label">Lot sous élevage à bâtonner</label>
-                <select
-                  className="form-select"
-                  value={batonnageLotId}
-                  onChange={(e) => setBatonnageLotId(e.target.value)}
-                >
-                  {lotsReadyForBlend.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.code} · {l.name} ({l.vintage})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Observations & Consigne de chai</label>
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={batonnageNote}
-                  onChange={(e) => setBatonnageNote(e.target.value)}
-                  placeholder="Ex : Bâtonnage doux à la dondaine sur fûts neufs et 1 vin. Lie fine bien nette, aucune réduction."
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowBatonnageModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Consigner le bâtonnage
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Élevage sur lies"
+          title="Bâtonnage des lies fines"
+          subtitle="Remise en suspension manuelle des lies fines pour nourrir le vin, développer le gras et apporter une protection antioxydante naturelle sans intrant chimique."
+          onClose={() => setShowBatonnageModal(false)}
+          onSubmit={handleExecuteBatonnage}
+          maxWidth="560px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowBatonnageModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Consigner le bâtonnage
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Lot sous élevage à bâtonner</label>
+            <select
+              className="form-select"
+              value={batonnageLotId}
+              onChange={(e) => setBatonnageLotId(e.target.value)}
+            >
+              {lotsReadyForBlend.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} · {l.name} ({l.vintage})
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+
+          <div className="form-group">
+            <label className="form-label">Observations & Consigne de chai</label>
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={batonnageNote}
+              onChange={(e) => setBatonnageNote(e.target.value)}
+              placeholder="Ex : Bâtonnage doux à la dondaine sur fûts neufs et 1 vin. Lie fine bien nette, aucune réduction."
+              required
+            />
+          </div>
+        </Modal>
       )}
     </div>
   );

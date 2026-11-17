@@ -15,10 +15,9 @@ import {
   RotateCcw,
   UserCheck,
   ChevronRight,
-  Navigation,
-  Lock,
   Sliders,
 } from 'lucide-react';
+import { Modal } from './ui/Modal';
 import { useStore } from './app/store-context';
 import { ROLE_LABELS } from './domain/selectors';
 import type { RoleId } from './domain/types';
@@ -56,7 +55,6 @@ const AppInner: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [pendingPrefill, setPendingPrefill] = useState<AssistantPrefillPayload | null>(null);
   const prefillSeqRef = useRef(0);
-  const [restrictedFieldMode, setRestrictedFieldMode] = useState<boolean>(false);
   const [showDemoGuide, setShowDemoGuide] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState<boolean>(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState<boolean>(false);
@@ -192,135 +190,88 @@ const AppInner: React.FC = () => {
   return (
     <div className="app-shell">
       <div className="app-body">
-        {/* Left Sidebar — Masquée en Mode Restreint Terrain */}
-        {!restrictedFieldMode && (
-          <aside className="app-sidebar" aria-label="Menu latéral du domaine">
-            <div>
-              <div className="brand-block">
-                <div className="brand-crest">
-                  <div className="brand-emblem">TC</div>
-                  <div>
-                    <div className="brand-title">Trois Coteaux</div>
-                    <div className="brand-subtitle">Grands Domaines & Terroirs · Démo</div>
-                  </div>
+        {/* Left Sidebar */}
+        <aside className="app-sidebar" aria-label="Menu latéral du domaine">
+          <div>
+            <div className="brand-block">
+              <div className="brand-crest">
+                <div className="brand-emblem">TC</div>
+                <div>
+                  <div className="brand-title">Trois Coteaux</div>
+                  <div className="brand-subtitle">Grands Domaines & Terroirs · Démo</div>
                 </div>
               </div>
+            </div>
 
-              <nav aria-label="Navigation principale">
-                {navGroups.map((group) => (
-                  <div key={group.groupLabel} style={{ marginBottom: '8px' }}>
-                    <div className="sidebar-section-label">{group.groupLabel}</div>
-                    <div className="sidebar-nav">
-                      {group.items.map((item) => {
-                        const IconComp = item.icon;
-                        const isRecommended = recommendedTabs.includes(item.id);
-                        return (
-                          <button
-                            key={item.id}
-                            className={`nav-tab ${effectiveActiveTab === item.id ? 'active' : ''} ${
-                              isRecommended ? 'role-recommended' : ''
-                            }`}
-                            onClick={() => navigateClean(item.id)}
-                            title={
-                              isRecommended
-                                ? `${item.label} — Écran clé pour ${ROLE_LABELS[role]}`
-                                : item.label
-                            }
-                          >
-                            <span className="nav-tab-left" style={{ width: '100%' }}>
-                              <IconComp className="nav-icon" size={16} strokeWidth={1.85} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
-                              {navCounts[item.id] && (
-                                <span
-                                  aria-hidden="true"
-                                  className={`nav-count-pill ${navCounts[item.id]?.alert ? 'is-alert' : ''}`}
-                                >
-                                  {navCounts[item.id]?.label}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+            <nav aria-label="Navigation principale">
+              {navGroups.map((group) => (
+                <div key={group.groupLabel} style={{ marginBottom: '4px' }}>
+                  <div className="sidebar-section-label">{group.groupLabel}</div>
+                  <div className="sidebar-nav">
+                    {group.items.map((item) => {
+                      const IconComp = item.icon;
+                      const isRecommended = recommendedTabs.includes(item.id);
+                      return (
+                        <button
+                          key={item.id}
+                          className={`nav-tab ${effectiveActiveTab === item.id ? 'active' : ''} ${
+                            isRecommended ? 'role-recommended' : ''
+                          }`}
+                          onClick={() => navigateClean(item.id)}
+                          title={
+                            isRecommended
+                              ? `${item.label} — Écran clé pour ${ROLE_LABELS[role]}`
+                              : item.label
+                          }
+                        >
+                          <span className="nav-tab-left" style={{ width: '100%' }}>
+                            <IconComp className="nav-icon" size={15} strokeWidth={1.85} style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                            {navCounts[item.id] && (
+                              <span
+                                aria-hidden="true"
+                                className={`nav-count-pill ${navCounts[item.id]?.alert ? 'is-alert' : ''}`}
+                              >
+                                {navCounts[item.id]?.label}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-              </nav>
-            </div>
+                </div>
+              ))}
+            </nav>
+          </div>
 
-            <div
-              className="sidebar-footer-info"
-              style={{
-                padding: '12px',
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(196, 164, 122, 0.18)',
-                fontSize: '11px',
-                color: 'rgba(250, 248, 245, 0.65)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 600, color: '#C4A47A' }}>24 Octobre 2026</span>
-                <span style={{ fontSize: '10px', opacity: 0.75 }}>5 Millésimes</span>
-              </div>
-              <div style={{ fontSize: '11px', color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', fontWeight: 600 }}>
-                <span>✓</span>
-                <span>Chai & Souterrain Hors-Ligne (PWA)</span>
-              </div>
-              <div style={{ fontSize: '10px', opacity: 0.75 }}>
-                Persistance locale IndexedDB active sous cave
-              </div>
+          <div
+            className="sidebar-footer-info"
+            style={{
+              padding: '9px 11px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(196, 164, 122, 0.18)',
+              fontSize: '11px',
+              color: 'rgba(250, 248, 245, 0.7)',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span style={{ fontWeight: 600, color: '#C4A47A' }}>24 Octobre 2026</span>
+              <span style={{ fontSize: '10px', opacity: 0.78 }}>5 Millésimes</span>
             </div>
-          </aside>
-        )}
+            <div style={{ fontSize: '10.5px', color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+              <span>✓</span>
+              <span>Hors-Ligne (PWA) · IndexedDB actif</span>
+            </div>
+          </div>
+        </aside>
 
         {/* Right Workspace */}
         <div className="app-workspace">
-          {restrictedFieldMode ? (
-            <header
-              style={{
-                background: '#141814',
-                color: '#FAF8F5',
-                padding: '10px 24px',
-                borderBottom: '2px solid #F97316',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span
-                  style={{
-                    background: '#F97316',
-                    color: '#FFFFFF',
-                    fontWeight: 800,
-                    fontSize: '11px',
-                    padding: '3px 10px',
-                    borderRadius: '999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                >
-                  <Lock size={12} /> MODE TERRAIN RESTREINT (VENDANGEURS)
-                </span>
-                <span style={{ fontSize: '13px', fontWeight: 600 }}>
-                  Profil Vendangeur / Chauffeur — Seuls la feuille de route du jour, les repères parcellaires et le guidage GPS sont actifs
-                </span>
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-gold"
-                onClick={() => setRestrictedFieldMode(false)}
-              >
-                Quitter la vue restreinte (Retour ERP)
-              </button>
-            </header>
-          ) : (
-            /* UN SEUL En-tête Aérien & Iconique (Zéro empilement de bandeaux) */
-            <header className="workspace-header" aria-label="Bandeau de démonstration">
+          {/* UN SEUL En-tête Aérien & Iconique (Zéro empilement de bandeaux) */}
+          <header className="workspace-header" aria-label="Bandeau de démonstration">
               {/* Search Pill */}
               <button
                 type="button"
@@ -409,21 +360,6 @@ const AppInner: React.FC = () => {
                   <span>Modules</span>
                 </button>
 
-                {isMainEnabled('vineyard') && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => {
-                      navigateClean('vineyard');
-                      setRestrictedFieldMode(true);
-                    }}
-                    title="Basculer vers l'interface simplifiée de terrain (Guidage GPS & feuille de route des équipes)"
-                  >
-                    <Navigation size={12} style={{ color: '#F97316' }} />
-                    <span>Mode Terrain</span>
-                  </button>
-                )}
-
                 <button
                   className="btn btn-sm btn-gold"
                   onClick={() => setShowDemoGuide(true)}
@@ -453,7 +389,6 @@ const AppInner: React.FC = () => {
                 </button>
               </div>
             </header>
-          )}
 
           {/* Main Content Area */}
           <main className="app-main animate-fade-in">
@@ -469,13 +404,7 @@ const AppInner: React.FC = () => {
               </div>
             )}
 
-            {restrictedFieldMode ? (
-              <VineyardView
-                restrictedFieldMode={true}
-                onToggleRestrictedMode={() => setRestrictedFieldMode(false)}
-              />
-            ) : (
-              <>
+            <>
                 {effectiveActiveTab === 'overview' && (
                   <OverviewView
                     onNavigate={navigateClean}
@@ -484,8 +413,6 @@ const AppInner: React.FC = () => {
                 )}
                 {effectiveActiveTab === 'vineyard' && (
                   <VineyardView
-                    restrictedFieldMode={false}
-                    onToggleRestrictedMode={() => setRestrictedFieldMode(true)}
                     prefill={pendingPrefill?.tab === 'vineyard' ? pendingPrefill : undefined}
                   />
                 )}
@@ -525,7 +452,6 @@ const AppInner: React.FC = () => {
                   />
                 )}
               </>
-            )}
           </main>
         </div>
       </div>
@@ -599,19 +525,19 @@ const AppInner: React.FC = () => {
 
       {/* Reset Confirmation Modal */}
       {confirmReset && (
-        <div className="modal-backdrop" onClick={() => setConfirmReset(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '10px' }}>
-              Réinitialiser la démo locale ?
-            </h2>
-            <p style={{ fontSize: '13.5px', color: 'var(--color-ink-muted)', marginBottom: '18px' }}>
-              Cette action réinitialise uniquement la base IndexedDB <code>domaine-erp-demo</code> à son état initial.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button className="btn btn-secondary" onClick={() => setConfirmReset(false)}>
+        <Modal
+          eyebrow="Données locales"
+          title="Réinitialiser la démo locale ?"
+          subtitle="Cette action restaure uniquement les données d’exemple locales à leur état initial."
+          onClose={() => setConfirmReset(false)}
+          maxWidth="480px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmReset(false)}>
                 Annuler
               </button>
               <button
+                type="button"
                 className="btn btn-danger"
                 onClick={async () => {
                   try {
@@ -629,9 +555,13 @@ const AppInner: React.FC = () => {
               >
                 Confirmer la réinitialisation
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '13.5px', color: 'var(--color-ink)', lineHeight: 1.55 }}>
+            La base locale <code>domaine-erp-demo</code> (modifications, comptages, réceptions et paramétrages) sera remise à zéro avec les 5 millésimes de démonstration.
+          </p>
+        </Modal>
       )}
 
       {/* Guided Tour Modal */}

@@ -18,6 +18,7 @@ import { CellarBottleMapPanel } from './CellarBottleMapPanel';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+import { Modal } from '../../ui/Modal';
 
 type BottlingTabId = 'stocks' | 'cellar_map' | 'elabel';
 
@@ -499,163 +500,173 @@ export const BottlingView: React.FC<{
 
       {/* Modal Mise en bouteilles (accessible depuis tous les onglets) */}
       {showBottlingModal && (
-            <div className="modal-backdrop" onClick={() => setShowBottlingModal(false)}>
-              <div className="modal-content" style={{ maxWidth: '650px' }} onClick={(e) => e.stopPropagation()}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
-                    Ordre de mise en bouteilles
-                  </h2>
-                  <span className="badge badge-accent">Transaction atomique</span>
+        <Modal
+          eyebrow="Conditionnement & Tirage"
+          badge={<span className="badge badge-accent">Transaction atomique</span>}
+          title="Ordre de mise en bouteilles"
+          subtitle="Décompte simultanément la cuve et les matières sèches nécessaires sans jamais créer de bouteille fantôme."
+          onClose={() => setShowBottlingModal(false)}
+          onSubmit={handleExecuteBottling}
+          maxWidth="650px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowBottlingModal(false)}>
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={hasInsufficientDryGoods || !activeLot}
+              >
+                Valider le conditionnement
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Lot de vin à conditionner</label>
+              <select
+                className="form-select"
+                value={activeLotId}
+                onChange={(e) => setSelectedLotId(e.target.value)}
+                required
+              >
+                {eligibleLots.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.code} · {l.name} ({lotVolumeMl(state, l.id) / 1000} L dispo)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Article / Présentation (SKU)</label>
+              <select
+                className="form-select"
+                value={selectedSkuId}
+                onChange={(e) => setSelectedSkuId(e.target.value)}
+                required
+              >
+                {skus.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label} ({s.sizeMl / 10} cl)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-grid-3">
+            <div className="form-group">
+              <label className="form-label">Bouteilles produites</label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="form-input tabular"
+                  value={bottleCount}
+                  onChange={(e) => setBottleCount(e.target.value)}
+                  required
+                />
+                <span className="input-unit-cap">cols</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Perte de tirage</label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  className="form-input tabular"
+                  value={lossLitres}
+                  onChange={(e) => setLossLitres(e.target.value)}
+                  required
+                />
+                <span className="input-unit-cap">L</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Prestation de mise</label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  className="form-input tabular"
+                  value={serviceCostEur}
+                  onChange={(e) => setServiceCostEur(e.target.value)}
+                />
+                <span className="input-unit-cap">€ HT</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Volume Conservation Summary */}
+          {sku && (
+            <div className="ds-modal-summary">
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-forest)' }}>
+                  Volume de vin soutiré de la cuve : <span className="tabular">{inputVolumeMl / 1000} L</span>
                 </div>
-
-                <form onSubmit={handleExecuteBottling}>
-                  <div className="form-group">
-                    <label className="form-label">Lot de vin à conditionner</label>
-                    <select
-                      className="form-select"
-                      value={activeLotId}
-                      onChange={(e) => setSelectedLotId(e.target.value)}
-                      required
-                    >
-                      {eligibleLots.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.code} · {l.name} ({lotVolumeMl(state, l.id) / 1000} L disponibles)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Article / Présentation (SKU)</label>
-                    <select
-                      className="form-select"
-                      value={selectedSkuId}
-                      onChange={(e) => setSelectedSkuId(e.target.value)}
-                      required
-                    >
-                      {skus.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label} ({s.sizeMl / 10} cl)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Nombre de bouteilles produites</label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="form-input"
-                        value={bottleCount}
-                        onChange={(e) => setBottleCount(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">Perte de tirage déclarée (L)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        className="form-input"
-                        value={lossLitres}
-                        onChange={(e) => setLossLitres(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Volume Conservation Summary */}
-                  {sku && (
-                    <div style={{ background: 'var(--color-surface-soft)', padding: '10px 12px', borderRadius: 'var(--radius-md)', marginBottom: '14px', fontSize: '13px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Volume de vin soutiré de la cuve :</span>
-                        <strong className="tabular">{inputVolumeMl / 1000} L</strong>
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                        Conservation : {bottles} × {sku.sizeMl / 10} cl ({(bottles * sku.sizeMl) / 1000} L) + {lossLitres} L perte = {inputVolumeMl / 1000} L.
-                      </div>
-                    </div>
-                  )}
-
-                  {/* BOM Check with visual bars */}
-                  <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px' }}>
-                      Vérification automatique des fournitures (Bouteilles, Bouchons, Étiquettes, Cartons)
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {bomReqs.map((r) => {
-                        const g = state.dryGoods[r.dryGoodId];
-                        const isOk = r.onHand >= r.required;
-                        const coverPct = r.required > 0 ? Math.min(100, Math.round((r.onHand / r.required) * 100)) : 100;
-                        return (
-                          <div key={r.dryGoodId}>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '12px',
-                                color: isOk ? 'var(--color-ink)' : 'var(--color-crimson)',
-                                marginBottom: '3px',
-                              }}
-                            >
-                              <span>{g?.name ?? r.dryGoodId}</span>
-                              <span className="tabular" style={{ fontWeight: 600 }}>
-                                {r.required} nécessaires (en stock : {r.onHand}) {isOk ? '✓ OK' : `⚠️ Manque ${r.required - r.onHand}`}
-                              </span>
-                            </div>
-                            <div className="ds-bar" style={{ height: '5px' }}>
-                              <span
-                                style={{
-                                  width: `${coverPct}%`,
-                                  background: isOk ? 'var(--color-forest)' : 'var(--color-crimson)',
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Coût prestation de mise (€ HT)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      className="form-input"
-                      value={serviceCostEur}
-                      onChange={(e) => setServiceCostEur(e.target.value)}
-                    />
-                  </div>
-
-                  {hasInsufficientDryGoods && (
-                    <div className="alert alert-error" style={{ marginBottom: '14px' }}>
-                      Stock de matières sèches insuffisant : l’opération est bloquée sans toucher au vin.
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowBottlingModal(false)}>
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={hasInsufficientDryGoods || !activeLot}
-                    >
-                      Valider le conditionnement
-                    </button>
-                  </div>
-                </form>
+                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                  Conservation : {bottles} × {sku.sizeMl / 10} cl ({(bottles * sku.sizeMl) / 1000} L) + {lossLitres} L perte = {inputVolumeMl / 1000} L.
+                </div>
               </div>
             </div>
           )}
+
+          {/* BOM Check with visual bars */}
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px', background: '#FFFFFF' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 700, marginBottom: '8px', color: 'var(--color-forest)' }}>
+              Vérification des fournitures (Bouteilles, Bouchons, Étiquettes, Cartons)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {bomReqs.map((r) => {
+                const g = state.dryGoods[r.dryGoodId];
+                const isOk = r.onHand >= r.required;
+                const coverPct = r.required > 0 ? Math.min(100, Math.round((r.onHand / r.required) * 100)) : 100;
+                return (
+                  <div key={r.dryGoodId}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '12px',
+                        color: isOk ? 'var(--color-ink)' : 'var(--color-crimson)',
+                        marginBottom: '3px',
+                      }}
+                    >
+                      <span>{g?.name ?? r.dryGoodId}</span>
+                      <span className="tabular" style={{ fontWeight: 600 }}>
+                        {r.required} nécessaires (en stock : {r.onHand}) {isOk ? '✓ OK' : `⚠️ Manque ${r.required - r.onHand}`}
+                      </span>
+                    </div>
+                    <div className="ds-bar" style={{ height: '5px' }}>
+                      <span
+                        style={{
+                          width: `${coverPct}%`,
+                          background: isOk ? 'var(--color-forest)' : 'var(--color-crimson)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {hasInsufficientDryGoods && (
+            <div className="alert alert-error" style={{ marginTop: '14px', marginBottom: 0 }}>
+              Stock de matières sèches insuffisant : l’opération est bloquée sans toucher au vin.
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 };

@@ -9,7 +9,6 @@ import {
   Compass,
   Layers,
   MapPin,
-  BookOpen,
 } from 'lucide-react';
 import type { Parcel } from '../../domain/types';
 
@@ -49,7 +48,6 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   isEditingGpsPin,
   onToggleEditGpsPin,
   onSetCustomGps,
-  onOpenLivret,
   fieldMode = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -293,7 +291,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     });
   }, [selectedParcelId, selectedItem]);
 
-  // Invalidate map size when toggling fullscreen
+  // Invalidate map size when toggling fullscreen or terrain focus height
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!isMapAlive(map)) return;
@@ -303,7 +301,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
       }
     }, 150);
     return () => clearTimeout(timer);
-  }, [isFullscreen]);
+  }, [isFullscreen, fieldMode]);
 
   // Handle Floating GPS Button ("Me localiser sur le terrain")
   const handleLocateMe = () => {
@@ -398,7 +396,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
           : { position: 'relative', width: '100%' }
       }
     >
-      {/* Barre d'outils Carte : Couches Satellite / Cadastre IGN / Livret + Plein écran */}
+      {/* Barre d'outils Carte épurée : Couches Satellite / Cadastre IGN + GPS / Plein écran */}
       <div
         style={{
           display: 'flex',
@@ -417,7 +415,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
               onClick={() => setMapStyle('satellite')}
               style={{ fontSize: '12px', padding: '5px 10px' }}
             >
-              🛰️ Satellite Réel (Zoomable)
+              🛰️ Satellite
             </button>
             <button
               type="button"
@@ -425,7 +423,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
               onClick={() => setMapStyle('cadastre')}
               style={{ fontSize: '12px', padding: '5px 10px' }}
             >
-              📐 Plan Cadastral IGN
+              📐 Plan IGN
             </button>
           </div>
 
@@ -436,21 +434,8 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
             title="Activer/désactiver les limites cadastrales officielles IGN en surimpression"
           >
             <Layers size={13} />
-            <span>Limites Cadastre IGN {showCadastreOverlay ? 'ON' : 'OFF'}</span>
+            <span>Limites IGN {showCadastreOverlay ? 'ON' : 'OFF'}</span>
           </button>
-
-          {onOpenLivret && (
-            <button
-              type="button"
-              className="btn btn-sm btn-secondary"
-              onClick={onOpenLivret}
-              title="Consulter le Livret Parcellaire complet avec caractéristiques et vendanges"
-              style={{ fontWeight: 600 }}
-            >
-              <BookOpen size={13} />
-              <span>📖 Ouvrir le Livret Parcellaire</span>
-            </button>
-          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -461,7 +446,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
             title="Recentrer la carte sur toutes les parcelles du domaine"
           >
             <Compass size={13} />
-            <span>Voir tout le domaine</span>
+            <span>Tout voir</span>
           </button>
 
           <button
@@ -471,7 +456,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
             title="Cliquer sur la carte satellite pour déplacer le point GPS exact d'entrée de rang"
           >
             <Crosshair size={13} />
-            <span>{isEditingGpsPin ? 'Cliquez sur la carte...' : 'Déplacer Point GPS'}</span>
+            <span>{isEditingGpsPin ? 'Cliquez sur la carte…' : 'Point GPS'}</span>
           </button>
 
           <button
@@ -485,16 +470,16 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
         </div>
       </div>
 
-      {/* Conteneur de la Carte Interactive (430px normal, 100% en plein écran) */}
+      {/* Conteneur de la Carte Interactive */}
       <div
         style={{
           position: 'relative',
           width: '100%',
-          height: isFullscreen ? 'calc(100vh - 165px)' : fieldMode ? '480px' : '420px',
+          height: isFullscreen ? 'calc(100vh - 140px)' : fieldMode ? '500px' : '440px',
           borderRadius: 'var(--radius-md)',
           overflow: 'hidden',
           border: isEditingGpsPin ? '3px dashed #F97316' : '1.5px solid rgba(196, 164, 122, 0.55)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.16)',
           background: '#161F15',
         }}
       >

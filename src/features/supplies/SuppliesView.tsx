@@ -11,6 +11,7 @@ import {
 import { useStore } from '../../app/store-context';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { Modal } from '../../ui/Modal';
 
 export const SuppliesView: React.FC<{
   prefill?: Extract<AssistantPrefillPayload, { tab: 'supplies' }>;
@@ -540,88 +541,106 @@ export const SuppliesView: React.FC<{
       </div>
 
       {/* Modal Créer PO */}
-      {showPoModal && (
-        <div className="modal-backdrop" onClick={() => setShowPoModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Nouvelle commande fournisseur
-            </h2>
-            <form onSubmit={handleCreatePo}>
-              <div className="form-group">
-                <label className="form-label">Fournisseur</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Fourniture commandée</label>
-                <select
-                  className="form-select"
-                  value={poGoodId}
-                  onChange={(e) => setPoGoodId(e.target.value)}
-                >
-                  {dryGoods.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name} (en stock : {g.onHand})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Quantité commandée</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={poQuantity}
-                    onChange={(e) => setPoQuantity(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Prix unitaire (€ HT)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="form-input"
-                    value={poCostEur}
-                    onChange={(e) => setPoCostEur(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Date de livraison attendue</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={poExpectedAt}
-                  onChange={(e) => setPoExpectedAt(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+      {showPoModal && (() => {
+        const selectedGood = state.dryGoods[poGoodId];
+        const qtyNum = parseFloat(poQuantity) || 0;
+        const unitNum = parseFloat(poCostEur) || 0;
+        const estimatedTotal = qtyNum * unitNum;
+        return (
+          <Modal
+            eyebrow="Achats & Matières sèches"
+            title="Nouvelle commande fournisseur"
+            subtitle="Préparez votre réapprovisionnement avant les prochaines mises en bouteilles."
+            onClose={() => setShowPoModal(false)}
+            onSubmit={handleCreatePo}
+            maxWidth="580px"
+            footerNote={
+              <span>
+                Total estimé : <strong className="tabular" style={{ color: 'var(--color-forest)' }}>{estimatedTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</strong>
+              </span>
+            }
+            footer={
+              <>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowPoModal(false)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Enregistrer la commande
                 </button>
+              </>
+            }
+          >
+            <div className="form-group">
+              <label className="form-label">Fournisseur</label>
+              <input
+                type="text"
+                className="form-input"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Fourniture commandée</label>
+              <select
+                className="form-select"
+                value={poGoodId}
+                onChange={(e) => setPoGoodId(e.target.value)}
+              >
+                {dryGoods.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} (en stock : {g.onHand})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">Quantité commandée</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input tabular"
+                    value={poQuantity}
+                    onChange={(e) => setPoQuantity(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">{selectedGood?.unit ?? 'u.'}</span>
+                </div>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <div className="form-group">
+                <label className="form-label">Prix unitaire</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="form-input tabular"
+                    value={poCostEur}
+                    onChange={(e) => setPoCostEur(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">€ HT</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date de livraison attendue</label>
+              <input
+                type="date"
+                className="form-input tabular"
+                value={poExpectedAt}
+                onChange={(e) => setPoExpectedAt(e.target.value)}
+                required
+              />
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Modal Réception PO */}
       {showReceiveModal && (() => {
@@ -629,128 +648,142 @@ export const SuppliesView: React.FC<{
         const firstLine = currentPo?.lines[0];
         const poItem = firstLine ? state.dryGoods[firstLine.dryGoodId] : undefined;
         return (
-          <div className="modal-backdrop" onClick={() => setShowReceiveModal(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-                Réceptionner la commande {currentPo?.code}
-              </h2>
-              <form onSubmit={handleReceivePo}>
-                {openPos.length > 0 && (
-                  <div className="form-group">
-                    <label className="form-label">Commande fournisseur ouverte</label>
-                    <select
-                      className="form-select"
-                      value={showReceiveModal}
-                      onChange={(e) => {
-                        const nextPo = state.purchaseOrders[e.target.value];
-                        setShowReceiveModal(e.target.value);
-                        const rem =
-                          (nextPo?.lines[0]?.ordered ?? 0) - (nextPo?.lines[0]?.received ?? 0);
-                        setReceiveQty(String(Math.max(1, rem)));
-                      }}
-                    >
-                      {openPos.map((po) => {
-                        const l = po.lines[0];
-                        const item = l ? state.dryGoods[l.dryGoodId] : undefined;
-                        const rem = (l?.ordered ?? 0) - (l?.received ?? 0);
-                        return (
-                          <option key={po.id} value={po.id}>
-                            {po.code} · {po.supplier} — {item?.name ?? ''} (reste {rem})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                )}
-                {poItem && (
-                  <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '12px' }}>
-                    Article : <strong>{poItem.name}</strong> · Stock actuel : {poItem.onHand.toLocaleString('fr-FR')} {poItem.unit}
-                  </p>
-                )}
-                <div className="form-group">
-                  <label className="form-label">Quantité reçue</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={receiveQty}
-                    onChange={(e) => setReceiveQty(e.target.value)}
-                    required
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowReceiveModal(null)}>
-                    Annuler
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    Valider la réception
-                  </button>
-                </div>
-              </form>
+          <Modal
+            eyebrow="Réception magasin"
+            title={`Réceptionner la commande ${currentPo?.code ?? ''}`}
+            subtitle="L'entrée physique met immédiatement à jour le stock disponible et le coût moyen."
+            onClose={() => setShowReceiveModal(null)}
+            onSubmit={handleReceivePo}
+            maxWidth="540px"
+            footer={
+              <>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowReceiveModal(null)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Valider la réception
+                </button>
+              </>
+            }
+          >
+            {openPos.length > 0 && (
+              <div className="form-group">
+                <label className="form-label">Commande fournisseur ouverte</label>
+                <select
+                  className="form-select"
+                  value={showReceiveModal}
+                  onChange={(e) => {
+                    const nextPo = state.purchaseOrders[e.target.value];
+                    setShowReceiveModal(e.target.value);
+                    const rem =
+                      (nextPo?.lines[0]?.ordered ?? 0) - (nextPo?.lines[0]?.received ?? 0);
+                    setReceiveQty(String(Math.max(1, rem)));
+                  }}
+                >
+                  {openPos.map((po) => {
+                    const l = po.lines[0];
+                    const item = l ? state.dryGoods[l.dryGoodId] : undefined;
+                    const rem = (l?.ordered ?? 0) - (l?.received ?? 0);
+                    return (
+                      <option key={po.id} value={po.id}>
+                        {po.code} · {po.supplier} — {item?.name ?? ''} (reste {rem})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+            {poItem && (
+              <div className="ds-modal-summary">
+                <span>Article : <strong>{poItem.name}</strong></span>
+                <span className="tabular">Stock actuel : <strong>{poItem.onHand.toLocaleString('fr-FR')} {poItem.unit}</strong></span>
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label">Quantité reçue</label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  min="1"
+                  className="form-input tabular"
+                  value={receiveQty}
+                  onChange={(e) => setReceiveQty(e.target.value)}
+                  required
+                />
+                <span className="input-unit-cap">{poItem?.unit ?? 'unités'}</span>
+              </div>
             </div>
-          </div>
+          </Modal>
         );
       })()}
 
       {/* Modal Inventaire */}
-      {showInvModal && (
-        <div className="modal-backdrop" onClick={() => setShowInvModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Comptage d’inventaire — {state.dryGoods[showInvModal]?.name}
-            </h2>
-            <form onSubmit={handleInventory}>
-              <div className="form-group">
-                <label className="form-label">Matière sèche à inventorier</label>
-                <select
-                  className="form-select"
-                  value={showInvModal}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setShowInvModal(nextId);
-                    setInvCounted(String(state.dryGoods[nextId]?.onHand ?? 0));
-                  }}
-                >
-                  {dryGoods.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name} (stock théorique : {g.onHand.toLocaleString('fr-FR')} {g.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Quantité physique réellement constatée</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="form-input"
-                  value={invCounted}
-                  onChange={(e) => setInvCounted(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Motif / Contexte de l’écart</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={invReason}
-                  onChange={(e) => setInvReason(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+      {showInvModal && (() => {
+        const invItem = state.dryGoods[showInvModal];
+        return (
+          <Modal
+            eyebrow="Inventaire physique"
+            title={`Comptage — ${invItem?.name ?? ''}`}
+            subtitle="Tout écart entre stock théorique et stock compté est tracé avec motif."
+            onClose={() => setShowInvModal(null)}
+            onSubmit={handleInventory}
+            maxWidth="540px"
+            footer={
+              <>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowInvModal(null)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-accent">
                   Enregistrer le comptage
                 </button>
+              </>
+            }
+          >
+            <div className="form-group">
+              <label className="form-label">Matière sèche à inventorier</label>
+              <select
+                className="form-select"
+                value={showInvModal}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setShowInvModal(nextId);
+                  setInvCounted(String(state.dryGoods[nextId]?.onHand ?? 0));
+                }}
+              >
+                {dryGoods.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} (stock théorique : {g.onHand.toLocaleString('fr-FR')} {g.unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Quantité physique réellement constatée</label>
+              <div className="input-with-unit">
+                <input
+                  type="number"
+                  min="0"
+                  className="form-input tabular"
+                  value={invCounted}
+                  onChange={(e) => setInvCounted(e.target.value)}
+                  required
+                />
+                <span className="input-unit-cap">{invItem?.unit ?? 'u.'}</span>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Motif / Contexte de l’écart</label>
+              <input
+                type="text"
+                className="form-input"
+                value={invReason}
+                onChange={(e) => setInvReason(e.target.value)}
+                required
+              />
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 };

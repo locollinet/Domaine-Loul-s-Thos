@@ -34,6 +34,7 @@ import { useModuleConfig } from '../modules/ModuleConfigContext';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
 import { SubNav, scrollSubNavIntoView, type SubNavTab } from '../../ui/SubNav';
+import { Modal } from '../../ui/Modal';
 
 type VineyardTabId = 'map' | 'livret' | 'harvest' | 'reception' | 'phyto_tesa';
 
@@ -419,15 +420,14 @@ function compressImageFile(file: File): Promise<string> {
 }
 
 export const VineyardView: React.FC<{
-  restrictedFieldMode?: boolean;
-  onToggleRestrictedMode?: () => void;
   prefill?: Extract<AssistantPrefillPayload, { tab: 'vineyard' }>;
-}> = ({ restrictedFieldMode = false, onToggleRestrictedMode, prefill }) => {
+}> = ({ prefill }) => {
   const { state, dispatch, role } = useStore();
   const { isAddonEnabled } = useModuleConfig();
   // Navigation claire par espaces métier distincts (Carte GPS, Livret, Planning, Quai, Phyto/TESA)
   const [activeView, setActiveView] = useState<VineyardTabId>('map');
   const [livretStatusFilter, setLivretStatusFilter] = useState<'all' | 'vendange' | 'en_cours' | 'a_faire'>('all');
+  const [terrainFocus, setTerrainFocus] = useState(false);
   const [fieldMode, setFieldMode] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>('parcel-c');
   const [parcelSearch, setParcelSearch] = useState('');
@@ -1089,19 +1089,6 @@ export const VineyardView: React.FC<{
     return 'badge-green';
   };
 
-  const scrollToSection = (elementId: string) => {
-    setTimeout(() => {
-      try {
-        const el = document.getElementById(elementId);
-        if (el && typeof el.scrollIntoView === 'function') {
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      } catch {
-        // Ignore in test environment
-      }
-    }, 60);
-  };
-
   const switchVineyardView = (nextView: VineyardTabId) => {
     setActiveView(nextView);
     scrollSubNavIntoView('vineyard-subnav');
@@ -1124,11 +1111,7 @@ export const VineyardView: React.FC<{
   };
 
   const effectiveView: VineyardTabId =
-    restrictedFieldMode && (activeView === 'reception' || activeView === 'phyto_tesa')
-      ? 'map'
-      : activeView === 'phyto_tesa' && !isAddonEnabled('phyto_tesa')
-        ? 'map'
-        : activeView;
+    activeView === 'phyto_tesa' && !isAddonEnabled('phyto_tesa') ? 'map' : activeView;
 
   const totalAreaHa = parcels.reduce((sum, p) => sum + (p.areaM2?.value ?? 0) / 10000, 0);
   const donePct = parcels.length > 0 ? Math.round((globalHarvestStats.doneCount / parcels.length) * 100) : 0;
@@ -1166,19 +1149,15 @@ export const VineyardView: React.FC<{
       alert: untransportedCounts.length > 0,
       hint: 'Ordre de coupe Aujourd’hui / Demain, comptage des caisses et départ bennes',
     },
-    ...(!restrictedFieldMode
-      ? [
-          {
-            id: 'reception' as const,
-            label: '⚖️ Quai & Pesées',
-            icon: Scale,
-            count: inTransitCount > 0 ? `${inTransitCount} en route` : receptions.length,
-            alert: inTransitCount > 0,
-            hint: 'Navettes en transit, pesée Brut/Tare/Net et affectation cuverie',
-          },
-        ]
-      : []),
-    ...(!restrictedFieldMode && isAddonEnabled('phyto_tesa')
+    {
+      id: 'reception',
+      label: '⚖️ Quai & Pesées',
+      icon: Scale,
+      count: inTransitCount > 0 ? `${inTransitCount} en route` : receptions.length,
+      alert: inTransitCount > 0,
+      hint: 'Navettes en transit, pesée Brut/Tare/Net et affectation cuverie',
+    },
+    ...(isAddonEnabled('phyto_tesa')
       ? [
           {
             id: 'phyto_tesa' as const,
@@ -1190,70 +1169,84 @@ export const VineyardView: React.FC<{
       : []),
   ];
 
+  const totalPendingCrates = untransportedCounts.reduce((s, c) => s + c.quantity, 0);
+
   return (
-    <div className="ds-overview">
-      {/* 1. BANNIÈRE VIGNOBLE & RÉCOLTE (Design System v2) */}
-      <section className="ds-hero ds-rise">
-        <div>
+    <div className="ds-overview" style={{ gap: terrainFocus ? '14px' : '20px' }}>
+      {/* 1. EN-TÊTE COMPACT VIGNOBLE & OUTILS STABLES (Laisse la carte visible immédiatement) */}
+      <section className={`vineyard-header-bar ds-rise ${terrainFocus ? 'is-terrain-focus' : ''}`}>
+        <div style={{ minWidth: 0, flex: '1 1 320px' }}>
           <div className="ds-eyebrow">
             <span className="ds-pulse" aria-hidden="true" />
             <span>
               Cadastre IGN {territoryLabel} · {parcels.length} parcelles ({totalAreaHa.toFixed(2)} ha)
+              {terrainFocus ? ' · Vue Terrain optimisée' : ''}
             </span>
           </div>
-          <h1 className="ds-hero-title">Vignoble & Récolte</h1>
-          <p className="ds-hero-sub">
-            Repérez chaque parcelle au mètre près pour guider vos coupeurs dès 5 h du matin,
-            planifiez les coupes du jour, déclenchez les bennes et pesez la vendange à l’arrivée au pressoir.
-          </p>
+          <h1 className="ds-hero-title" style={{ fontSize: terrainFocus ? '26px' : '32px', margin: '4px 0 4px' }}>
+            Vignoble & Récolte
+          </h1>
+          {!terrainFocus && (
+            <p className="ds-hero-sub" style={{ maxWidth: '640px', fontSize: '13.5px' }}>
+              Repérez chaque parcelle au mètre près sur le cadastre IGN, suivez la feuille de route GPS, comptez les caisses au rang et pesez à l’arrivée au pressoir.
+            </p>
+          )}
         </div>
 
-        <div className="ds-next">
-          <div>
-            <div className="ds-next-label">Priorité dans les vignes</div>
-            <div className="ds-next-title">
-              {untransportedCounts.length > 0
-                ? `${untransportedCounts.reduce((s, c) => s + c.quantity, 0)} cagettes coupées attendent au bout du rang`
-                : inTransitCount > 0
-                  ? `${inTransitCount} benne(s) en route vers le quai de réception`
-                  : 'Consulter la carte GPS et le planning de coupe'}
-            </div>
-            <p className="ds-next-desc">
-              {untransportedCounts.length > 0
-                ? 'Groupez ces cagettes dans une navette pour les envoyer au pressoir avant que le raisin ne chauffe.'
-                : inTransitCount > 0
-                  ? 'Une remorque est en transit : passez au quai pour enregistrer le ticket de pesée Brut/Tare/Net.'
-                  : 'Utilisez le guidage GPS ±1 m ou importez votre livret parcellaire / CVI.'}
-            </p>
-          </div>
-          {untransportedCounts.length > 0 && !restrictedFieldMode ? (
+        <div className="vineyard-header-actions">
+          {totalPendingCrates > 0 && effectiveView !== 'harvest' && (
             <button
               type="button"
-              className="ds-cta"
+              className="btn btn-sm btn-gold"
               onClick={() => switchVineyardView('harvest')}
+              title="Voir les cagettes prêtes à partir vers le pressoir"
             >
-              <span>Envoyer la vendange au pressoir</span>
-              <ArrowRight size={16} />
-            </button>
-          ) : inTransitCount > 0 && !restrictedFieldMode ? (
-            <button
-              type="button"
-              className="ds-cta"
-              onClick={() => switchVineyardView('reception')}
-            >
-              <span>Peser au quai de réception</span>
-              <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="ds-cta"
-              onClick={() => switchVineyardView('map')}
-            >
-              <span>Ouvrir la carte GPS des parcelles</span>
-              <ArrowRight size={16} />
+              <Truck size={14} />
+              <span>{totalPendingCrates} cagettes au rang</span>
+              <ArrowRight size={13} />
             </button>
           )}
+          {totalPendingCrates === 0 && inTransitCount > 0 && effectiveView !== 'reception' && (
+            <button
+              type="button"
+              className="btn btn-sm btn-gold"
+              onClick={() => switchVineyardView('reception')}
+            >
+              <Scale size={14} />
+              <span>{inTransitCount} benne(s) au quai</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => setShowLivretImportModal(true)}
+            title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
+          >
+            <BookOpen size={14} />
+            <span>Importer Livret / CVI</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${terrainFocus ? 'btn-accent' : 'btn-secondary'}`}
+            onClick={() => setTerrainFocus((v) => !v)}
+            title="Compacter l'en-tête et agrandir la carte pour un usage rapide dans les vignes sans perdre vos onglets"
+          >
+            <Navigation size={14} />
+            <span>{terrainFocus ? 'Vue Terrain Active' : 'Vue Terrain'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
+            onClick={() => setFieldMode((v) => !v)}
+            title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
+          >
+            <Sun size={14} />
+            <span>{fieldMode ? 'Soleil Actif' : 'Mode Soleil'}</span>
+          </button>
         </div>
       </section>
 
@@ -1284,187 +1277,23 @@ export const VineyardView: React.FC<{
         </div>
       )}
 
-      {/* 2. BARRE D'ESPACES MÉTIER VIGNOBLE (UN SEUL SÉLECTEUR CLAIR DIRECTEMENT AU-DESSUS DU CONTENU) */}
+      {/* 2. BARRE D'ONGLETS HORIZONTALE PLEINE LARGEUR (Toujours au même endroit) */}
       <SubNav
         id="vineyard-subnav"
         ariaLabel="Espaces de travail Vignoble et Récolte"
         tabs={vineyardTabs}
         active={effectiveView}
         onChange={switchVineyardView}
-        trailing={
-          <>
-            {!restrictedFieldMode && (
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={() => setShowLivretImportModal(true)}
-                title="Importer et traduire un Livret Parcellaire PDF/Texte, un Export CVI Douanes, un CSV Excel ou un GeoJSON"
-              >
-                <BookOpen size={14} />
-                <span>Importer Livret / CVI</span>
-              </button>
-            )}
-
-            {onToggleRestrictedMode && (
-              <button
-                type="button"
-                className={`btn btn-sm ${restrictedFieldMode ? 'btn-accent' : 'btn-gold'}`}
-                onClick={onToggleRestrictedMode}
-                title="Restreindre l'interface uniquement au guidage GPS et aux priorités de vendange pour les vendangeurs et chauffeurs"
-              >
-                <Navigation size={14} />
-                <span>
-                  {restrictedFieldMode
-                    ? '🔒 Quitter Mode Terrain'
-                    : '🚜 Mode Terrain'}
-                </span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={`btn btn-sm ${fieldMode ? 'btn-gold' : 'btn-secondary'}`}
-              onClick={() => setFieldMode((v) => !v)}
-              title="Activer le contraste élevé pour lecture en plein soleil dans les vignes"
-            >
-              <Sun size={14} />
-              <span>{fieldMode ? 'Soleil Actif' : 'Mode Soleil'}</span>
-            </button>
-          </>
-        }
       />
 
       {/* =====================================================================
           SOUS-VUE 1 : CARTE SATELLITE / CADASTRE IGN & GUIDAGE GPS TERRAIN
          ===================================================================== */}
       {effectiveView === 'map' && (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Feuille de route GPS du jour (contextuelle à la Carte & Guidage terrain) */}
-          {todayPriorityItems.length > 0 && (
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #19211A 0%, #243025 100%)',
-                color: '#FAF8F5',
-                borderRadius: 'var(--radius-md)',
-                padding: '14px 18px',
-                border: '1.5px solid #F97316',
-                boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <span
-                    style={{
-                      background: '#F97316',
-                      color: '#FFFFFF',
-                      fontWeight: 800,
-                      fontSize: '11px',
-                      padding: '3px 10px',
-                      borderRadius: '999px',
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    🌅 Feuille de Route GPS du Jour
-                  </span>
-                  <span style={{ fontSize: '12.5px', color: '#E2C799', fontWeight: 600 }}>
-                    Touchez une parcelle pour centrer la carte ou « Y ALLER (MAPS) » pour guider le tracteur
-                  </span>
-                </div>
-                {tomorrowItems.length > 0 && (
-                  <span style={{ fontSize: '12px', color: 'rgba(250,248,245,0.78)' }}>
-                    Demain :{' '}
-                    <strong style={{ color: '#E2C799' }}>
-                      {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (Réf. #${t.pastilleNum})`).join(', ')}
-                    </strong>
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
-                {todayPriorityItems.map((item) => {
-                  const metrics = getParcelHarvestMetrics(item.parcel);
-                  const isSelected = selectedParcel?.id === item.parcel.id;
-                  return (
-                    <div
-                      key={item.parcel.id}
-                      onClick={() => {
-                        setSelectedParcelId(item.parcel.id);
-                        scrollToSection('climat-inspector-card');
-                      }}
-                      style={{
-                        background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
-                        border: isSelected ? '2px solid #F97316' : '1px solid rgba(255,255,255,0.16)',
-                        borderRadius: '10px',
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '10px',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <span
-                            style={{
-                              background: '#F97316',
-                              color: '#FFFFFF',
-                              fontWeight: 800,
-                              fontSize: '11px',
-                              padding: '1px 7px',
-                              borderRadius: '999px',
-                            }}
-                          >
-                            Réf. #{item.pastilleNum} {item.pageLivret ? `· Livret p.${item.pageLivret}` : ''}
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#E2C799', fontWeight: 700 }}>
-                            {item.status === 'en_cours' ? '● En cours de coupe' : 'À attaquer en premier'}
-                          </span>
-                        </div>
-                        <div className="serif-display" style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF' }}>
-                          {item.parcel.name.replace(' — fictif', '')} ({item.parcel.code})
-                        </div>
-                        <div style={{ fontSize: '11.5px', color: 'rgba(250,248,245,0.8)' }}>
-                          {item.nbRangs} · <strong>{metrics.totalCaisses} caisses</strong> ({metrics.totalKg} kg)
-                        </div>
-                      </div>
-
-                      <a
-                        href={item.googleMapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(ev) => ev.stopPropagation()}
-                        style={{
-                          background: '#10B981',
-                          color: '#FFFFFF',
-                          fontWeight: 800,
-                          fontSize: '12px',
-                          padding: '8px 13px',
-                          borderRadius: '999px',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                        }}
-                      >
-                        <Navigation size={14} />
-                        <span>Y ALLER (MAPS)</span>
-                      </a>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="grid-2">
-          {/* Colonne Gauche : Vraie Carte Interactive Navigable (Zoom / Pan / GPS Flottant / Plein Écran) */}
+        <div className="animate-fade-in">
+          <div className="vineyard-workspace-grid">
+          {/* Colonne Gauche : Vraie Carte Interactive + Fiche Climat sélectionné */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
           <div
             id="vineyard-map-card"
             className="card"
@@ -1472,9 +1301,10 @@ export const VineyardView: React.FC<{
               background: fieldMode ? '#141814' : 'var(--color-surface)',
               color: fieldMode ? '#FAF8F5' : 'var(--color-ink)',
               borderColor: fieldMode ? '#C4A47A' : 'var(--color-border)',
+              padding: '16px',
             }}
           >
-            <div className="card-header" style={{ borderColor: fieldMode ? 'rgba(255,255,255,0.12)' : undefined, marginBottom: '10px' }}>
+            <div className="card-header" style={{ borderColor: fieldMode ? 'rgba(255,255,255,0.12)' : undefined, marginBottom: '10px', paddingBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
@@ -1486,6 +1316,7 @@ export const VineyardView: React.FC<{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
                   <MapPin size={16} />
@@ -1495,7 +1326,7 @@ export const VineyardView: React.FC<{
                     Carte Satellite Interactive, Cadastre IGN & GPS Terrain
                   </h2>
                   <div style={{ fontSize: '11.5px', opacity: 0.78 }}>
-                    Déplacez-vous et zoomez sur la carte · Cliquez sur « ME LOCALISER (GPS) » en bas à droite ou ouvrez en Plein Écran
+                    Touchez une parcelle ou utilisez « ME LOCALISER (GPS) » · Plein écran disponible en haut à droite de la carte
                   </div>
                 </div>
               </div>
@@ -1508,8 +1339,7 @@ export const VineyardView: React.FC<{
               isEditingGpsPin={isEditingGpsPin}
               onToggleEditGpsPin={() => setIsEditingGpsPin((v) => !v)}
               onSetCustomGps={handleSetCustomGpsFromMap}
-              onOpenLivret={() => switchVineyardView('livret')}
-              fieldMode={fieldMode || restrictedFieldMode}
+              fieldMode={fieldMode || terrainFocus}
             />
 
             {/* Fiche du Climat Sélectionné + Continuité Post-Vendange ("Ce qu'il se passe par la suite") */}
@@ -1786,27 +1616,133 @@ export const VineyardView: React.FC<{
               </div>
             )}
           </div>
+          </div>
 
-          {/* Colonne Droite : Répertoire Parcellaire avec Statut Vendange & Horizon */}
-          <div className="card">
-            <div className="card-header">
+          {/* Colonne Droite : Feuille de route GPS du jour + Répertoire Parcellaire */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+            {todayPriorityItems.length > 0 && (
+              <div className="vineyard-route-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                  <span
+                    style={{
+                      background: '#F97316',
+                      color: '#FFFFFF',
+                      fontWeight: 800,
+                      fontSize: '10.5px',
+                      padding: '3px 9px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    🌅 À vendanger aujourd’hui
+                  </span>
+                  {tomorrowItems.length > 0 && (
+                    <span style={{ fontSize: '11.5px', color: 'rgba(250,248,245,0.78)' }}>
+                      Demain :{' '}
+                      <strong style={{ color: '#E2C799' }}>
+                        {tomorrowItems.map((t) => `${t.parcel.name.replace(' — fictif', '')} (#${t.pastilleNum})`).join(', ')}
+                      </strong>
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {todayPriorityItems.map((item) => {
+                    const metrics = getParcelHarvestMetrics(item.parcel);
+                    const isSelected = selectedParcel?.id === item.parcel.id;
+                    return (
+                      <div
+                        key={item.parcel.id}
+                        onClick={() => setSelectedParcelId(item.parcel.id)}
+                        style={{
+                          background: isSelected ? 'rgba(249, 115, 22, 0.16)' : 'rgba(255,255,255,0.06)',
+                          border: isSelected ? '2px solid #F97316' : '1px solid rgba(255,255,255,0.16)',
+                          borderRadius: '10px',
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                background: '#F97316',
+                                color: '#FFFFFF',
+                                fontWeight: 800,
+                                fontSize: '10.5px',
+                                padding: '1px 7px',
+                                borderRadius: '999px',
+                              }}
+                            >
+                              Réf. #{item.pastilleNum}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#E2C799', fontWeight: 700 }}>
+                              {item.status === 'en_cours' ? '● En cours' : 'Prioritaire'}
+                            </span>
+                          </div>
+                          <div className="serif-display" style={{ fontSize: '17px', fontWeight: 700, color: '#FFFFFF' }}>
+                            {item.parcel.name.replace(' — fictif', '')} ({item.parcel.code})
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: 'rgba(250,248,245,0.82)' }}>
+                            {item.nbRangs} · <strong>{metrics.totalCaisses} c.</strong> ({metrics.totalKg} kg)
+                          </div>
+                        </div>
+
+                        <a
+                          href={item.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(ev) => ev.stopPropagation()}
+                          style={{
+                            background: '#10B981',
+                            color: '#FFFFFF',
+                            fontWeight: 800,
+                            fontSize: '11.5px',
+                            padding: '7px 12px',
+                            borderRadius: '999px',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <Navigation size={13} />
+                          <span>Y ALLER</span>
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          <div className="card" style={{ padding: '16px' }}>
+            <div className="card-header" style={{ marginBottom: '12px', paddingBottom: '10px' }}>
               <div>
-                <h2 className="card-title">Répertoire Parcellaire & État d’Avancement</h2>
-                <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-                  Chaque Climat combine référence cadastrale, Pastille du livret et cumul (Caisses / kg / hL)
+                <h2 className="card-title" style={{ fontSize: '18px' }}>Répertoire Parcellaire</h2>
+                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
+                  Touchez un climat pour centrer la carte & inspecter l’accès
                 </div>
               </div>
               <span className="badge badge-gold">{filteredParcels.length} Climats</span>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <input
                 type="search"
-                className="form-input"
-                placeholder="Rechercher un Climat, commune, cépage..."
+                className="form-input form-input-sm"
+                placeholder="Rechercher Climat, cépage..."
                 value={parcelSearch}
                 onChange={(e) => setParcelSearch(e.target.value)}
-                style={{ flex: 1, minWidth: '170px' }}
+                style={{ flex: 1, minWidth: '150px' }}
               />
               <div className="segmented-control">
                 {(['all', 'Grand Cru', '1er Cru', 'Village'] as const).map((lvl) => (
@@ -1815,7 +1751,7 @@ export const VineyardView: React.FC<{
                     type="button"
                     className={`segmented-btn ${levelFilter === lvl ? 'active' : ''}`}
                     onClick={() => setLevelFilter(lvl)}
-                    style={{ fontSize: '11.5px', padding: '5px 10px' }}
+                    style={{ fontSize: '11px', padding: '4px 9px' }}
                   >
                     {lvl === 'all' ? 'Tous' : lvl}
                   </button>
@@ -1833,18 +1769,17 @@ export const VineyardView: React.FC<{
                   track.status === 'vendange'
                     ? { label: '✓ Vendangé', cls: 'badge-green' }
                     : track.status === 'en_cours'
-                    ? { label: '● En cours (Aujourd’hui)', cls: 'badge-amber' }
-                    : { label: 'Demain / À venir', cls: 'badge-muted' };
+                    ? { label: '● En cours', cls: 'badge-amber' }
+                    : { label: 'À venir', cls: 'badge-muted' };
 
                 return (
                   <div
                     key={p.id}
                     onClick={() => {
                       setSelectedParcelId(p.id);
-                      scrollToSection('climat-inspector-card');
                     }}
                     style={{
-                      padding: '12px 14px',
+                      padding: '10px 12px',
                       borderRadius: 'var(--radius-sm)',
                       border: isSelected ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)',
                       background: isSelected ? 'var(--color-gold-soft)' : 'var(--color-surface)',
@@ -1856,15 +1791,15 @@ export const VineyardView: React.FC<{
                       transition: 'all 140ms ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                       <div
                         style={{
-                          width: '28px',
-                          height: '28px',
+                          width: '26px',
+                          height: '26px',
                           borderRadius: '50%',
                           background: isSelected ? '#F97316' : 'var(--color-surface-soft)',
                           color: isSelected ? '#FFFFFF' : 'var(--color-ink)',
-                          fontSize: '11.5px',
+                          fontSize: '11px',
                           fontWeight: 700,
                           display: 'flex',
                           alignItems: 'center',
@@ -1876,8 +1811,8 @@ export const VineyardView: React.FC<{
                         {meta.pastilleNum}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span className="serif-display" style={{ fontWeight: 600, fontSize: '17px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                          <span className="serif-display" style={{ fontWeight: 600, fontSize: '16px' }}>
                             {p.name}
                           </span>
                           <span className={`badge ${getLevelBadgeClass(meta.classification)}`}>
@@ -1887,24 +1822,25 @@ export const VineyardView: React.FC<{
                             {statusBadge.label}
                           </span>
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
-                          {meta.appellation} · {meta.nbRangs}
+                        <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)', marginTop: '2px' }}>
+                          {meta.appellation} · {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : '—'}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ textAlign: 'right', flexShrink: 0 }} className="tabular">
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-forest)' }}>
-                        {metrics.totalCaisses} c. · {metrics.totalKg} kg · {metrics.totalHl} hL
+                      <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--color-forest)' }}>
+                        {metrics.totalCaisses} c. · {metrics.totalKg} kg
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-ink-light)' }}>
-                        {p.areaM2 ? `${(p.areaM2.value / 10000).toFixed(2)} ha` : 'Surface inconnue'} · Livret p.{meta.pageLivret}
+                      <div style={{ fontSize: '10.5px', color: 'var(--color-ink-light)' }}>
+                        {metrics.totalHl} hL · p.{meta.pageLivret}
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
+          </div>
           </div>
           </div>
         </div>
@@ -2309,7 +2245,7 @@ export const VineyardView: React.FC<{
       {effectiveView === 'harvest' && (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* Alerte d'action immédiate au rang : départ navette vers le pressoir */}
-          {untransportedCounts.length > 0 && !restrictedFieldMode && (
+          {untransportedCounts.length > 0 && (
             <div className="ds-direct-bar" style={{ marginTop: 0 }}>
               <div>
                 <div style={{ fontWeight: 800, fontSize: '14.5px', color: 'var(--color-ink)' }}>
@@ -2334,7 +2270,7 @@ export const VineyardView: React.FC<{
             </div>
           )}
 
-          {/* Jauges de progression des vendanges (uniquement sur cet écran Planning & Vendanges) */}
+          {/* Jauges uniques de progression des vendanges */}
           <section className="ds-stats" aria-label="Repères de vendange">
             <div className="ds-stat">
               <div className="ds-stat-top">
@@ -2403,33 +2339,33 @@ export const VineyardView: React.FC<{
                 <span className="ds-icon-bubble ds-tone-grape">
                   <Wine size={16} />
                 </span>
-                <span>Surface suivie</span>
+                <span>Volume potentiel</span>
               </div>
               <div className="ds-stat-value">
-                {totalAreaHa.toFixed(2)}
-                <span className="ds-stat-unit">ha</span>
+                {globalHarvestStats.hl}
+                <span className="ds-stat-unit">hL</span>
               </div>
               <div className="ds-bar" aria-hidden="true">
                 <span style={{ width: '100%', background: 'var(--color-grape)' }} />
               </div>
               <div className="ds-stat-foot">
-                {territoryLabel} · {parcels.length} parcelles
+                Soit {(globalHarvestStats.hl / 2.28).toFixed(1)} pièces (228 L) · {totalAreaHa.toFixed(2)} ha
               </div>
             </div>
           </section>
-          {/* Tableau de Pilotage Quotidien inspiré de Parcelles-vendanges (Aujourd'hui / Demain / Jours à venir + Caisses / kg / hL) */}
+          {/* Tableau de Pilotage Quotidien (Aujourd'hui / Demain / Jours à venir + Caisses / kg / hL) */}
           <div className="card">
             <div className="card-header">
               <div>
-                <h2 className="card-title">Pilotage des Parcelles à Vendanger (Aujourd’hui · Demain · Jours à venir)</h2>
+                <h2 className="card-title">Pilotage des Parcelles à Vendanger</h2>
                 <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
-                  Planifiez l’ordre de coupe et suivez l’avancement en Caisses, en Kilogrammes (kg) ou en Hectolitres (hL)
+                  Planifiez l’ordre de coupe (Aujourd’hui · Demain · À venir) et suivez Caisses, kg ou hL
                 </div>
               </div>
 
               {/* Sélecteur d'unité actif : Caisses | kg | hL */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>Unité de saisie rapide :</span>
+                <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--color-ink-muted)' }}>Unité :</span>
                 <div className="segmented-control">
                   <button
                     type="button"
@@ -2452,57 +2388,6 @@ export const VineyardView: React.FC<{
                   >
                     <Droplets size={13} /> Volume (hL)
                   </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Barre de synthèse globale Multi-Unités */}
-            <div className="grid-4" style={{ marginBottom: '16px' }}>
-              <div style={{ padding: '12px 14px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>
-                  Progression Parcellaire
-                </div>
-                <div className="serif-display tabular" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-forest)', marginTop: '2px' }}>
-                  {globalHarvestStats.doneCount} / {parcels.length} vendangées
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
-                  {globalHarvestStats.inProgressCount} en cours · {globalHarvestStats.todoCount} à venir
-                </div>
-              </div>
-
-              <div style={{ padding: '12px 14px', background: unitMode === 'caisses' ? 'var(--color-gold-soft)' : 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: unitMode === 'caisses' ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>
-                  Cumul Caisses (Terrain)
-                </div>
-                <div className="serif-display tabular" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-ink)', marginTop: '2px' }}>
-                  {globalHarvestStats.caisses} caisses
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
-                  Caisses de ~18–20 kg
-                </div>
-              </div>
-
-              <div style={{ padding: '12px 14px', background: unitMode === 'kg' ? 'var(--color-gold-soft)' : 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: unitMode === 'kg' ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>
-                  Cumul Poids Raisin (kg)
-                </div>
-                <div className="serif-display tabular" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-ink)', marginTop: '2px' }}>
-                  {globalHarvestStats.kg.toLocaleString('fr-FR')} kg
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
-                  Bascule quai + estimé rangs
-                </div>
-              </div>
-
-              <div style={{ padding: '12px 14px', background: unitMode === 'hl' ? 'var(--color-gold-soft)' : 'var(--color-bg-elevated)', borderRadius: 'var(--radius-sm)', border: unitMode === 'hl' ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>
-                  Cumul Volume Moût (hL)
-                </div>
-                <div className="serif-display tabular" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-grape)', marginTop: '2px' }}>
-                  {globalHarvestStats.hl} hL
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--color-ink-muted)' }}>
-                  Soit {(globalHarvestStats.hl / 2.28).toFixed(1)} pièces bourguignonnes (228 L)
                 </div>
               </div>
             </div>
@@ -2557,6 +2442,9 @@ export const VineyardView: React.FC<{
                 const effPastille = track.customPastilleNum ?? meta.pastilleNum;
                 const effClass = track.customClassification ?? meta.classification;
                 const effNbRangs = track.customNbRangs ?? meta.nbRangs;
+                const activeHarvestMission = missions.find(
+                  (m) => m.parcelId === p.id && m.operation === 'harvest' && m.status !== 'completed'
+                );
                 return (
                   <div
                     key={p.id}
@@ -2578,20 +2466,14 @@ export const VineyardView: React.FC<{
                           <span className={`badge ${getLevelBadgeClass(effClass)}`}>{effClass}</span>
                           <select
                             aria-label={`Jour de vendange ${p.name}`}
+                            className="form-select form-select-sm"
                             value={track.daySlot}
                             onChange={(e) =>
                               updateParcelTrack(p, {
                                 daySlot: e.target.value as CustomParcelTracking['daySlot'],
                               })
                             }
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--color-border)',
-                              background: 'var(--color-bg-elevated)',
-                              fontWeight: 600,
-                            }}
+                            style={{ width: 'auto', minHeight: '28px', fontSize: '11.5px', fontWeight: 600 }}
                           >
                             <option value="today">📅 Aujourd’hui</option>
                             <option value="tomorrow">📅 Demain</option>
@@ -2647,7 +2529,7 @@ export const VineyardView: React.FC<{
                       </div>
                     </div>
 
-                    {/* Compteurs Caisses / kg / hL + Boutons d'incrément/correction selon l'unité choisie */}
+                    {/* Compteurs Caisses / kg / hL + Boutons d'incrément / Mission auditée */}
                     <div
                       style={{
                         display: 'flex',
@@ -2667,7 +2549,20 @@ export const VineyardView: React.FC<{
                         <span style={{ color: 'var(--color-grape)' }}>{metrics.totalHl} hL</span>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '4px' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {activeHarvestMission && canEditVineyard && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-gold"
+                            onClick={() => {
+                              setShowCountModal(activeHarvestMission);
+                              setCountQuantity('8');
+                            }}
+                            title="Saisir un comptage audité relié au transport vers le pressoir"
+                          >
+                            <Plus size={12} /> Compter (Mission)
+                          </button>
+                        )}
                         {unitMode === 'caisses' && (
                           <>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={() => adjustParcelUnit(p, -1)} disabled={track.extraCaisses <= 0} title="Retirer 1 caisse ajoutée">
@@ -2922,7 +2817,7 @@ export const VineyardView: React.FC<{
       {/* =====================================================================
           SOUS-VUE 4 : QUAI DE RÉCEPTION & PESÉES AU CHAI
          ===================================================================== */}
-      {effectiveView === 'reception' && !restrictedFieldMode && (
+      {effectiveView === 'reception' && (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* Jauges spécifiques au Quai & Pressoir */}
           <section className="ds-stats" aria-label="Repères du quai de réception">
@@ -3182,537 +3077,559 @@ export const VineyardView: React.FC<{
        {/* =====================================================================
            SOUS-VUE 5 : REGISTRE PHYTOSANITAIRE BIO/HVE (DAR) & POINTAGE TESA MSA
           ===================================================================== */}
-       {effectiveView === 'phyto_tesa' && !restrictedFieldMode && isAddonEnabled('phyto_tesa') && (
+       {effectiveView === 'phyto_tesa' && isAddonEnabled('phyto_tesa') && (
          <PhytoAndTesaPanel parcels={parcels} />
        )}
 
       {/* Modal Ajout Comptage */}
       {showCountModal && (
-        <div className="modal-backdrop" onClick={() => setShowCountModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '12px' }}>
-              Saisie terrain : Ajouter un comptage ({showCountModal.title})
-            </h2>
-            <form onSubmit={handleAddCount}>
-              <div className="form-group">
-                <label className="form-label">Nombre de caisses (20 kg nominal)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  className="form-input"
-                  value={countQuantity}
-                  onChange={(e) => setCountQuantity(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCountModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Enregistrer le comptage
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Saisie terrain"
+          title={`Ajouter un comptage (${showCountModal.title})`}
+          subtitle="Comptage horodaté des cagettes coupées au bout du rang."
+          onClose={() => setShowCountModal(null)}
+          onSubmit={handleAddCount}
+          maxWidth="480px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCountModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer le comptage
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Nombre de caisses (20 kg nominal)</label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                min="1"
+                max="500"
+                className="form-input tabular"
+                value={countQuantity}
+                onChange={(e) => setCountQuantity(e.target.value)}
+                required
+                autoFocus
+              />
+              <span className="input-unit-cap">caisses</span>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal Correction Comptage */}
       {showCorrectModal && (
-        <div className="modal-backdrop" onClick={() => setShowCorrectModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '8px' }}>
-              Correction auditée du comptage ({showCorrectModal.id})
-            </h2>
-            <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              La valeur actuelle ({showCorrectModal.quantity} caisses, v{showCorrectModal.version}) sera archivée dans l’historique.
-            </p>
-            <form onSubmit={handleCorrectCount}>
-              <div className="form-group">
-                <label className="form-label">Nouvelle quantité exacte (caisses)</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="form-input"
-                  value={correctQty}
-                  onChange={(e) => setCorrectQty(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Motif obligatoire de correction</label>
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  placeholder="Ex : Recomptage contradictoire au chargement de la remorque"
-                  value={correctReason}
-                  onChange={(e) => setCorrectReason(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCorrectModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-accent">
-                  Valider la correction
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Audit vendanges"
+          title={`Correction auditée (${showCorrectModal.id})`}
+          subtitle={`La valeur actuelle (${showCorrectModal.quantity} caisses, v${showCorrectModal.version}) sera archivée dans l’historique.`}
+          onClose={() => setShowCorrectModal(null)}
+          onSubmit={handleCorrectCount}
+          maxWidth="520px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCorrectModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-accent">
+                Valider la correction
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Nouvelle quantité exacte</label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                min="0"
+                className="form-input tabular"
+                value={correctQty}
+                onChange={(e) => setCorrectQty(e.target.value)}
+                required
+              />
+              <span className="input-unit-cap">caisses</span>
+            </div>
           </div>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Motif obligatoire de correction</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              placeholder="Ex : Recomptage contradictoire au chargement de la remorque"
+              value={correctReason}
+              onChange={(e) => setCorrectReason(e.target.value)}
+              required
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modal Création Transport */}
       {showTransportModal && (
-        <div className="modal-backdrop" onClick={() => setShowTransportModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '12px' }}>
-              Créer un transport vers le chai
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              {selectedCountsForTransport.length} comptage(s) sélectionné(s) vont être chargés et placés en statut <code>in_transit</code>.
-            </p>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <Modal
+          eyebrow="Navette pressoir"
+          title="Créer un transport vers le chai"
+          subtitle="Regroupe les cagettes coupées pour les acheminer vers le quai de réception."
+          onClose={() => setShowTransportModal(false)}
+          maxWidth="480px"
+          footer={
+            <>
               <button type="button" className="btn btn-secondary" onClick={() => setShowTransportModal(false)}>
                 Annuler
               </button>
               <button type="button" className="btn btn-primary" onClick={handleCreateTransport}>
                 Confirmer le départ navette
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p style={{ fontSize: '13.5px', color: 'var(--color-ink)', lineHeight: 1.5 }}>
+            <strong>{selectedCountsForTransport.length} comptage(s)</strong> sélectionné(s) vont être chargés sur la navette et placés en statut <code>in_transit</code>.
+          </p>
+        </Modal>
       )}
 
       {/* Modal Réception au Chai */}
-      {showReceptionModal && (
-        <div className="modal-backdrop" onClick={() => setShowReceptionModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '8px' }}>
-              Réception & Pesée au Chai ({showReceptionModal})
-            </h2>
-            <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Règle métier : la réception enregistre des kilogrammes de raisin (Brut − Tare = Net). Aucun volume en litres n’est inventé par conversion automatique.
-            </p>
-            <form onSubmit={handleRecordReception}>
-              <div className="form-group">
-                <label className="form-label">Numéro de ticket de pesée</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={receptionTicket}
-                  onChange={(e) => setReceptionTicket(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Poids Brut (kg)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={grossKg}
-                    onChange={(e) => setGrossKg(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Tare contenants (kg)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="form-input"
-                    value={tareKg}
-                    onChange={(e) => setTareKg(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Lot de vinification destinataire</label>
-                <select
-                  className="form-select"
-                  value={receptionDestLot}
-                  onChange={(e) => setReceptionDestLot(e.target.value)}
-                >
-                  {Object.values(state.lots)
-                    .filter((l) => l.vintage === 2026)
-                    .map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+      {showReceptionModal && (() => {
+        const netCalc = Math.max(0, (parseFloat(grossKg || '0') || 0) - (parseFloat(tareKg || '0') || 0));
+        return (
+          <Modal
+            eyebrow="Quai & Pont-bascule"
+            title={`Réception & Pesée (${showReceptionModal})`}
+            subtitle="La réception enregistre des kilogrammes de raisin (Brut − Tare = Net) sans conversion automatique en litres."
+            onClose={() => setShowReceptionModal(null)}
+            onSubmit={handleRecordReception}
+            maxWidth="580px"
+            footerNote={
+              <span>
+                Poids net calculé : <strong className="tabular" style={{ color: 'var(--color-forest)' }}>{netCalc.toLocaleString('fr-FR')} kg</strong>
+              </span>
+            }
+            footer={
+              <>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowReceptionModal(null)}>
                   Annuler
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Valider la réception ({Math.max(0, parseFloat(grossKg || '0') - parseFloat(tareKg || '0'))} kg net)
+                  Valider la réception ({netCalc} kg net)
                 </button>
+              </>
+            }
+          >
+            <div className="form-group">
+              <label className="form-label">Numéro de ticket de pesée</label>
+              <input
+                type="text"
+                className="form-input font-mono-metric"
+                value={receptionTicket}
+                onChange={(e) => setReceptionTicket(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label">Poids Brut</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input tabular"
+                    value={grossKg}
+                    onChange={(e) => setGrossKg(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">kg</span>
+                </div>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <div className="form-group">
+                <label className="form-label">Tare contenants</label>
+                <div className="input-with-unit">
+                  <input
+                    type="number"
+                    min="0"
+                    className="form-input tabular"
+                    value={tareKg}
+                    onChange={(e) => setTareKg(e.target.value)}
+                    required
+                  />
+                  <span className="input-unit-cap">kg</span>
+                </div>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Lot de vinification destinataire</label>
+              <select
+                className="form-select"
+                value={receptionDestLot}
+                onChange={(e) => setReceptionDestLot(e.target.value)}
+              >
+                {Object.values(state.lots)
+                  .filter((l) => l.vintage === 2026)
+                  .map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} — {l.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Modal Observation */}
       {showObsModal && (
-        <div className="modal-backdrop" onClick={() => setShowObsModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 600, marginBottom: '12px' }}>
-              Nouvelle observation — {showObsModal.name}
-            </h2>
-            <form onSubmit={handleAddObservation}>
-              <div className="form-group">
-                <label className="form-label">Observation terrain (état sanitaire, pépins, pellicules...)</label>
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={obsText}
-                  onChange={(e) => setObsText(e.target.value)}
-                  placeholder="Ex : État sanitaire irréprochable, pellicules croquantes, pépins bruns..."
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Indicateur</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={obsMeasureLabel}
-                    onChange={(e) => setObsMeasureLabel(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Valeur</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="form-input"
-                    value={obsMeasureVal}
-                    onChange={(e) => setObsMeasureVal(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Unité</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={obsMeasureUnit}
-                    onChange={(e) => setObsMeasureUnit(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowObsModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Enregistrer l’observation
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Suivi agronomique"
+          title={`Nouvelle observation — ${showObsModal.name}`}
+          subtitle="État sanitaire, maturité des pépins, pellicules et contrôle réfractométrique."
+          onClose={() => setShowObsModal(null)}
+          onSubmit={handleAddObservation}
+          maxWidth="580px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowObsModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer l’observation
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Observation terrain (état sanitaire, pépins, pellicules...)</label>
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={obsText}
+              onChange={(e) => setObsText(e.target.value)}
+              placeholder="Ex : État sanitaire irréprochable, pellicules croquantes, pépins bruns..."
+              required
+              autoFocus
+            />
           </div>
-        </div>
+          <div className="form-grid-3">
+            <div className="form-group">
+              <label className="form-label">Indicateur</label>
+              <input
+                type="text"
+                className="form-input"
+                value={obsMeasureLabel}
+                onChange={(e) => setObsMeasureLabel(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Valeur</label>
+              <input
+                type="number"
+                step="0.1"
+                className="form-input tabular"
+                value={obsMeasureVal}
+                onChange={(e) => setObsMeasureVal(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Unité</label>
+              <input
+                type="text"
+                className="form-input"
+                value={obsMeasureUnit}
+                onChange={(e) => setObsMeasureUnit(e.target.value)}
+              />
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Modal Paramétrage Complet & Photos Terrain de la Parcelle */}
       {configParcel && (
-        <div className="modal-backdrop" onClick={() => setConfigParcel(null)}>
-          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-              <div>
-                <span className="badge badge-gold" style={{ marginBottom: '4px' }}>
-                  Paramétrage Parcellaire & Terrain
-                </span>
-                <h2 className="serif-display" style={{ fontSize: '22px', fontWeight: 700 }}>
-                  {configParcel.name} ({configParcel.code})
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                onClick={handleCaptureDeviceGps}
-                title="Utiliser le GPS du téléphone/tablette pour capturer les coordonnées exactes sur le terrain"
-              >
-                <Crosshair size={13} />
-                <span>Capturer ma position GPS actuelle</span>
+        <Modal
+          eyebrow="Paramétrage Parcellaire & Terrain"
+          title={`${configParcel.name} (${configParcel.code})`}
+          subtitle="Ajustez les coordonnées GPS d'entrée de rang, les repères du livret et les photos d'accès."
+          onClose={() => setConfigParcel(null)}
+          onSubmit={handleSaveParcelConfig}
+          maxWidth="680px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setConfigParcel(null)}>
+                Annuler
               </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer le paramétrage de la parcelle
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+              Positionnement GPS précis de l’entrée de rang
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              onClick={handleCaptureDeviceGps}
+              title="Utiliser le GPS du téléphone/tablette pour capturer les coordonnées exactes sur le terrain"
+            >
+              <Crosshair size={13} />
+              <span>Capturer ma position GPS actuelle</span>
+            </button>
+          </div>
+
+          {gpsStatusMsg && (
+            <div
+              style={{
+                marginBottom: '14px',
+                padding: '9px 12px',
+                background: 'var(--color-forest-soft)',
+                border: '1px solid var(--color-forest-border)',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--color-forest)',
+              }}
+            >
+              {gpsStatusMsg}
+            </div>
+          )}
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Latitude GPS exacte (Entrée de rang)</label>
+              <input
+                type="number"
+                step="0.00001"
+                className="form-input tabular"
+                value={cfgLat}
+                onChange={(e) => {
+                  setCfgLat(e.target.value);
+                  setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${e.target.value},${cfgLng}`);
+                }}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Longitude GPS exacte (Entrée de rang)</label>
+              <input
+                type="number"
+                step="0.00001"
+                className="form-input tabular"
+                value={cfgLng}
+                onChange={(e) => {
+                  setCfgLng(e.target.value);
+                  setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${cfgLat},${e.target.value}`);
+                }}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Lien Google Maps direct (Itinéraire véhicule / benne ou épingle partagée)</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="url"
+                className="form-input"
+                value={cfgGoogleMapsUrl}
+                onChange={(e) => setCfgGoogleMapsUrl(e.target.value)}
+                placeholder="https://www.google.com/maps/dir/?api=1&destination=..."
+                style={{ flex: 1 }}
+              />
+              <a
+                href={cfgGoogleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ textDecoration: 'none' }}
+              >
+                <Navigation size={14} /> Tester Maps
+              </a>
+            </div>
+          </div>
+
+          <div className="form-grid-3">
+            <div className="form-group">
+              <label className="form-label">Référence Cadastrale</label>
+              <input
+                type="text"
+                className="form-input"
+                value={cfgSectionCadastrale}
+                onChange={(e) => setCfgSectionCadastrale(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Page du Livret</label>
+              <input
+                type="number"
+                min="1"
+                className="form-input tabular"
+                value={cfgPageLivret}
+                onChange={(e) => setCfgPageLivret(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Pastille n° (Repère)</label>
+              <input
+                type="number"
+                min="1"
+                className="form-input tabular"
+                value={cfgPastilleNum}
+                onChange={(e) => setCfgPastilleNum(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Subdivision & Nombre de rangs</label>
+              <input
+                type="text"
+                className="form-input"
+                value={cfgNbRangs}
+                onChange={(e) => setCfgNbRangs(e.target.value)}
+                placeholder="Ex : 42 rangs (Rangs 1 à 28 Chardonnay)"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Consignes d’accès (Fourgon / Tracteur)</label>
+              <input
+                type="text"
+                className="form-input"
+                value={cfgAccessNotes}
+                onChange={(e) => setCfgAccessNotes(e.target.value)}
+                placeholder="Ex : Entrée par le portail vert chemin haut"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Infos contextuelles (Terroir, pente, vigilance météo / sanitaire)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={cfgContextNotes}
+              onChange={(e) => setCfgContextNotes(e.target.value)}
+            />
+          </div>
+
+          {/* Section Photos prises du terrain */}
+          <div
+            style={{
+              padding: '12px',
+              background: 'var(--color-surface-soft)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink)' }}>
+                  📷 Photos prises du terrain (Entrée de rang, murger, grappes, accès)
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                  Sur mobile, ouvre directement l’appareil photo · Compression automatique hors-ligne
+                </div>
+              </div>
+              <label className="btn btn-sm btn-gold" style={{ cursor: 'pointer', margin: 0 }}>
+                <Camera size={13} />
+                <span>Prendre / Importer une photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleAddParcelPhoto}
+                  style={{ display: 'none' }}
+                />
+              </label>
             </div>
 
-            {gpsStatusMsg && (
-              <div
-                style={{
-                  marginBottom: '12px',
-                  padding: '8px 12px',
-                  background: 'var(--color-forest-soft)',
-                  border: '1px solid var(--color-forest-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: 'var(--color-forest)',
-                }}
-              >
-                {gpsStatusMsg}
-              </div>
-            )}
+            <div className="form-group" style={{ marginBottom: '10px' }}>
+              <input
+                type="text"
+                className="form-input form-input-sm"
+                value={newPhotoCaption}
+                onChange={(e) => setNewPhotoCaption(e.target.value)}
+                placeholder="Légende de la prochaine photo (ex: Portail d'accès rang n°1 côté nord)"
+              />
+            </div>
 
-            <form onSubmit={handleSaveParcelConfig}>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Latitude GPS exacte (Entrée de rang)</label>
-                  <input
-                    type="number"
-                    step="0.00001"
-                    className="form-input tabular"
-                    value={cfgLat}
-                    onChange={(e) => {
-                      setCfgLat(e.target.value);
-                      setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${e.target.value},${cfgLng}`);
-                    }}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Longitude GPS exacte (Entrée de rang)</label>
-                  <input
-                    type="number"
-                    step="0.00001"
-                    className="form-input tabular"
-                    value={cfgLng}
-                    onChange={(e) => {
-                      setCfgLng(e.target.value);
-                      setCfgGoogleMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${cfgLat},${e.target.value}`);
-                    }}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Lien Google Maps direct (Itinéraire véhicule / benne ou épingle partagée)</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="url"
-                    className="form-input"
-                    value={cfgGoogleMapsUrl}
-                    onChange={(e) => setCfgGoogleMapsUrl(e.target.value)}
-                    placeholder="https://www.google.com/maps/dir/?api=1&destination=..."
-                    style={{ flex: 1 }}
-                  />
-                  <a
-                    href={cfgGoogleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-secondary"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <Navigation size={14} /> Tester Maps
-                  </a>
-                </div>
-              </div>
-
-              <div className="grid-3">
-                <div className="form-group">
-                  <label className="form-label">Référence Cadastrale</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={cfgSectionCadastrale}
-                    onChange={(e) => setCfgSectionCadastrale(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Page du Livret</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={cfgPageLivret}
-                    onChange={(e) => setCfgPageLivret(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Pastille n° (Repère carte)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={cfgPastilleNum}
-                    onChange={(e) => setCfgPastilleNum(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Subdivision & Nombre de rangs</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={cfgNbRangs}
-                    onChange={(e) => setCfgNbRangs(e.target.value)}
-                    placeholder="Ex : 42 rangs (Rangs 1 à 28 Chardonnay)"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Consignes d’accès (Fourgon / Tracteur / Équipe)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={cfgAccessNotes}
-                    onChange={(e) => setCfgAccessNotes(e.target.value)}
-                    placeholder="Ex : Entrée par le portail vert chemin haut"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Infos contextuelles (Terroir, pente, vigilance météo / sanitaire)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={cfgContextNotes}
-                  onChange={(e) => setCfgContextNotes(e.target.value)}
-                />
-              </div>
-
-              {/* Section Photos prises du terrain */}
-              <div
-                style={{
-                  padding: '12px',
-                  background: 'var(--color-bg-elevated)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  marginBottom: '16px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--color-ink)' }}>
-                      📷 Photos prises du terrain (Entrée de rang, murger, grappes, accès)
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-                      Sur mobile, ouvre directement l’appareil photo · Compression automatique hors-ligne
-                    </div>
-                  </div>
-                  <label className="btn btn-sm btn-gold" style={{ cursor: 'pointer', margin: 0 }}>
-                    <Camera size={13} />
-                    <span>Prendre / Importer une photo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleAddParcelPhoto}
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={newPhotoCaption}
-                    onChange={(e) => setNewPhotoCaption(e.target.value)}
-                    placeholder="Légende de la prochaine photo (ex: Portail d'accès rang n°1 côté nord)"
-                    style={{ fontSize: '12px', padding: '6px 10px' }}
-                  />
-                </div>
-
-                {(() => {
-                  const track = getParcelTrack(configParcel);
-                  const photos = track.photos ?? [
-                    {
-                      id: 'default-photo-1',
-                      dataUrl: DEFAULT_FIELD_PHOTO_SVG,
-                      caption: `Entrée de rang Pastille n°${track.customPastilleNum ?? (CLIMAT_METADATA[configParcel.id]?.pastilleNum ?? 1)}`,
-                      date: '2026-10-20',
-                    },
-                  ];
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
-                      {photos.map((ph) => (
-                        <div
-                          key={ph.id}
-                          style={{
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '8px',
-                            background: 'var(--color-surface)',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <img
-                            src={ph.dataUrl}
-                            alt={ph.caption}
-                            onClick={() => setPreviewPhoto(ph)}
-                            style={{ width: '100%', height: '90px', objectFit: 'cover', cursor: 'pointer' }}
-                          />
-                          <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {ph.caption}
-                              </div>
-                              <div style={{ fontSize: '10px', color: 'var(--color-ink-light)' }}>{ph.date}</div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveParcelPhoto(configParcel, ph.id)}
-                              style={{ color: 'var(--color-crimson)', padding: '3px', cursor: 'pointer' }}
-                              title="Supprimer cette photo"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+            {(() => {
+              const track = getParcelTrack(configParcel);
+              const photos = track.photos ?? [
+                {
+                  id: 'default-photo-1',
+                  dataUrl: DEFAULT_FIELD_PHOTO_SVG,
+                  caption: `Entrée de rang Pastille n°${track.customPastilleNum ?? (CLIMAT_METADATA[configParcel.id]?.pastilleNum ?? 1)}`,
+                  date: '2026-10-20',
+                },
+              ];
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
+                  {photos.map((ph) => (
+                    <div
+                      key={ph.id}
+                      style={{
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '8px',
+                        background: 'var(--color-surface)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <img
+                        src={ph.dataUrl}
+                        alt={ph.caption}
+                        onClick={() => setPreviewPhoto(ph)}
+                        style={{ width: '100%', height: '90px', objectFit: 'cover', cursor: 'pointer' }}
+                      />
+                      <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {ph.caption}
                           </div>
+                          <div style={{ fontSize: '10px', color: 'var(--color-ink-light)' }}>{ph.date}</div>
                         </div>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveParcelPhoto(configParcel, ph.id)}
+                          style={{ color: 'var(--color-crimson)', padding: '3px', cursor: 'pointer' }}
+                          title="Supprimer cette photo"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                  );
-                })()}
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setConfigParcel(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Enregistrer le paramétrage de la parcelle
-                </button>
-              </div>
-            </form>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Lightbox d'aperçu plein écran d'une photo terrain */}
       {previewPhoto && (
-        <div className="modal-backdrop" onClick={() => setPreviewPhoto(null)}>
-          <div className="modal-content" style={{ maxWidth: '720px', padding: '16px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div>
-                <h3 className="serif-display" style={{ fontSize: '20px', fontWeight: 700 }}>{previewPhoto.caption}</h3>
-                <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>Photo terrain prise le {previewPhoto.date}</div>
-              </div>
-              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setPreviewPhoto(null)}>
-                Fermer
-              </button>
-            </div>
-            <img
-              src={previewPhoto.dataUrl}
-              alt={previewPhoto.caption}
-              style={{ width: '100%', maxHeight: '460px', objectFit: 'contain', borderRadius: '8px', background: '#141814' }}
-            />
-          </div>
-        </div>
+        <Modal
+          eyebrow="Repère visuel terrain"
+          title={previewPhoto.caption}
+          subtitle={`Photo terrain prise le ${previewPhoto.date}`}
+          onClose={() => setPreviewPhoto(null)}
+          maxWidth="720px"
+          footer={
+            <button type="button" className="btn btn-sm btn-secondary" onClick={() => setPreviewPhoto(null)}>
+              Fermer
+            </button>
+          }
+        >
+          <img
+            src={previewPhoto.dataUrl}
+            alt={previewPhoto.caption}
+            style={{ width: '100%', maxHeight: '460px', objectFit: 'contain', borderRadius: '10px', background: '#141814' }}
+          />
+        </Modal>
       )}
       {/* Modale d'Import & Traduction de Livrets Numériques (PDF/Texte, CVI Douanes, CSV, JSON/GeoJSON) */}
       {showLivretImportModal && (

@@ -213,72 +213,75 @@ export const DemoGuideModal: React.FC<{
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-content ds-modal" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="ds-modal-header">
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
+            <div className="ds-modal-eyebrow">Parcours Guidé</div>
+            <h2 className="ds-modal-title">
               Visite guidée du scénario de démo (10 min)
             </h2>
-            <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>
+            <p className="ds-modal-subtitle">
               Étape {currentStep} sur 10 : {active.title}
-            </div>
+            </p>
           </div>
-          <button className="btn btn-sm btn-secondary" onClick={onClose}>
+          <button type="button" className="btn btn-sm btn-secondary" onClick={onClose}>
             ✕ Fermer
           </button>
         </div>
 
-        {/* Stepper progress */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '18px' }}>
-          {steps.map((s) => (
-            <button
-              key={s.num}
-              onClick={() => {
-                setCurrentStep(s.num);
-                goStep(s);
-              }}
-              style={{
-                flex: 1,
-                height: '6px',
-                borderRadius: '3px',
-                background: s.num === currentStep ? 'var(--color-forest)' : s.num < currentStep ? '#98BDB0' : '#E0DDD3',
-                cursor: 'pointer',
-              }}
-              title={`Étape ${s.num}: ${s.title}`}
-            />
-          ))}
-        </div>
-
-        {/* Step description */}
-        <div style={{ background: 'var(--color-surface-soft)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '18px' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-forest)', marginBottom: '6px' }}>
-            {active.num}. {active.title}
+        <div className="ds-modal-body">
+          {/* Stepper progress */}
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '18px' }}>
+            {steps.map((s) => (
+              <button
+                key={s.num}
+                onClick={() => {
+                  setCurrentStep(s.num);
+                  goStep(s);
+                }}
+                style={{
+                  flex: 1,
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: s.num === currentStep ? 'var(--color-forest)' : s.num < currentStep ? '#98BDB0' : '#E0DDD3',
+                  cursor: 'pointer',
+                }}
+                title={`Étape ${s.num}: ${s.title}`}
+              />
+            ))}
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: '1.6' }}>
-            {active.desc}
-          </p>
-        </div>
 
-        {/* Step action if executable */}
-        {active.action && (
-          <div style={{ marginBottom: '18px', padding: '12px', background: 'var(--color-forest-soft)', border: '1px solid #C2DCC8', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '13px' }}>Action automatique pour cette étape :</div>
-              <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>Exécute réellement la transaction métier persistante dans IndexedDB.</div>
+          {/* Step description */}
+          <div style={{ background: '#FFFFFF', border: '1px solid var(--color-border)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-forest)', marginBottom: '6px' }}>
+              {active.num}. {active.title}
             </div>
-            <button
-              className="btn btn-sm btn-primary"
-              disabled={executing}
-              onClick={handleStepAction}
-            >
-              {executing ? 'Exécution...' : active.actionLabel}
-            </button>
+            <p style={{ fontSize: '13px', color: 'var(--color-ink)', lineHeight: '1.6' }}>
+              {active.desc}
+            </p>
           </div>
-        )}
+
+          {/* Step action if executable */}
+          {active.action && (
+            <div style={{ padding: '12px 14px', background: 'var(--color-forest-soft)', border: '1px solid var(--color-forest-border)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '13px' }}>Action automatique pour cette étape :</div>
+                <div style={{ fontSize: '12px', color: 'var(--color-ink-muted)' }}>Exécute réellement la transaction métier persistante dans IndexedDB.</div>
+              </div>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={executing}
+                onClick={handleStepAction}
+              >
+                {executing ? 'Exécution...' : active.actionLabel}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="ds-modal-footer" style={{ justifyContent: 'space-between' }}>
           <button
             className="btn btn-secondary"
             disabled={currentStep === 1}

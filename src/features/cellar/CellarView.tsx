@@ -21,6 +21,7 @@ import { lotVolumeMl, lotOccupancies } from '../../domain/selectors';
 import type { Container, ContainerKind, Measurement, MeasurementParameter } from '../../domain/types';
 import type { AssistantPrefillPayload } from '../ai/types';
 import { useAssistantPrefill } from '../ai/useAssistantPrefill';
+import { Modal } from '../../ui/Modal';
 
 const CUSTOM_CONTAINERS_KEY = 'domaine-erp-custom-containers-v1';
 const CONTAINER_OVERRIDES_KEY = 'domaine-erp-container-overrides-v1';
@@ -1328,346 +1329,351 @@ export const CellarView: React.FC<{
 
       {/* Modal Relevé */}
       {showMeasModal && (
-        <div className="modal-backdrop" onClick={() => setShowMeasModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="serif-display" style={{ fontSize: '20px', fontWeight: 700, marginBottom: '14px' }}>
-              Nouveau relevé analytique — {selectedLot?.name}
-            </h2>
-            <form onSubmit={handleAddMeasurement}>
-              <div className="form-group">
-                <label className="form-label">Lot / Cuvée concerné(e)</label>
-                <select
-                  className="form-select"
-                  value={selectedLot?.id ?? ''}
-                  onChange={(e) => setSelectedLotId(e.target.value)}
-                >
-                  {lots.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Paramètre mesuré</label>
-                <select
-                  className="form-select"
-                  value={paramKey}
-                  onChange={(e) => {
-                    const k = e.target.value as MeasurementParameter;
-                    setParamKey(k);
-                    setParamUnit(PARAMETERS[k].units[0]!);
-                    if (DEFAULT_PARAM_VALUES[k]) {
-                      setParamVal(DEFAULT_PARAM_VALUES[k]);
-                    }
-                  }}
-                >
-                  {Object.entries(PARAMETERS).map(([k, def]) => (
-                    <option key={k} value={k}>{def.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Valeur mesurée & Unité</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    step="any"
-                    className="form-input tabular"
-                    style={{ flex: 1, fontSize: '15px', fontWeight: 600 }}
-                    value={paramVal}
-                    onChange={(e) => setParamVal(e.target.value)}
-                    required
-                  />
-                  {PARAMETERS[paramKey].units.length > 1 ? (
-                    <select
-                      className="form-select"
-                      style={{ width: '160px', flexShrink: 0 }}
-                      value={paramUnit}
-                      onChange={(e) => setParamUnit(e.target.value)}
-                    >
-                      {PARAMETERS[paramKey].units.map((u) => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div
-                      style={{
-                        padding: '8px 16px',
-                        background: 'var(--color-surface-soft)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                        color: 'var(--color-forest)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minWidth: '85px',
-                        userSelect: 'none',
-                      }}
-                      title="Unité fixe déterminée par le paramètre"
-                    >
-                      {paramUnit || PARAMETERS[paramKey].units[0]}
-                    </div>
-                  )}
-                </div>
-                {PARAMETERS[paramKey].units.length === 1 && (
-                  <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: '4px', display: 'block' }}>
-                    Unité standard contrainte pour {PARAMETERS[paramKey].label} : <strong>{paramUnit || PARAMETERS[paramKey].units[0]}</strong>
-                  </span>
-                )}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Date du prélèvement</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={sampledDate}
-                  onChange={(e) => setSampledDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowMeasModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Enregistrer la mesure
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Chai & Analyses"
+          title={`Nouveau relevé analytique — ${selectedLot?.name ?? ''}`}
+          subtitle="Saisie horodatée de suivi fermentaire et analytique."
+          onClose={() => setShowMeasModal(false)}
+          onSubmit={handleAddMeasurement}
+          maxWidth="580px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowMeasModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer la mesure
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Lot / Cuvée concerné(e)</label>
+            <select
+              className="form-select"
+              value={selectedLot?.id ?? ''}
+              onChange={(e) => setSelectedLotId(e.target.value)}
+            >
+              {lots.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Paramètre mesuré</label>
+              <select
+                className="form-select"
+                value={paramKey}
+                onChange={(e) => {
+                  const k = e.target.value as MeasurementParameter;
+                  setParamKey(k);
+                  setParamUnit(PARAMETERS[k].units[0]!);
+                  if (DEFAULT_PARAM_VALUES[k]) {
+                    setParamVal(DEFAULT_PARAM_VALUES[k]);
+                  }
+                }}
+              >
+                {Object.entries(PARAMETERS).map(([k, def]) => (
+                  <option key={k} value={k}>{def.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date du prélèvement</label>
+              <input
+                type="date"
+                className="form-input tabular"
+                value={sampledDate}
+                onChange={(e) => setSampledDate(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Valeur mesurée & Unité</label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                step="any"
+                className="form-input tabular"
+                style={{ fontSize: '16px', fontWeight: 600 }}
+                value={paramVal}
+                onChange={(e) => setParamVal(e.target.value)}
+                required
+              />
+              {PARAMETERS[paramKey].units.length > 1 ? (
+                <select
+                  className="form-select input-unit-select"
+                  value={paramUnit}
+                  onChange={(e) => setParamUnit(e.target.value)}
+                >
+                  {PARAMETERS[paramKey].units.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="input-unit-cap" title="Unité fixe déterminée par le paramètre">
+                  {paramUnit || PARAMETERS[paramKey].units[0]}
+                </span>
+              )}
+            </div>
+            {PARAMETERS[paramKey].units.length === 1 && (
+              <span className="form-hint">
+                Unité standard contrainte pour {PARAMETERS[paramKey].label} : <strong>{paramUnit || PARAMETERS[paramKey].units[0]}</strong>
+              </span>
+            )}
+          </div>
+        </Modal>
       )}
 
       {/* Modal Correction de mesure */}
       {showCorrectMeas && (
-        <div className="modal-backdrop" onClick={() => setShowCorrectMeas(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '12px' }}>
-              Corriger le relevé ({PARAMETERS[showCorrectMeas.parameter]?.label})
-            </h2>
-            <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '12px' }}>
-              L’ancienne mesure ({showCorrectMeas.value} {showCorrectMeas.unit}) reste conservée dans l’historique (`supersededBy`).
-            </p>
-            <form onSubmit={handleCorrectMeasurement}>
-              <div className="form-group">
-                <label className="form-label">Nouvelle valeur corrigée ({showCorrectMeas.unit})</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="form-input"
-                  value={correctMeasVal}
-                  onChange={(e) => setCorrectMeasVal(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Motif de correction (obligatoire)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={correctMeasReason}
-                  onChange={(e) => setCorrectMeasReason(e.target.value)}
-                  placeholder="Ex : Correction de lecture hydromètre à 20°C"
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCorrectMeas(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-accent">
-                  Valider la correction
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Audit laboratoire"
+          title={`Corriger le relevé (${PARAMETERS[showCorrectMeas.parameter]?.label})`}
+          subtitle={`L’ancienne mesure (${showCorrectMeas.value} ${showCorrectMeas.unit}) reste conservée dans l’historique d’audit.`}
+          onClose={() => setShowCorrectMeas(null)}
+          onSubmit={handleCorrectMeasurement}
+          maxWidth="540px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCorrectMeas(null)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-accent">
+                Valider la correction
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Nouvelle valeur corrigée</label>
+            <div className="input-with-unit">
+              <input
+                type="number"
+                step="any"
+                className="form-input tabular"
+                value={correctMeasVal}
+                onChange={(e) => setCorrectMeasVal(e.target.value)}
+                required
+                autoFocus
+              />
+              <span className="input-unit-cap">{showCorrectMeas.unit}</span>
+            </div>
           </div>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Motif de correction (obligatoire)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={correctMeasReason}
+              onChange={(e) => setCorrectMeasReason(e.target.value)}
+              placeholder="Ex : Correction de lecture hydromètre à 20°C"
+              required
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modal Déclaration volume écoulé */}
       {showDeclareVolModal && (
-        <div className="modal-backdrop" onClick={() => setShowDeclareVolModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '10px' }}>
-              Déclarer le volume de moût / vin écoulé — {selectedLot?.name}
-            </h2>
-            <p style={{ fontSize: '12.5px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Les kilogrammes de raisin ({((selectedLot?.grapesReceivedG ?? 0) / 1000).toLocaleString('fr-FR')} kg) ne sont jamais convertis automatiquement en litres. Saisissez le volume réel entonné.
-            </p>
-            <form onSubmit={handleDeclareVolume}>
-              <div className="form-group">
-                <label className="form-label">Lot / Cuvée concerné(e)</label>
-                <select
-                  className="form-select"
-                  value={selectedLot?.id ?? ''}
-                  onChange={(e) => setSelectedLotId(e.target.value)}
-                >
-                  {lots.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.code} · {l.name} ({((l.grapesReceivedG ?? 0) / 1000).toLocaleString('fr-FR')} kg)
+        <Modal
+          eyebrow="Entonnage & Cuverie"
+          title={`Déclarer le volume écoulé — ${selectedLot?.name ?? ''}`}
+          subtitle={`Les kilogrammes de raisin (${((selectedLot?.grapesReceivedG ?? 0) / 1000).toLocaleString('fr-FR')} kg) ne sont jamais convertis automatiquement : saisissez le volume réel entonné.`}
+          onClose={() => setShowDeclareVolModal(false)}
+          onSubmit={handleDeclareVolume}
+          maxWidth="560px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowDeclareVolModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Déclarer le volume
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Lot / Cuvée concerné(e)</label>
+            <select
+              className="form-select"
+              value={selectedLot?.id ?? ''}
+              onChange={(e) => setSelectedLotId(e.target.value)}
+            >
+              {lots.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} · {l.name} ({((l.grapesReceivedG ?? 0) / 1000).toLocaleString('fr-FR')} kg)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Contenant de destination</label>
+              <select
+                className="form-select"
+                value={effectiveDeclareContainerId}
+                onChange={(e) => setDeclareContainerId(e.target.value)}
+              >
+                {emptyAvailableContainers.length === 0 ? (
+                  <option value="">Aucune cuve vide disponible</option>
+                ) : (
+                  emptyAvailableContainers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} ({c.capacityMl / 1000} L)
                     </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Contenant de destination</label>
-                <select
-                  className="form-select"
-                  value={effectiveDeclareContainerId}
-                  onChange={(e) => setDeclareContainerId(e.target.value)}
-                >
-                  {emptyAvailableContainers.length === 0 ? (
-                    <option value="">Aucune cuve vide disponible</option>
-                  ) : (
-                    emptyAvailableContainers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} ({c.capacityMl / 1000} L)
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Volume réel mesuré (Litres)</label>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Volume réel mesuré</label>
+              <div className="input-with-unit">
                 <input
                   type="number"
                   min="1"
-                  className="form-input"
+                  className="form-input tabular"
                   value={declareLitres}
                   onChange={(e) => setDeclareLitres(e.target.value)}
                   required
                 />
+                <span className="input-unit-cap">Litres</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowDeclareVolModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Déclarer le volume
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal Dégustation */}
       {showTastingModal && (
-        <div className="modal-backdrop" onClick={() => setShowTastingModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              Note de dégustation — {selectedLot?.name}
-            </h2>
-            <form onSubmit={handleAddTasting}>
-              <div className="form-group">
-                <label className="form-label">Lot / Cuvée concerné(e)</label>
-                <select
-                  className="form-select"
-                  value={selectedLot?.id ?? ''}
-                  onChange={(e) => setSelectedLotId(e.target.value)}
-                >
-                  {lots.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Commentaire humain / impressions</label>
-                <textarea
-                  className="form-textarea"
-                  rows={4}
-                  value={tastingNote}
-                  onChange={(e) => setTastingNote(e.target.value)}
-                  placeholder="Ex : Équilibre frais, fin de fermentation alcoolique à surveiller"
-                  required
-                  autoFocus
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowTastingModal(false)}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Valider
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Dégustation au chai"
+          title={`Note de dégustation — ${selectedLot?.name ?? ''}`}
+          subtitle="Consignez vos impressions organoleptiques pour le suivi du millésime."
+          onClose={() => setShowTastingModal(false)}
+          onSubmit={handleAddTasting}
+          maxWidth="560px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowTastingModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer la note
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Lot / Cuvée concerné(e)</label>
+            <select
+              className="form-select"
+              value={selectedLot?.id ?? ''}
+              onChange={(e) => setSelectedLotId(e.target.value)}
+            >
+              {lots.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code} · {l.name} ({Math.round(lotVolumeMl(state, l.id) / 1000)} L)
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Commentaire humain / impressions</label>
+            <textarea
+              className="form-textarea"
+              rows={4}
+              value={tastingNote}
+              onChange={(e) => setTastingNote(e.target.value)}
+              placeholder="Ex : Équilibre frais, fin de fermentation alcoolique à surveiller"
+              required
+              autoFocus
+            />
+          </div>
+        </Modal>
       )}
 
       {/* Modal Qualité (Hold/Release) */}
       {showQualityModal && (
-        <div className="modal-backdrop" onClick={() => setShowQualityModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px' }}>
-              {showQualityModal === 'hold' ? 'Bloquer la commercialisation' : 'Libérer le lot'} — {selectedLot?.name}
-            </h2>
-            <form onSubmit={handleQualityChange}>
-              <div className="form-group">
-                <label className="form-label">Motif (décision humaine auditée)</label>
-                <textarea
-                  className="form-textarea"
-                  value={qualityReason}
-                  onChange={(e) => setQualityReason(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowQualityModal(null)}>
-                  Annuler
-                </button>
-                <button type="submit" className={showQualityModal === 'hold' ? 'btn btn-danger' : 'btn btn-primary'}>
-                  Confirmer
-                </button>
-              </div>
-            </form>
+        <Modal
+          eyebrow="Statut qualité"
+          title={`${showQualityModal === 'hold' ? 'Bloquer la commercialisation' : 'Libérer le lot'} — ${selectedLot?.name ?? ''}`}
+          subtitle="Décision humaine auditée impactant la disponibilité commerciale de la cuvée."
+          onClose={() => setShowQualityModal(null)}
+          onSubmit={handleQualityChange}
+          maxWidth="520px"
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowQualityModal(null)}>
+                Annuler
+              </button>
+              <button type="submit" className={showQualityModal === 'hold' ? 'btn btn-danger' : 'btn btn-primary'}>
+                Confirmer la décision
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Motif (décision humaine auditée)</label>
+            <textarea
+              className="form-textarea"
+              rows={3}
+              value={qualityReason}
+              onChange={(e) => setQualityReason(e.target.value)}
+              required
+              autoFocus
+            />
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal Ajout Contenant sur-mesure (Cuve, Foudre, Œuf béton, Demi-muid, Pièce 228L) */}
       {showAddContainerModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddContainerModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
-              Ajouter un contenant sur-mesure au plan de cuverie
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginBottom: '14px' }}>
-              Adaptez la cuverie à la structure exacte du domaine (Cuve inox thermorégulée, Œuf béton, Foudre chêne, Demi-muid 600 L, Pièce bourguignonne 228 L).
-            </p>
-            <form onSubmit={handleAddCustomContainer}>
-              <div className="form-group">
-                <label className="form-label">Code du contenant (ex: OEUF-01, FOUDRE-02, F-18)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newContainerCode}
-                  onChange={(e) => setNewContainerCode(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Famille de contenant</label>
-                <select
-                  className="form-select"
-                  value={newContainerKind}
-                  onChange={(e) => setNewContainerKind(e.target.value as ContainerKind)}
-                >
-                  <option value="tank">Cuve Inox / Béton (tank)</option>
-                  <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
-                  <option value="barrel">Pièce 228 L / Barrique 225 L / Demi-muid 600 L (barrel)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Capacité nominale en hectolitres (hL) — ex: 2,28 pour une pièce de 228 L</label>
+        <Modal
+          eyebrow="Plan de cuverie"
+          title="Ajouter un contenant sur-mesure au plan de cuverie"
+          subtitle="Cuve inox thermorégulée, Œuf béton, Foudre chêne, Demi-muid 600 L ou Pièce bourguignonne 228 L."
+          onClose={() => setShowAddContainerModal(false)}
+          onSubmit={handleAddCustomContainer}
+          maxWidth="620px"
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAddContainerModal(false)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Ajouter au plan de cave
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Code du contenant</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ex : OEUF-01, FOUDRE-02, F-18"
+                value={newContainerCode}
+                onChange={(e) => setNewContainerCode(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Capacité nominale (ex: 2,28 pour 228 L)</label>
+              <div className="input-with-unit">
                 <input
                   type="number"
                   step="0.01"
@@ -1676,282 +1682,282 @@ export const CellarView: React.FC<{
                   onChange={(e) => setNewContainerCapHl(e.target.value)}
                   required
                 />
+                <span className="input-unit-cap">hL</span>
               </div>
-              <div className="form-group">
-                <label className="form-label">Localisation / Salle de chai</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newContainerLocation}
-                  onChange={(e) => setNewContainerLocation(e.target.value)}
-                  required
-                />
-              </div>
-
-              {(newContainerKind === 'barrel' || newContainerKind === 'vat') && (
-                <div style={{ padding: '12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', marginBottom: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '8px' }}>
-                    🪵 Caractéristiques de Tonnellerie & Fûts
-                  </div>
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Tonnellerie</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ex : François Frères, Taransaud, Seguin Moreau, Damy..."
-                        value={newContainerCooper}
-                        onChange={(e) => setNewContainerCooper(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Origine du bois / Forêt</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ex : Tronçais, Allier, Vosges, Bertranges..."
-                        value={newContainerWoodOrigin}
-                        onChange={(e) => setNewContainerWoodOrigin(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Type de chauffe</label>
-                      <select
-                        className="form-select"
-                        value={newContainerToast}
-                        onChange={(e) => setNewContainerToast(e.target.value)}
-                      >
-                        <option value="Légère">Chauffe Légère</option>
-                        <option value="Moyenne">Chauffe Moyenne</option>
-                        <option value="Moyenne +">Chauffe Moyenne +</option>
-                        <option value="Forte">Chauffe Forte</option>
-                        <option value="Immersion">Chauffe Immersion</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Rotation / Nombre de vins</label>
-                      <select
-                        className="form-select"
-                        value={newContainerBarrelAge}
-                        onChange={(e) => setNewContainerBarrelAge(e.target.value)}
-                      >
-                        <option value="0">Fût Neuf (0 vin)</option>
-                        <option value="1">1 vin (1 an d’usage)</option>
-                        <option value="2">2 vins (2 ans d’usage)</option>
-                        <option value="3">3 vins et plus (fût aguerri)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowAddContainerModal(false)}
-                >
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Ajouter au plan de cave
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Famille de contenant</label>
+              <select
+                className="form-select"
+                value={newContainerKind}
+                onChange={(e) => setNewContainerKind(e.target.value as ContainerKind)}
+              >
+                <option value="tank">Cuve Inox / Béton (tank)</option>
+                <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
+                <option value="barrel">Pièce 228 L / Barrique 225 L / Demi-muid 600 L (barrel)</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Localisation / Salle de chai</label>
+              <input
+                type="text"
+                className="form-input"
+                value={newContainerLocation}
+                onChange={(e) => setNewContainerLocation(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {(newContainerKind === 'barrel' || newContainerKind === 'vat') && (
+            <div style={{ padding: '14px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '10px' }}>
+                🪵 Caractéristiques de Tonnellerie & Fûts
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Tonnellerie</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex : François Frères, Taransaud, Damy..."
+                    value={newContainerCooper}
+                    onChange={(e) => setNewContainerCooper(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Origine du bois / Forêt</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex : Tronçais, Allier, Vosges..."
+                    value={newContainerWoodOrigin}
+                    onChange={(e) => setNewContainerWoodOrigin(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Type de chauffe</label>
+                  <select
+                    className="form-select"
+                    value={newContainerToast}
+                    onChange={(e) => setNewContainerToast(e.target.value)}
+                  >
+                    <option value="Légère">Chauffe Légère</option>
+                    <option value="Moyenne">Chauffe Moyenne</option>
+                    <option value="Moyenne +">Chauffe Moyenne +</option>
+                    <option value="Forte">Chauffe Forte</option>
+                    <option value="Immersion">Chauffe Immersion</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rotation / Nombre de vins</label>
+                  <select
+                    className="form-select"
+                    value={newContainerBarrelAge}
+                    onChange={(e) => setNewContainerBarrelAge(e.target.value)}
+                  >
+                    <option value="0">Fût Neuf (0 vin)</option>
+                    <option value="1">1 vin (1 an d’usage)</option>
+                    <option value="2">2 vins (2 ans d’usage)</option>
+                    <option value="3">3 vins et plus (fût aguerri)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
       )}
 
       {/* Modal Modifier Contenant (Cuve, Fût, Foudre) */}
       {showEditContainerModal && (
-        <div className="modal-backdrop" onClick={() => setShowEditContainerModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-              <div>
-                <h2 style={{ fontSize: '19px', fontWeight: 700, margin: 0 }}>
-                  Modifier {showEditContainerModal.code}
-                </h2>
-                <p style={{ fontSize: '13px', color: 'var(--color-ink-muted)', marginTop: '4px', marginBottom: 0 }}>
-                  Ajustez les caractéristiques physiques, l’emplacement ou l’état opérationnel de ce contenant.
-                </p>
-              </div>
-              <span className={`badge ${showEditContainerModal.state === 'maintenance' ? 'badge-crimson' : 'badge-green'}`}>
-                {showEditContainerModal.state === 'maintenance' ? 'En maintenance' : 'Opérationnel'}
-              </span>
+        <Modal
+          eyebrow="Fiche contenant"
+          badge={
+            <span className={`badge ${showEditContainerModal.state === 'maintenance' ? 'badge-crimson' : 'badge-green'}`}>
+              {showEditContainerModal.state === 'maintenance' ? 'En maintenance' : 'Opérationnel'}
+            </span>
+          }
+          title={`Modifier ${showEditContainerModal.code}`}
+          subtitle="Ajustez les caractéristiques physiques, l’emplacement ou l’état opérationnel de ce contenant."
+          onClose={() => setShowEditContainerModal(null)}
+          onSubmit={handleSaveEditContainer}
+          maxWidth="620px"
+          footerNote={
+            customContainers.some((cc) => cc.id === showEditContainerModal.id) && !state.occupancies[showEditContainerModal.id] ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => handleDeleteCustomContainer(showEditContainerModal.id)}
+                title="Supprimer ce contenant personnalisé vide"
+              >
+                <Trash2 size={13} /> Supprimer
+              </button>
+            ) : undefined
+          }
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowEditContainerModal(null)}
+              >
+                Annuler
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Enregistrer les modifications
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Identifiant / Code contenant</label>
+            <input
+              type="text"
+              className="form-input"
+              value={editCode}
+              onChange={(e) => setEditCode(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Famille de contenant</label>
+              <select
+                className="form-select"
+                value={editKind}
+                onChange={(e) => setEditKind(e.target.value as ContainerKind)}
+              >
+                <option value="tank">Cuve Inox / Béton (tank)</option>
+                <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
+                <option value="barrel">Pièce / Barrique / Demi-muid (barrel)</option>
+              </select>
             </div>
 
-            <form onSubmit={handleSaveEditContainer}>
-              <div className="form-group">
-                <label className="form-label">Identifiant / Code contenant</label>
+            <div className="form-group">
+              <label className="form-label">
+                Capacité nominale
+                {editCapHl && !isNaN(parseFloat(editCapHl)) && (
+                  <span style={{ fontWeight: 400, color: 'var(--color-ink-muted)', marginLeft: '6px' }}>
+                    ({Math.round(parseFloat(editCapHl) * 100).toLocaleString('fr-FR')} L)
+                  </span>
+                )}
+              </label>
+              <div className="input-with-unit">
                 <input
-                  type="text"
-                  className="form-input"
-                  value={editCode}
-                  onChange={(e) => setEditCode(e.target.value)}
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  className="form-input tabular"
+                  value={editCapHl}
+                  onChange={(e) => setEditCapHl(e.target.value)}
                   required
                 />
+                <span className="input-unit-cap">hL</span>
               </div>
+            </div>
+          </div>
 
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Famille de contenant</label>
-                  <select
-                    className="form-select"
-                    value={editKind}
-                    onChange={(e) => setEditKind(e.target.value as ContainerKind)}
-                  >
-                    <option value="tank">Cuve Inox / Béton (tank)</option>
-                    <option value="vat">Foudre Bois / Œuf Béton / Amphore (vat)</option>
-                    <option value="barrel">Pièce / Barrique / Demi-muid (barrel)</option>
-                  </select>
-                </div>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Localisation / Salle de chai</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
+                required
+              />
+            </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Capacité nominale (hL)
-                    {editCapHl && !isNaN(parseFloat(editCapHl)) && (
-                      <span style={{ fontWeight: 400, color: 'var(--color-ink-muted)', marginLeft: '6px' }}>
-                        ({Math.round(parseFloat(editCapHl) * 100).toLocaleString('fr-FR')} L)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.1"
-                    className="form-input tabular"
-                    value={editCapHl}
-                    onChange={(e) => setEditCapHl(e.target.value)}
-                    required
-                  />
-                </div>
+            <div className="form-group">
+              <label className="form-label">Statut opérationnel</label>
+              <select
+                className="form-select"
+                value={editState}
+                onChange={(e) => setEditState(e.target.value as 'available' | 'maintenance')}
+              >
+                <option value="available">✓ Disponible / En service</option>
+                <option value="maintenance">🔧 En maintenance / Nettoyage</option>
+              </select>
+            </div>
+          </div>
+
+          {(editKind === 'barrel' || editKind === 'vat') && (
+            <div style={{ padding: '14px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '10px' }}>
+                🪵 Caractéristiques de Tonnellerie & Fûts
               </div>
-
-              <div className="grid-2">
+              <div className="form-grid-2">
                 <div className="form-group">
-                  <label className="form-label">Localisation / Salle de chai</label>
+                  <label className="form-label">Tonnellerie</label>
                   <input
                     type="text"
                     className="form-input"
-                    value={editLocation}
-                    onChange={(e) => setEditLocation(e.target.value)}
-                    required
+                    placeholder="Ex : François Frères, Taransaud, Damy..."
+                    value={editCooper}
+                    onChange={(e) => setEditCooper(e.target.value)}
                   />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Statut opérationnel</label>
+                  <label className="form-label">Origine du bois / Forêt</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex : Tronçais, Allier, Vosges..."
+                    value={editWoodOrigin}
+                    onChange={(e) => setEditWoodOrigin(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Type de chauffe</label>
                   <select
                     className="form-select"
-                    value={editState}
-                    onChange={(e) => setEditState(e.target.value as 'available' | 'maintenance')}
+                    value={editToast}
+                    onChange={(e) => setEditToast(e.target.value)}
                   >
-                    <option value="available">✓ Disponible / En service</option>
-                    <option value="maintenance">🔧 En maintenance / Nettoyage</option>
+                    <option value="Légère">Chauffe Légère</option>
+                    <option value="Moyenne">Chauffe Moyenne</option>
+                    <option value="Moyenne +">Chauffe Moyenne +</option>
+                    <option value="Forte">Chauffe Forte</option>
+                    <option value="Immersion">Chauffe Immersion</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rotation / Nombre de vins</label>
+                  <select
+                    className="form-select"
+                    value={editBarrelAge}
+                    onChange={(e) => setEditBarrelAge(e.target.value)}
+                  >
+                    <option value="0">Fût Neuf (0 vin)</option>
+                    <option value="1">1 vin (1 an d’usage)</option>
+                    <option value="2">2 vins (2 ans d’usage)</option>
+                    <option value="3">3 vins et plus (fût aguerri)</option>
                   </select>
                 </div>
               </div>
+            </div>
+          )}
 
-              {(editKind === 'barrel' || editKind === 'vat') && (
-                <div style={{ padding: '12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', marginBottom: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-gold-dark)', marginBottom: '8px' }}>
-                    🪵 Caractéristiques de Tonnellerie & Fûts
-                  </div>
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Tonnellerie</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ex : François Frères, Taransaud, Seguin Moreau, Damy..."
-                        value={editCooper}
-                        onChange={(e) => setEditCooper(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Origine du bois / Forêt</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ex : Tronçais, Allier, Vosges, Bertranges..."
-                        value={editWoodOrigin}
-                        onChange={(e) => setEditWoodOrigin(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Type de chauffe</label>
-                      <select
-                        className="form-select"
-                        value={editToast}
-                        onChange={(e) => setEditToast(e.target.value)}
-                      >
-                        <option value="Légère">Chauffe Légère</option>
-                        <option value="Moyenne">Chauffe Moyenne</option>
-                        <option value="Moyenne +">Chauffe Moyenne +</option>
-                        <option value="Forte">Chauffe Forte</option>
-                        <option value="Immersion">Chauffe Immersion</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Rotation / Nombre de vins</label>
-                      <select
-                        className="form-select"
-                        value={editBarrelAge}
-                        onChange={(e) => setEditBarrelAge(e.target.value)}
-                      >
-                        <option value="0">Fût Neuf (0 vin)</option>
-                        <option value="1">1 vin (1 an d’usage)</option>
-                        <option value="2">2 vins (2 ans d’usage)</option>
-                        <option value="3">3 vins et plus (fût aguerri)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {(() => {
-                const occ = state.occupancies[showEditContainerModal.id];
-                if (!occ) return null;
-                const occLot = state.lots[occ.lotId];
-                return (
-                  <div style={{ padding: '10px 12px', background: 'var(--color-surface-soft)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', fontSize: '12.5px', marginBottom: '14px', color: 'var(--color-ink)' }}>
-                    ⚠️ Ce contenant héberge actuellement {occ.volumeMl / 1000} L du lot <strong>{occLot?.code ?? occ.lotId}</strong>.
-                  </div>
-                );
-              })()}
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-                <div>
-                  {customContainers.some((cc) => cc.id === showEditContainerModal.id) && !state.occupancies[showEditContainerModal.id] && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDeleteCustomContainer(showEditContainerModal.id)}
-                      title="Supprimer ce contenant personnalisé vide"
-                    >
-                      <Trash2 size={13} /> Supprimer
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowEditContainerModal(null)}
-                  >
-                    Annuler
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    Enregistrer les modifications
-                  </button>
-                </div>
+          {(() => {
+            const occ = state.occupancies[showEditContainerModal.id];
+            if (!occ) return null;
+            const occLot = state.lots[occ.lotId];
+            return (
+              <div className="ds-modal-summary" style={{ marginBottom: 0 }}>
+                <span>⚠️ Contient actuellement <strong>{occ.volumeMl / 1000} L</strong> du lot <strong>{occLot?.code ?? occ.lotId}</strong></span>
               </div>
-            </form>
-          </div>
-        </div>
+            );
+          })()}
+        </Modal>
       )}
     </div>
   );
