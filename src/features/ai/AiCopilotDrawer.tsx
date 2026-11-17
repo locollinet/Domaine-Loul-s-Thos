@@ -74,6 +74,7 @@ export const AiCopilotDrawer: React.FC<{
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_GREETING]);
   const [isLoading, setIsLoading] = useState(false);
   const [stepLabel, setStepLabel] = useState<string>('Analyse des données du domaine en cours...');
+  const [streamingText, setStreamingText] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -83,6 +84,7 @@ export const AiCopilotDrawer: React.FC<{
   const rawHistoryRef = useRef<CopilotContent[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const scope = useMemo(
@@ -111,10 +113,14 @@ export const AiCopilotDrawer: React.FC<{
 
   useEffect(() => {
     if (!isOpen) return;
+    if (streamingText && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      return;
+    }
     if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [isOpen, messages, isLoading, errorMsg]);
+  }, [isOpen, messages, isLoading, errorMsg, streamingText]);
 
   useEffect(() => {
     return () => {
@@ -134,6 +140,7 @@ export const AiCopilotDrawer: React.FC<{
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setIsLoading(false);
+    setStreamingText('');
   };
 
   const handleResetConversation = () => {
@@ -191,6 +198,7 @@ export const AiCopilotDrawer: React.FC<{
     }
 
     setStepLabel('Analyse des données du domaine en cours...');
+    setStreamingText('');
     setIsLoading(true);
 
     try {
@@ -201,7 +209,13 @@ export const AiCopilotDrawer: React.FC<{
         signal: controller.signal,
         onStep: (step) => {
           if (requestIdRef.current === currentRequestId) {
+            setStreamingText('');
             setStepLabel(`${step.label} (étape ${step.round})`);
+          }
+        },
+        onToken: (partialText) => {
+          if (requestIdRef.current === currentRequestId) {
+            setStreamingText(partialText);
           }
         },
       });
@@ -232,6 +246,7 @@ export const AiCopilotDrawer: React.FC<{
       setMessages(priorMessages);
     } finally {
       if (requestIdRef.current === currentRequestId) {
+        setStreamingText('');
         setIsLoading(false);
         abortControllerRef.current = null;
       }
@@ -497,6 +512,7 @@ export const AiCopilotDrawer: React.FC<{
 
         {/* Chat message history */}
         <div
+          ref={scrollContainerRef}
           aria-live="polite"
           style={{
             flex: 1,
@@ -611,33 +627,47 @@ export const AiCopilotDrawer: React.FC<{
             <div
               style={{
                 alignSelf: 'flex-start',
+                maxWidth: '92%',
                 background: 'var(--color-surface-soft)',
+                color: 'var(--color-ink)',
                 borderRadius: 'var(--radius-md)',
                 padding: '10px 14px',
-                fontSize: '12px',
-                color: 'var(--color-ink-muted)',
+                fontSize: streamingText ? '13px' : '12px',
+                lineHeight: '1.5',
+                boxShadow: 'var(--shadow-sm)',
                 display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
+                flexDirection: 'column',
+                gap: '8px',
               }}
             >
-              <span style={{ fontStyle: 'italic' }}>{stepLabel}</span>
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                onClick={handleCancelRequest}
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  minHeight: '24px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Square size={10} fill="currentColor" />
-                <span>Arrêter</span>
-              </button>
+              {streamingText ? (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{streamingText}</div>
+              ) : (
+                <span style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>{stepLabel}</span>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {streamingText && (
+                  <span style={{ fontSize: '10.5px', color: 'var(--color-ink-light)', fontStyle: 'italic' }}>
+                    Rédaction en direct…
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={handleCancelRequest}
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    minHeight: '24px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Square size={10} fill="currentColor" />
+                  <span>Arrêter</span>
+                </button>
+              </div>
             </div>
           )}
 

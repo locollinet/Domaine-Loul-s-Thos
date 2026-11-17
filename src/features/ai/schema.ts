@@ -11,25 +11,25 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   inspect_vineyard: {
     name: 'inspect_vineyard',
     description:
-      'Consulte les parcelles (surfaces m²/ha ou inconnues), missions vendanges/taille/observation, comptages de caisses non transportés, réceptions pesées en kg net (jamais converties en litres) et disponibilité du cahier Phyto & TESA.',
+      'Parcelles (surfaces connues ou null), missions vendanges, caisses non transportées, réceptions en kg net (jamais converties en L) et module Phyto/TESA.',
     parameters: {
       type: Type.OBJECT,
       properties: {
         query: {
           type: Type.STRING,
-          description: 'Nom ou code de parcelle/climat/mission (optionnel).',
+          description: 'Nom ou code parcelle/climat/mission.',
         },
         missionStatus: {
           type: Type.STRING,
-          description: 'Filtrer par statut de mission : planned, in_progress, blocked, completed, cancelled.',
+          description: 'planned, in_progress, blocked, completed, cancelled.',
         },
         includePendingCounts: {
           type: Type.BOOLEAN,
-          description: 'Inclure les comptages de vendange en attente de transport.',
+          description: 'Inclure comptages en attente de transport.',
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Nombre maximum d’éléments détaillés (max 20).',
+          description: 'Plafond résultats (max 20).',
         },
       },
     },
@@ -37,33 +37,33 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   inspect_cellar: {
     name: 'inspect_cellar',
     description:
-      'Consulte les lots de vin au chai (volumes exacts en L et hL, stades, blocage qualité), les contenants (cuves, foudres, barriques, maintenance, tonnellerie), les relevés analytiques actifs (densité, température, SO2, TAV) et détecte explicitement les absences de mesure sans interpoler.',
+      'Lots au chai (volumes L/hL, stades, qualité), contenants (cuves, foudres, barriques, maintenance), dernières mesures et trous de relevés sans interpolation.',
     parameters: {
       type: Type.OBJECT,
       properties: {
         lotQuery: {
           type: Type.STRING,
-          description: 'Code, nom, millésime ou couleur de lot (ex: "L26-B-01", "Blanc 2026", "2025").',
+          description: 'Code, nom, millésime ou couleur (ex: "L26-B-01", "Blanc 2026").',
         },
         containerQuery: {
           type: Type.STRING,
-          description: 'Code ou emplacement de contenant (ex: "C-07", "F-01", "barrique").',
+          description: 'Code ou emplacement (ex: "C-07", "F-01").',
         },
         onlyMaintenanceContainers: {
           type: Type.BOOLEAN,
-          description: 'Ne lister que les contenants en maintenance.',
+          description: 'Uniquement les contenants en maintenance.',
         },
         onlyAvailableContainers: {
           type: Type.BOOLEAN,
-          description: 'Ne lister que les contenants disponibles et vides.',
+          description: 'Uniquement les contenants vides disponibles.',
         },
         includeMeasurements: {
           type: Type.BOOLEAN,
-          description: 'Inclure les séries de relevés analytiques et alertes de trous de mesure.',
+          description: 'Mettre à true uniquement pour la série chronologique complète des relevés.',
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Plafond d’éléments retournés (max 20).',
+          description: 'Plafond résultats (max 20).',
         },
       },
     },
@@ -71,25 +71,25 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   check_aging_and_bottling: {
     name: 'check_aging_and_bottling',
     description:
-      'Évalue les lots prêts pour assemblage (simulation pure previewBlend), la faisabilité de mise en bouteilles (matières sèches requises vs stock physique et commandes fournisseurs en attente comme CF-26-H01).',
+      'Lots prêts pour assemblage (simulation previewBlend), faisabilité de mise (matières sèches requises vs stock et commandes ouvertes comme CF-26-H01).',
     parameters: {
       type: Type.OBJECT,
       properties: {
         vintage: {
           type: Type.INTEGER,
-          description: 'Millésime ciblé (ex: 2024, 2025).',
+          description: 'Millésime (ex: 2024, 2025).',
         },
         skuQuery: {
           type: Type.STRING,
-          description: 'Libellé ou identifiant d’article/cuvée (ex: "Blanc 2024", "Rouge 2025").',
+          description: 'Libellé/cuvée (ex: "Blanc 2024").',
         },
         bottles: {
           type: Type.INTEGER,
-          description: 'Nombre de bouteilles envisagé pour vérifier les matières sèches.',
+          description: 'Nombre de bouteilles à tester.',
         },
         checkBlend2025: {
           type: Type.BOOLEAN,
-          description: 'Simuler l’assemblage des lots Rouge 2025 prêts.',
+          description: 'Simuler assemblage Rouge 2025.',
         },
       },
     },
@@ -97,25 +97,25 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   check_commercial_stock: {
     name: 'check_commercial_stock',
     description:
-      'Consulte les stocks bouteilles avec distinction stricte Physique ≠ Réservé ≠ Bloqué qualité ≠ Quarantaine ≠ Disponible vendable, ainsi que les commandes/devis et expéditions.',
+      'Stocks bouteilles (Physique ≠ Réservé ≠ Bloqué ≠ Quarantaine ≠ Disponible vendable), commandes, devis et expéditions.',
     parameters: {
       type: Type.OBJECT,
       properties: {
         batchQuery: {
           type: Type.STRING,
-          description: 'Code lot de mise ou cuvée (ex: "M23-001", "Rouge 2023").',
+          description: 'Code lot de mise ou cuvée (ex: "M23-001").',
         },
         customerQuery: {
           type: Type.STRING,
-          description: 'Nom ou ville d’un client (ex: "Table des Coteaux", "Beaune").',
+          description: 'Nom ou ville client.',
         },
         orderStatus: {
           type: Type.STRING,
-          description: 'Statut de commande : quote, confirmed, partially_shipped, shipped, cancelled.',
+          description: 'quote, confirmed, partially_shipped, shipped, cancelled.',
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Plafond d’éléments (max 20).',
+          description: 'Plafond résultats (max 20).',
         },
       },
     },
@@ -123,17 +123,17 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   inspect_finance_and_planning: {
     name: 'inspect_finance_and_planning',
     description:
-      'Consulte les factures, avoirs, règlements, expéditions non facturées, prévisions de trésorerie par niveau de certitude (certain, engagé, estimé), coûts connus/incomplets des lots et scénario de renouvellement 2027. Réservé aux rôles autorisés.',
+      'Factures, règlements, prévisions par certitude (certain, engaged, estimated), coûts connus/incomplets et scénario 2027 (rôles autorisés uniquement).',
     parameters: {
       type: Type.OBJECT,
       properties: {
         certainty: {
           type: Type.STRING,
-          description: 'Filtrer les prévisions par certitude : certain, engaged, estimated.',
+          description: 'certain, engaged, estimated.',
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Plafond d’éléments (max 20).',
+          description: 'Plafond résultats (max 20).',
         },
       },
     },
@@ -141,21 +141,21 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   search_traceability: {
     name: 'search_traceability',
     description:
-      'Retrace la généalogie ascendante/descendante d’un lot ou lot de mise (parcelles d’origine, tickets de pesée, assemblages, matières sèches, expéditions clients) et le journal immuable des opérations.',
+      'Généalogie amont/aval d’un lot ou lot de mise (parcelles, pesées, assemblages, expéditions) et journal d’audit.',
     parameters: {
       type: Type.OBJECT,
       properties: {
         query: {
           type: Type.STRING,
-          description: 'Code lot, code lot de mise ou mot-clé d’opération (ex: "M23-001", "L26-B-01", "ouillage").',
+          description: 'Code lot, mise ou mot-clé (ex: "M23-001", "L26-B-01").',
         },
         opType: {
           type: Type.STRING,
-          description: 'Type d’opération : reception, transfer, topping, loss, blend, bottling, quality, note, itinerary.',
+          description: 'reception, transfer, topping, loss, blend, bottling, quality, note, itinerary.',
         },
         limit: {
           type: Type.INTEGER,
-          description: 'Plafond d’opérations retournées (max 20).',
+          description: 'Plafond opérations (max 20).',
         },
       },
     },
@@ -163,54 +163,54 @@ export const TOOL_DECLARATIONS: Record<AssistantToolName, FunctionDeclaration> =
   prepare_action: {
     name: 'prepare_action',
     description:
-      'Prépare un écran ou formulaire pré-rempli sans jamais écrire en base. Vérifie les permissions du rôle, détecte les doublons ou ruptures de stock, et fournit un lien d’ouverture nécessitant validation humaine.',
+      'Prépare un écran/formulaire pré-rempli sans écrire en base (vérifie droits, doublons, stock) pour validation humaine.',
     parameters: {
       type: Type.OBJECT,
       properties: {
         actionKind: {
           type: Type.STRING,
           description:
-            'Type d’action : prefill_measurement, prefill_order, prefill_bottling, prefill_purchase, prefill_harvest_count, navigate.',
+            'prefill_measurement, prefill_order, prefill_bottling, prefill_purchase, prefill_harvest_count, navigate.',
         },
         lotQuery: {
           type: Type.STRING,
-          description: 'Lot cible pour relevé ou mise en bouteilles.',
+          description: 'Lot cible.',
         },
         parameter: {
           type: Type.STRING,
-          description: 'Paramètre analytique (density, temperature, sugar, tav, ph, ta, va, free_so2, malic).',
+          description: 'density, temperature, sugar, tav, ph, ta, va, free_so2, malic.',
         },
         value: {
           type: Type.NUMBER,
-          description: 'Valeur mesurée proposée pour pré-remplissage.',
+          description: 'Valeur mesurée.',
         },
         batchQuery: {
           type: Type.STRING,
-          description: 'Lot de mise pour une commande/devis.',
+          description: 'Lot de mise pour commande/devis.',
         },
         customerQuery: {
           type: Type.STRING,
-          description: 'Client cible pour une commande/devis.',
+          description: 'Client cible.',
         },
         dryGoodQuery: {
           type: Type.STRING,
-          description: 'Matière sèche pour une commande fournisseur.',
+          description: 'Matière sèche.',
         },
         quantity: {
           type: Type.INTEGER,
-          description: 'Quantité proposée (bouteilles, caisses ou unités).',
+          description: 'Quantité.',
         },
         asQuote: {
           type: Type.BOOLEAN,
-          description: 'Créer en devis (sans réservation) plutôt qu’en commande ferme.',
+          description: 'Créer en devis sans réservation.',
         },
         targetTab: {
           type: Type.STRING,
-          description: 'Onglet cible pour navigate (overview, vineyard, cellar, aging, bottling, supplies, sales, finance, traceability).',
+          description: 'overview, vineyard, cellar, aging, bottling, supplies, sales, finance, traceability.',
         },
         subTab: {
           type: Type.STRING,
-          description: 'Sous-onglet cible (ex: phyto_tesa, drm, elabel, cellar_map, allocations, harvest, reception).',
+          description: 'phyto_tesa, drm, elabel, cellar_map, allocations, harvest, reception.',
         },
       },
       required: ['actionKind'],

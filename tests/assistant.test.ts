@@ -6,6 +6,8 @@ import { ThinkingLevel, type Content } from '@google/genai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCopilotRouter,
+  extractStreamingReadableText,
+  FALLBACK_MODEL,
   MAX_CALLS_PER_QUESTION,
   PRIMARY_MODEL,
   resetQuestionTurnTrackerForTests,
@@ -252,7 +254,7 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
     expect(safeToolTrim).toEqual([{ role: 'user', parts: [{ text: 'Q1' }] }]);
   });
 
-  it('exécute la boucle HTTP /api/copilot avec ThinkingLevel.LOW, sans temperature, conservation de thoughtSignature et lockedModel', async () => {
+  it('exécute la boucle HTTP /api/copilot avec ThinkingLevel.MINIMAL sur Flash-Lite, sans temperature, conservation de thoughtSignature et lockedModel', async () => {
     const capturedCalls: Array<{
       model: string;
       contents: Content[];
@@ -345,7 +347,7 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
 
     expect(capturedCalls).toHaveLength(2);
     expect(capturedCalls[0]?.model).toBe(PRIMARY_MODEL);
-    expect(capturedCalls[0]?.thinkingLevel).toBe(ThinkingLevel.LOW);
+    expect(capturedCalls[0]?.thinkingLevel).toBe(ThinkingLevel.MINIMAL);
     expect(capturedCalls[0]?.hasTemperature).toBe(false);
     expect(capturedCalls[0]?.hasTools).toBe(true);
     expect(capturedCalls[0]?.hasResponseSchema).toBe(false);
@@ -357,14 +359,16 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
     expect(JSON.stringify(modelTurnInHistory)).toContain('sig-opaque-xyz-999');
   });
 
-  it('bascule sur gemini-3.1-flash-lite si gemini-4-hydrogen renvoie 503 au tour 1 et verrouille lockedModel au tour 2', async () => {
+  it('bascule immédiatement sur FALLBACK_MODEL (gemini-3.8-flash, LOW) si le primaire renvoie 503 et verrouille lockedModel', async () => {
     const modelsCalled: string[] = [];
+    const levelsCalled: Array<ThinkingLevel | undefined> = [];
     let firstTurnDone = false;
 
     setCopilotClientFactoryForTests(() => ({
       models: {
         async generateContent(params) {
           modelsCalled.push(params.model);
+          levelsCalled.push(params.config?.thinkingConfig?.thinkingLevel);
           if (params.model === PRIMARY_MODEL) {
             const err = new Error('503 UNAVAILABLE high demand');
             (err as unknown as Record<string, unknown>)['status'] = 503;
@@ -407,17 +411,13 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
         history: [],
         ctx: makeCtx('cellar_master', 'cellar'),
       });
-      expect(res.model).toBe('gemini-3.1-flash-lite');
+      expect(res.model).toBe(FALLBACK_MODEL);
       expect(res.answer.text).toContain('1530 L');
     });
 
-    // Turn 1: 2 attempts on PRIMARY_MODEL -> fallback to gemini-3.1-flash-lite; Turn 2: locked directly on gemini-3.1-flash-lite
-    expect(modelsCalled).toEqual([
-      PRIMARY_MODEL,
-      PRIMARY_MODEL,
-      'gemini-3.1-flash-lite',
-      'gemini-3.1-flash-lite',
-    ]);
+    // Instant failover on primary 503 -> direct fallback to gemini-3.8-flash (LOW); Turn 2 stays locked
+    expect(modelsCalled).toEqual([PRIMARY_MODEL, FALLBACK_MODEL, FALLBACK_MODEL]);
+    expect(levelsCalled).toEqual([ThinkingLevel.MINIMAL, ThinkingLevel.LOW, ThinkingLevel.LOW]);
   });
 
   it('applique responseSchema au dernier tour (MAX_TOOL_ROUNDS) et rejette les outils inconnus + >5 tours sur un questionId', async () => {
@@ -513,5 +513,62 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
     expect(getContextualSuggestions(buildAssistantScope('vineyard_manager', 'vineyard'))[0]).toMatch(
       /vendanges|parcelle/i
     );
+  });
+
+  it('streame en SSE (generateContentStream) en 1 seul appel via préchargement et masque le JSON brut en mode schema', async () => {
+    expect(extractStreamingReadableText('{"te', true)).toBe('');
+    expect(extractStreamingReadableText('{"text":"Bonjour\\nChai \\"C-05\\"', true)).toBe(
+      'Bonjour\nChai "C-05"'
+    );
+
+    const capturedPrompts: string[] = [];
+    setCopilotClientFactoryForTests(() => ({
+      models: {
+        async generateContent() {
+          throw new Error('Should use generateContentStream when available');
+        },
+        async generateContentStream(params) {
+          capturedPrompts.push(JSON.stringify(params.contents));
+          return (async function* () {
+            yield {
+              candidates: [{ content: { role: 'model', parts: [{ thought: true, text: 'Réflexion interne' }] } }],
+            };
+            yield {
+              candidates: [{ content: { role: 'model', parts: [{ text: 'Le chai totalise ' }] } }],
+            };
+            yield {
+              candidates: [{ content: { role: 'model', parts: [{ text: '1 530 L (15,3 hL).' }] } }],
+            };
+          })();
+        },
+      },
+    }));
+
+    const originalFetch = globalThis.fetch;
+    await withCopilotTestServer(async (baseUrl) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+        const url = typeof input === 'string' && input.startsWith('/') ? `${baseUrl}${input}` : input;
+        return originalFetch(url, init);
+      });
+
+      const tokens: string[] = [];
+      const res = await askAssistant({
+        question: 'Fais un bilan des volumes de vin actuellement au chai.',
+        history: [],
+        ctx: makeCtx('cellar_master', 'overview'),
+        onToken: (partial) => tokens.push(partial),
+      });
+
+      // Completed in 1 single round thanks to local deterministic prefetch + SSE stream
+      expect(capturedPrompts).toHaveLength(1);
+      expect(capturedPrompts[0]).toContain('[DONNÉES PRÉCHARGÉES (inspect_cellar)]');
+      expect(tokens).toEqual(['Le chai totalise ', 'Le chai totalise 1 530 L (15,3 hL).']);
+      expect(res.answer.text).toBe('Le chai totalise 1 530 L (15,3 hL).');
+      expect(res.cards.length).toBeGreaterThanOrEqual(1);
+      // Persisted history must keep concise question text without the prefetched JSON payload
+      expect(res.updatedHistory[0]?.parts?.[0]?.text).toBe(
+        'Fais un bilan des volumes de vin actuellement au chai.'
+      );
+    });
   });
 });

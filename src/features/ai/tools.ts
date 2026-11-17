@@ -339,17 +339,18 @@ function runInspectCellar(
         grapesReceivedKg: l.grapesReceivedG > 0 ? l.grapesReceivedG / 1000 : null,
         containers: occs,
         latestMeasurements: latestByParam,
-        measurementSeries:
-          input.includeMeasurements !== false
-            ? activeMeas.slice(-8).map((m) => ({
+        ...(input.includeMeasurements === true
+          ? {
+              measurementSeries: activeMeas.slice(-8).map((m) => ({
                 id: m.id,
                 parameter: m.parameter,
                 label: PARAMETERS[m.parameter]?.label ?? m.parameter,
                 value: m.value,
                 unit: m.unit,
                 date: m.sampledAt.slice(0, 10),
-              }))
-            : [],
+              })),
+            }
+          : {}),
         lastMeasurementDate: lastMeas ? lastMeas.sampledAt.slice(0, 10) : null,
         daysSinceLastReading,
         measurementGapAlert,

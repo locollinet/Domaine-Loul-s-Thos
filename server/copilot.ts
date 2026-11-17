@@ -20,14 +20,21 @@ import type {
   CopilotToolCallRequest,
 } from '../src/features/ai/types';
 
-export const PRIMARY_MODEL = 'gemini-4-hydrogen';
-export const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
-export const REQUEST_TIMEOUT_MS = 25_000;
+export const PRIMARY_MODEL = 'gemini-3.5-flash-lite';
+export const FALLBACK_MODEL = 'gemini-3.8-flash';
+export const PRIMARY_TIMEOUT_MS = 10_000;
+export const REQUEST_TIMEOUT_MS = 18_000;
 export const MAX_TOOL_ROUNDS = 4;
 export const MAX_HISTORY_TURNS = 16;
 export const MAX_PAYLOAD_BYTES = 200 * 1024;
 export const QUESTION_TTL_MS = 120_000;
 export const MAX_CALLS_PER_QUESTION = 5;
+
+export interface GenerateContentResultLike {
+  text?: string;
+  functionCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>;
+  candidates?: Array<{ content?: Content }>;
+}
 
 export interface AiClientLike {
   models: {
@@ -35,17 +42,19 @@ export interface AiClientLike {
       model: string;
       contents: Content[];
       config?: GenerateContentConfig;
-    }): Promise<{
-      text?: string;
-      functionCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>;
-      candidates?: Array<{ content?: Content }>;
-    }>;
+    }): Promise<GenerateContentResultLike>;
+    generateContentStream?(params: {
+      model: string;
+      contents: Content[];
+      config?: GenerateContentConfig;
+    }): Promise<AsyncIterable<GenerateContentResultLike>>;
   };
 }
 
 type AiClientFactory = (apiKey: string) => AiClientLike;
 
 let testClientFactory: AiClientFactory | null = null;
+const aiClientCache = new Map<string, AiClientLike>();
 
 export function setCopilotClientFactoryForTests(factory: AiClientFactory | null): void {
   testClientFactory = factory;
@@ -55,7 +64,11 @@ function getAiClient(apiKey: string): AiClientLike {
   if (testClientFactory) {
     return testClientFactory(apiKey);
   }
-  return new GoogleGenAI({
+  const cached = aiClientCache.get(apiKey);
+  if (cached) {
+    return cached;
+  }
+  const client = new GoogleGenAI({
     apiKey,
     httpOptions: {
       headers: {
@@ -63,6 +76,8 @@ function getAiClient(apiKey: string): AiClientLike {
       },
     },
   });
+  aiClientCache.set(apiKey, client);
+  return client;
 }
 
 export function isGemini3Or4Model(model: string): boolean {
@@ -71,6 +86,21 @@ export function isGemini3Or4Model(model: string): boolean {
     model.startsWith('gemini-4') ||
     model === 'gemini-flash-latest'
   );
+}
+
+/**
+ * Picks the lowest safe ThinkingLevel per Gemini model family:
+ * - `gemini-3.5-flash-lite` & `gemini-3.6-flash`: `MINIMAL` (lowest latency)
+ * - `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-4-*`: `LOW`
+ */
+export function thinkingLevelForModel(model: string): ThinkingLevel | undefined {
+  if (!isGemini3Or4Model(model)) {
+    return undefined;
+  }
+  if (model.startsWith('gemini-3.5-flash-lite') || model.startsWith('gemini-3.6-flash')) {
+    return ThinkingLevel.MINIMAL;
+  }
+  return ThinkingLevel.LOW;
 }
 
 export function copilotModelList(lockedModel?: string): string[] {
@@ -222,21 +252,19 @@ function buildSystemInstruction(scope: AssistantScope | undefined): string {
   const activeTab = scope?.activeTab ?? 'overview';
   const costAccess =
     scope?.canSeeCosts && scope?.canSeeFinance
-      ? 'Coûts et prévisions financières autorisés pour ce rôle.'
-      : 'Coûts internes, prix d’achat et finances STRICTEMENT MASQUÉS pour ce rôle (ne jamais inventer ni estimer un coût).';
+      ? 'Coûts et prévisions financières autorisés.'
+      : 'Coûts internes, prix et finances STRICTEMENT MASQUÉS (ne jamais inventer ni estimer).';
 
-  return `Tu es le Copilote IA Viticole du Domaine des Trois Coteaux (domaine viticole de démonstration).
-Profil actif : ${roleLabel} | Écran affiché : ${activeTab}
-Droits : ${costAccess}
+  return `Tu es le Copilote IA Viticole du Domaine des Trois Coteaux.
+Profil : ${roleLabel} | Écran : ${activeTab} | Droits : ${costAccess}
 
 RÈGLES MÉTIER IMPÉRATIVES :
-1. Réponds toujours en français, de manière claire, concise et factuelle.
-2. Appuie-toi STRICTEMENT sur les résultats des outils typés (Function Calling). N’invente jamais aucun lot, parcelle, contenant, client, volume ou chiffre.
-3. Si une information manque ou est inconnue (ex : surface TB = null, coût incomplet, relevé analytique absent sur L26-R-01 depuis le 17/10), signale-le explicitement sans interpoler : Inconnu ≠ zéro.
-4. kg de vendange ≠ litres de vin : ne convertis jamais des kilogrammes en litres ou hectolitres.
-5. Distinction stricte des stocks bouteilles : Physique ≠ Réservé ≠ Bloqué qualité ≠ Quarantaine ≠ Disponible vendable.
-6. Aucun traitement œnologique ou chimique n’est prescrit de façon autonome.
-7. Aucune écriture autonome en base : pour une saisie ou navigation, utilise l’outil \`prepare_action\` qui vérifie les droits et doublons pour validation humaine.`;
+1. Réponds en français, de façon claire, concise et factuelle.
+2. Appuie-toi STRICTEMENT sur le bloc [DONNÉES PRÉCHARGÉES] (s’il est fourni dans le message utilisateur) ou sur les outils typés. N’invente jamais aucun lot, parcelle, contenant, client, volume ou chiffre.
+3. Si [DONNÉES PRÉCHARGÉES] répond déjà complètement à la question, rédige directement la réponse finale en français sans rappeler le même outil. N’appelle un outil que s’il manque une donnée ou pour \`prepare_action\`.
+4. Donnée absente : signale-le sans interpoler (Inconnu ≠ zéro ; kg de vendange ≠ litres de vin).
+5. Stocks bouteilles : Physique ≠ Réservé ≠ Bloqué qualité ≠ Quarantaine ≠ Disponible vendable.
+6. Ne prescris jamais de traitement œnologique/chimique autonome. Pour toute saisie ou navigation, utilise \`prepare_action\` (validation humaine requise).`;
 }
 
 export function parseFinalAnswerJson(rawText: string): AssistantFinalAnswer {
@@ -410,6 +438,94 @@ function parseAndValidateRequest(
   };
 }
 
+// ------------------------------------------------------------------ Streaming Helpers
+
+/**
+ * Extracts progressive human-readable answer text while streaming either plain text
+ * or `ASSISTANT_ANSWER_SCHEMA` JSON (`{"text":"..."}`) so UI never flashes raw JSON syntax.
+ */
+export function extractStreamingReadableText(rawText: string, expectsJson: boolean): string {
+  const trimmedStart = rawText.trimStart();
+  if (!trimmedStart) return '';
+
+  if (!expectsJson && !trimmedStart.startsWith('{')) {
+    return rawText;
+  }
+
+  const keyMatch = /"text"\s*:\s*"/.exec(trimmedStart);
+  if (!keyMatch || keyMatch.index === undefined) {
+    return '';
+  }
+
+  let i = keyMatch.index + keyMatch[0].length;
+  let out = '';
+
+  while (i < trimmedStart.length) {
+    const ch = trimmedStart[i]!;
+    if (ch === '"') {
+      break;
+    }
+    if (ch === '\\') {
+      if (i + 1 >= trimmedStart.length) {
+        break;
+      }
+      const next = trimmedStart[i + 1]!;
+      switch (next) {
+        case 'n':
+          out += '\n';
+          i += 2;
+          break;
+        case 'r':
+          out += '\r';
+          i += 2;
+          break;
+        case 't':
+          out += '\t';
+          i += 2;
+          break;
+        case '"':
+          out += '"';
+          i += 2;
+          break;
+        case '\\':
+          out += '\\';
+          i += 2;
+          break;
+        case '/':
+          out += '/';
+          i += 2;
+          break;
+        case 'u': {
+          if (i + 6 > trimmedStart.length) {
+            return out;
+          }
+          const hex = trimmedStart.slice(i + 2, i + 6);
+          const code = Number.parseInt(hex, 16);
+          if (!Number.isNaN(code)) {
+            out += String.fromCharCode(code);
+          }
+          i += 6;
+          break;
+        }
+        default:
+          out += next;
+          i += 2;
+          break;
+      }
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+
+  return out;
+}
+
+function sendSseEvent(res: express.Response, event: string, data: unknown): void {
+  if (res.writableEnded) return;
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 // ------------------------------------------------------------------ Gemini Call with Retry & Lock
 
 async function callModelOnce(
@@ -417,10 +533,11 @@ async function callModelOnce(
   model: string,
   contents: Content[],
   config: GenerateContentConfig,
+  timeoutMs: number,
   externalSignal?: AbortSignal
-) {
+): Promise<GenerateContentResultLike> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error('Request timeout')), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(new Error('Request timeout')), timeoutMs);
   const onExternalAbort = () => controller.abort(externalSignal?.reason ?? new Error('Aborted'));
 
   if (externalSignal) {
@@ -448,6 +565,99 @@ async function callModelOnce(
   }
 }
 
+async function callModelStreamOnce(
+  ai: AiClientLike,
+  model: string,
+  contents: Content[],
+  config: GenerateContentConfig,
+  timeoutMs: number,
+  expectsJson: boolean,
+  onDelta: (delta: string) => void,
+  externalSignal?: AbortSignal
+): Promise<GenerateContentResultLike> {
+  if (!ai.models.generateContentStream) {
+    return callModelOnce(ai, model, contents, config, timeoutMs, externalSignal);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('Request timeout')), timeoutMs);
+  const onExternalAbort = () => controller.abort(externalSignal?.reason ?? new Error('Aborted'));
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timer);
+      throw new Error('aborted');
+    }
+    externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+
+  try {
+    const stream = await ai.models.generateContentStream({
+      model,
+      contents,
+      config: {
+        ...config,
+        abortSignal: controller.signal,
+      },
+    });
+
+    const assembledParts: Part[] = [];
+    const collectedCalls: Array<{ id?: string; name?: string; args?: Record<string, unknown> }> = [];
+    let rawText = '';
+    let emittedText = '';
+
+    for await (const chunk of stream) {
+      const chunkParts = chunk.candidates?.[0]?.content?.parts;
+      if (Array.isArray(chunkParts) && chunkParts.length > 0) {
+        for (const part of chunkParts) {
+          assembledParts.push(part);
+          if (part.functionCall) {
+            collectedCalls.push({
+              ...(part.functionCall.id ? { id: part.functionCall.id } : {}),
+              ...(part.functionCall.name ? { name: part.functionCall.name } : {}),
+              ...(part.functionCall.args && typeof part.functionCall.args === 'object'
+                ? { args: part.functionCall.args }
+                : {}),
+            });
+          } else if (typeof part.text === 'string' && !part.thought) {
+            rawText += part.text;
+          }
+        }
+      } else {
+        if (Array.isArray(chunk.functionCalls)) {
+          collectedCalls.push(...chunk.functionCalls);
+        }
+        if (typeof chunk.text === 'string' && chunk.text.length > 0) {
+          rawText += chunk.text;
+          assembledParts.push({ text: chunk.text });
+        }
+      }
+
+      if (collectedCalls.length === 0 && rawText.length > 0) {
+        const readable = extractStreamingReadableText(rawText, expectsJson);
+        if (readable.length > emittedText.length) {
+          onDelta(readable.slice(emittedText.length));
+          emittedText = readable;
+        }
+      }
+    }
+
+    return {
+      text: rawText,
+      functionCalls: collectedCalls.length > 0 ? collectedCalls : undefined,
+      candidates:
+        assembledParts.length > 0
+          ? [{ content: { role: 'model', parts: assembledParts } }]
+          : undefined,
+    };
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', onExternalAbort);
+    }
+  }
+}
+
 async function callGeminiWithLockAndFallback(
   ai: AiClientLike,
   contents: Content[],
@@ -455,34 +665,37 @@ async function callGeminiWithLockAndFallback(
   allowedTools: AssistantToolName[],
   toolRound: number,
   lockedModel?: string,
-  externalSignal?: AbortSignal
+  externalSignal?: AbortSignal,
+  onDelta?: (delta: string) => void
 ) {
   const models = copilotModelList(lockedModel);
   const primary = models[0] ?? PRIMARY_MODEL;
   const secondary = models[1];
 
-  const attempts: Array<{ model: string; delayBeforeMs: number }> = lockedModel
-    ? [
-        { model: primary, delayBeforeMs: 0 },
-        { model: primary, delayBeforeMs: 900 },
-      ]
-    : [
-        { model: primary, delayBeforeMs: 0 },
-        { model: primary, delayBeforeMs: 900 },
-        ...(secondary
-          ? [
-              { model: secondary, delayBeforeMs: 250 },
-              { model: secondary, delayBeforeMs: 1200 },
-            ]
-          : []),
-      ];
+  const attempts: Array<{ model: string; delayBeforeMs: number; timeoutMs: number }> =
+    lockedModel || !secondary
+      ? [
+          { model: primary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS },
+          { model: primary, delayBeforeMs: 250, timeoutMs: REQUEST_TIMEOUT_MS },
+        ]
+      : [
+          // Immediate failover on primary error/404/timeout instead of burning retries + sleep
+          { model: primary, delayBeforeMs: 0, timeoutMs: PRIMARY_TIMEOUT_MS },
+          { model: secondary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS },
+          { model: secondary, delayBeforeMs: 300, timeoutMs: REQUEST_TIMEOUT_MS },
+        ];
 
   const useTools = toolRound < MAX_TOOL_ROUNDS && allowedTools.length > 0;
   const declarations = useTools ? getToolDeclarations(allowedTools) : [];
+  const expectsJson = declarations.length === 0;
 
   let lastError: unknown;
+  const unavailableModels = new Set<string>();
 
   for (const attempt of attempts) {
+    if (unavailableModels.has(attempt.model)) {
+      continue;
+    }
     if (attempt.delayBeforeMs > 0) {
       await sleep(attempt.delayBeforeMs);
     }
@@ -490,11 +703,10 @@ async function callGeminiWithLockAndFallback(
       throw new Error('aborted');
     }
 
+    const thinkingLevel = thinkingLevelForModel(attempt.model);
     const config: GenerateContentConfig = {
       systemInstruction,
-      ...(isGemini3Or4Model(attempt.model)
-        ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-        : {}),
+      ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
       ...(declarations.length > 0
         ? { tools: [{ functionDeclarations: declarations }] }
         : {
@@ -503,14 +715,44 @@ async function callGeminiWithLockAndFallback(
           }),
     };
 
+    let emittedDeltaOnAttempt = false;
     try {
-      const response = await callModelOnce(ai, attempt.model, contents, config, externalSignal);
+      const response =
+        onDelta && ai.models.generateContentStream
+          ? await callModelStreamOnce(
+              ai,
+              attempt.model,
+              contents,
+              config,
+              attempt.timeoutMs,
+              expectsJson,
+              (delta) => {
+                emittedDeltaOnAttempt = true;
+                onDelta(delta);
+              },
+              externalSignal
+            )
+          : await callModelOnce(
+              ai,
+              attempt.model,
+              contents,
+              config,
+              attempt.timeoutMs,
+              externalSignal
+            );
       return { response, modelUsed: attempt.model };
     } catch (err: unknown) {
       lastError = err;
+      if (emittedDeltaOnAttempt) {
+        // Never splice two model responses mid-stream
+        throw err;
+      }
       const status = getErrorStatus(err);
       if (status === 400 || status === 403) {
         throw err;
+      }
+      if (status === 404) {
+        unavailableModels.add(attempt.model);
       }
       if (!isTransientError(err) && status !== 404) {
         throw err;
@@ -571,6 +813,18 @@ export function createCopilotRouter(): Router {
 
     const ai = getAiClient(apiKey || 'test-key');
     const systemInstruction = buildSystemInstruction(scope);
+    const wantsStream =
+      typeof req.headers.accept === 'string' &&
+      req.headers.accept.includes('text/event-stream') &&
+      typeof ai.models.generateContentStream === 'function';
+
+    if (wantsStream) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+    }
 
     try {
       const { response, modelUsed } = await callGeminiWithLockAndFallback(
@@ -580,7 +834,12 @@ export function createCopilotRouter(): Router {
         allowedTools,
         toolRound,
         lockedModel,
-        requestAbortController.signal
+        requestAbortController.signal,
+        wantsStream
+          ? (delta) => {
+              sendSseEvent(res, 'delta', { text: delta });
+            }
+          : undefined
       );
 
       if (res.writableEnded) return;
@@ -598,6 +857,8 @@ export function createCopilotRouter(): Router {
           args: c.args && typeof c.args === 'object' ? c.args : {},
         }));
 
+      let payload: CopilotServerResponse;
+
       if (validCalls.length > 0 && toolRound < MAX_TOOL_ROUNDS) {
         // Keep raw candidateContent verbatim so `thought` & `thoughtSignature` survive intact
         const rawCandidateContent = response.candidates?.[0]?.content;
@@ -614,7 +875,7 @@ export function createCopilotRouter(): Router {
               })),
             };
 
-        const payload: CopilotServerResponse = {
+        payload = {
           kind: 'tool_calls',
           questionId,
           model: modelUsed,
@@ -625,32 +886,45 @@ export function createCopilotRouter(): Router {
         console.info(
           `[Copilot] model=${modelUsed} round=${toolRound} calls=${validCalls.map((c) => c.name).join(',')} ms=${Date.now() - startedAt}`
         );
-        res.json(payload);
-        return;
+      } else {
+        const answer = parseFinalAnswerJson(response.text ?? '');
+        payload = {
+          kind: 'answer',
+          questionId,
+          model: modelUsed,
+          lockedModel: modelUsed,
+          answer,
+        };
+        console.info(
+          `[Copilot] model=${modelUsed} round=${toolRound} status=answer ms=${Date.now() - startedAt}`
+        );
       }
 
-      const answer = parseFinalAnswerJson(response.text ?? '');
-      const payload: CopilotServerResponse = {
-        kind: 'answer',
-        questionId,
-        model: modelUsed,
-        lockedModel: modelUsed,
-        answer,
-      };
-      console.info(
-        `[Copilot] model=${modelUsed} round=${toolRound} status=answer ms=${Date.now() - startedAt}`
-      );
-      res.json(payload);
+      if (wantsStream) {
+        sendSseEvent(res, 'done', payload);
+        res.end();
+      } else {
+        res.json(payload);
+      }
     } catch (err: unknown) {
       if (res.writableEnded) return;
       const mapped = formatUserFacingError(err);
       console.info(
         `[Copilot] round=${toolRound} error=${mapped.code} ms=${Date.now() - startedAt}`
       );
-      res.status(mapped.status).json({
-        code: mapped.code,
-        error: mapped.message,
-      });
+      if (wantsStream) {
+        sendSseEvent(res, 'error', {
+          status: mapped.status,
+          code: mapped.code,
+          error: mapped.message,
+        });
+        res.end();
+      } else {
+        res.status(mapped.status).json({
+          code: mapped.code,
+          error: mapped.message,
+        });
+      }
     }
   });
 
