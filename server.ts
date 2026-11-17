@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCopilotRouter } from './server/copilot';
@@ -17,8 +18,10 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
+  const hmrDisabled = process.env.DISABLE_HMR === 'true';
 
   app.use(express.json({ limit: '256kb' }));
 
@@ -33,8 +36,8 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR !== 'true',
-        watch: process.env.DISABLE_HMR === 'true' ? null : {},
+        ...(hmrDisabled ? { hmr: false, ws: false } : { ws: { server: httpServer } }),
+        watch: hmrDisabled ? null : {},
       },
       appType: 'spa',
     });
@@ -51,7 +54,7 @@ async function startServer() {
     });
   }
 
-  app.listen(port, '0.0.0.0', () => {
+  httpServer.listen(port, '0.0.0.0', () => {
     console.log(`Domaine server listening on http://0.0.0.0:${port}`);
   });
 }
