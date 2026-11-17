@@ -59,6 +59,14 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   const cadastreLayerRef = useRef<L.TileLayer | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
 
+  const lastCenteredKeyRef = useRef<string | null>(null);
+
+  const isMapAlive = (map: L.Map | null): map is L.Map => {
+    if (!map || mapInstanceRef.current !== map) return false;
+    const internal = map as L.Map & { _mapPane?: HTMLElement };
+    return Boolean(internal._mapPane && map.getContainer()?.isConnected);
+  };
+
   const [mapStyle, setMapStyle] = useState<'satellite' | 'cadastre'>('satellite');
   const [showCadastreOverlay, setShowCadastreOverlay] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -82,13 +90,18 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     const initialCenter: [number, number] = selectedItem
       ? [selectedItem.lat, selectedItem.lng]
       : [46.9462, 4.7392];
+    const initialZoom = selectedItem ? 17 : 16;
 
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
-      zoom: 16,
+      zoom: initialZoom,
       zoomControl: false,
       attributionControl: false,
     });
+
+    lastCenteredKeyRef.current = selectedItem
+      ? `${selectedItem.parcel.id}:${selectedItem.lat}:${selectedItem.lng}`
+      : null;
 
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
@@ -111,9 +124,17 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     mapInstanceRef.current = map;
 
     return () => {
+      // Cancel any pending Leaflet zoom transition timer before destroying _mapPane
+      const internalMap = map as L.Map & { _animatingZoom?: boolean };
+      internalMap._animatingZoom = false;
+      map.stop();
+      map.off();
       map.remove();
       mapInstanceRef.current = null;
       layerGroupRef.current = null;
+      tileLayerRef.current = null;
+      cadastreLayerRef.current = null;
+      userMarkerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJsDom]);
@@ -121,7 +142,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   // Handle map style & cadastre overlay changes
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!isMapAlive(map)) return;
 
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current);
@@ -148,7 +169,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   // Handle click on map when positioning a custom Domain GPS pin
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!isMapAlive(map)) return;
 
     const onMapClick = (e: L.LeafletMouseEvent) => {
       if (!isEditingGpsPin || !selectedItem) return;
@@ -167,7 +188,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
   useEffect(() => {
     const map = mapInstanceRef.current;
     const fg = layerGroupRef.current;
-    if (!map || !fg) return;
+    if (!isMapAlive(map) || !fg) return;
 
     fg.clearLayers();
 
@@ -256,21 +277,30 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
     });
   }, [items, selectedParcelId, isEditingGpsPin, selectedItem, onSelectParcel, onSetCustomGps]);
 
-  // Smoothly fly to selected parcel when selection changes
+  // Smoothly fly to selected parcel when selection or coordinates actually change
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !selectedItem) return;
+    if (!isMapAlive(map) || !selectedItem) return;
+
+    const targetKey = `${selectedItem.parcel.id}:${selectedItem.lat}:${selectedItem.lng}`;
+    if (lastCenteredKeyRef.current === targetKey) return;
+
+    const hadPreviousTarget = lastCenteredKeyRef.current !== null;
+    lastCenteredKeyRef.current = targetKey;
+
     map.setView([selectedItem.lat, selectedItem.lng], Math.max(map.getZoom(), 17), {
-      animate: true,
+      animate: hadPreviousTarget,
     });
   }, [selectedParcelId, selectedItem]);
 
   // Invalidate map size when toggling fullscreen
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!isMapAlive(map)) return;
     const timer = setTimeout(() => {
-      map.invalidateSize();
+      if (isMapAlive(map)) {
+        map.invalidateSize({ animate: false });
+      }
     }, 150);
     return () => clearTimeout(timer);
   }, [isFullscreen]);
@@ -281,7 +311,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
 
     const placeUserBeacon = (lat: number, lng: number, label: string) => {
       setGpsState({ active: true, lat, lng, label });
-      if (map) {
+      if (isMapAlive(map)) {
         if (userMarkerRef.current) {
           map.removeLayer(userMarkerRef.current);
         }
@@ -344,7 +374,7 @@ export const InteractiveVineyardMap: React.FC<InteractiveVineyardMapProps> = ({
 
   const FitAllParcels = () => {
     const map = mapInstanceRef.current;
-    if (!map || items.length === 0) return;
+    if (!isMapAlive(map) || items.length === 0) return;
     const bounds = L.latLngBounds(items.map((i) => [i.lat, i.lng] as [number, number]));
     map.fitBounds(bounds.pad(0.25), { animate: true });
   };
