@@ -420,6 +420,133 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
     expect(levelsCalled).toEqual([ThinkingLevel.MINIMAL, ThinkingLevel.LOW, ThinkingLevel.LOW]);
   });
 
+  it('bascule immédiatement sur gemini-3.1-flash-lite en cas de timeout/AbortError au tour 0 et même en cours de question au tour 1', async () => {
+    // 1. Round 0 AbortError ("This operation was aborted") -> immediate switch to FALLBACK_MODEL without double primary timeout wait
+    const round0Models: string[] = [];
+    setCopilotClientFactoryForTests(() => ({
+      models: {
+        async generateContent(params) {
+          round0Models.push(params.model);
+          if (params.model === PRIMARY_MODEL) {
+            const abortErr = new Error('This operation was aborted');
+            abortErr.name = 'AbortError';
+            throw abortErr;
+          }
+          return {
+            text: JSON.stringify({
+              text: 'Reprise rapide après timeout du modèle principal.',
+              citedIds: [],
+              followUps: [],
+            }),
+          };
+        },
+      },
+    }));
+
+    const originalFetch = globalThis.fetch;
+    await withCopilotTestServer(async (baseUrl) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+        const url = typeof input === 'string' && input.startsWith('/') ? `${baseUrl}${input}` : input;
+        return originalFetch(url, init);
+      });
+
+      const res = await askAssistant({
+        question: 'Bonjour, quel est le stock au chai ?',
+        history: [],
+        ctx: makeCtx('cellar_master', 'cellar'),
+      });
+      expect(res.model).toBe('gemini-3.1-flash-lite');
+      expect(res.answer.text).toContain('Reprise rapide');
+    });
+
+    expect(round0Models).toEqual([PRIMARY_MODEL, 'gemini-3.1-flash-lite']);
+
+    // 2. Round 0 succeeds on PRIMARY_MODEL with functionCall + thoughtSignature, then Round 1 times out on locked PRIMARY_MODEL -> flattens tool history onto gemini-3.1-flash-lite
+    resetQuestionTurnTrackerForTests();
+    const round1Calls: Array<{
+      model: string;
+      contents: Content[];
+      hasResponseSchema: boolean;
+      hasTools: boolean;
+    }> = [];
+
+    setCopilotClientFactoryForTests(() => ({
+      models: {
+        async generateContent(params) {
+          round1Calls.push({
+            model: params.model,
+            contents: params.contents,
+            hasResponseSchema: Boolean(params.config?.responseSchema),
+            hasTools: Boolean(params.config?.tools),
+          });
+
+          if (params.model === PRIMARY_MODEL && round1Calls.length === 1) {
+            return {
+              functionCalls: [{ id: 'c-r0', name: 'inspect_cellar', args: {} }],
+              candidates: [
+                {
+                  content: {
+                    role: 'model',
+                    parts: [
+                      { thought: true, text: 'Réflexion interne' } as never,
+                      {
+                        functionCall: { id: 'c-r0', name: 'inspect_cellar', args: {} },
+                        thoughtSignature: 'sig-primary-only',
+                      } as never,
+                    ],
+                  },
+                },
+              ],
+            };
+          }
+
+          if (params.model === PRIMARY_MODEL) {
+            const timeoutErr = new Error('Request timeout after 10000ms');
+            timeoutErr.name = 'TimeoutError';
+            throw timeoutErr;
+          }
+
+          return {
+            text: JSON.stringify({
+              text: 'Synthèse de secours au tour 1 : 1530 L en cuverie.',
+              citedIds: ['L25-R-A'],
+              followUps: [],
+            }),
+          };
+        },
+      },
+    }));
+
+    await withCopilotTestServer(async (baseUrl) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+        const url = typeof input === 'string' && input.startsWith('/') ? `${baseUrl}${input}` : input;
+        return originalFetch(url, init);
+      });
+
+      const res = await askAssistant({
+        question: 'Quel est le volume total au chai ?',
+        history: [],
+        ctx: makeCtx('cellar_master', 'cellar'),
+      });
+      expect(res.model).toBe('gemini-3.1-flash-lite');
+      expect(res.answer.text).toContain('1530 L');
+    });
+
+    expect(round1Calls.map((c) => c.model)).toEqual([
+      PRIMARY_MODEL,
+      PRIMARY_MODEL,
+      'gemini-3.1-flash-lite',
+    ]);
+    const fallbackCall = round1Calls[2]!;
+    expect(fallbackCall.hasResponseSchema).toBe(true);
+    expect(fallbackCall.hasTools).toBe(false);
+    const serializedFallbackContents = JSON.stringify(fallbackCall.contents);
+    expect(serializedFallbackContents).not.toContain('thoughtSignature');
+    expect(serializedFallbackContents).not.toContain('functionCall');
+    expect(serializedFallbackContents).toContain('inspect_cellar');
+    expect(serializedFallbackContents).toContain('1530');
+  });
+
   it('applique responseSchema au dernier tour (MAX_TOOL_ROUNDS) et rejette les outils inconnus + >5 tours sur un questionId', async () => {
     const schemaFlags: boolean[] = [];
     setCopilotClientFactoryForTests(() => ({
