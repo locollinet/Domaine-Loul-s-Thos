@@ -41,6 +41,27 @@ async function startServer() {
       },
       appType: 'spa',
     });
+    if (hmrDisabled) {
+      app.get('/@vite/client', async (_req, res, next) => {
+        try {
+          const transformed = await vite.transformRequest('/@vite/client');
+          if (!transformed) {
+            next();
+            return;
+          }
+          // Vite 8 in middlewareMode with hmr:false/ws:false still emits transport.connect() to port 24678
+          const patched = transformed.code.replace(
+            /transport\.connect\([^;]+\);/,
+            '/* HMR disabled: WebSocket transport skipped */'
+          );
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.send(patched);
+        } catch (err) {
+          next(err);
+        }
+      });
+    }
     app.use(vite.middlewares);
   } else {
     const distDir = path.resolve(__dirname, 'dist');

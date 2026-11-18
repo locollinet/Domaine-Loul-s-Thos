@@ -20,8 +20,8 @@ import type {
   CopilotToolCallRequest,
 } from '../src/features/ai/types';
 
-export const PRIMARY_MODEL = 'gemini-3.5-flash-lite';
-export const FALLBACK_MODEL = 'gemini-3.8-flash';
+export const PRIMARY_MODEL = 'gemini-3.1-flash-lite';
+export const FALLBACK_MODEL = 'gemini-4-hydrogen';
 export const PRIMARY_TIMEOUT_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 18_000;
 export const MAX_TOOL_ROUNDS = 4;
@@ -90,14 +90,14 @@ export function isGemini3Or4Model(model: string): boolean {
 
 /**
  * Picks the lowest safe ThinkingLevel per Gemini model family:
- * - `gemini-3.5-flash-lite` & `gemini-3.6-flash`: `MINIMAL` (lowest latency)
- * - `gemini-3.8-flash`, `gemini-3.1-flash-lite`, `gemini-4-*`: `LOW`
+ * - `gemini-3.1-flash-lite`: `MINIMAL` (lowest latency, default for Flash-Lite)
+ * - `gemini-4-*`, other `gemini-3-*`: `LOW` (`MINIMAL` is not supported on Gemini 4)
  */
 export function thinkingLevelForModel(model: string): ThinkingLevel | undefined {
   if (!isGemini3Or4Model(model)) {
     return undefined;
   }
-  if (model.startsWith('gemini-3.5-flash-lite') || model.startsWith('gemini-3.6-flash')) {
+  if (model.startsWith('gemini-3.1-flash-lite')) {
     return ThinkingLevel.MINIMAL;
   }
   return ThinkingLevel.LOW;
@@ -169,7 +169,23 @@ function getErrorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
+function isTimeoutLikeError(err: unknown): boolean {
+  if (!err) return false;
+  const name = err instanceof Error ? err.name : '';
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    name === 'TimeoutError' ||
+    name === 'AbortError' ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('aborted')
+  );
+}
+
 function isTransientError(err: unknown): boolean {
+  if (isTimeoutLikeError(err)) {
+    return true;
+  }
   const status = getErrorStatus(err);
   if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) {
     return true;
@@ -181,8 +197,7 @@ function isTransientError(err: unknown): boolean {
     msg.includes('RESOURCE_EXHAUSTED') ||
     msg.includes('ETIMEDOUT') ||
     msg.includes('ECONNRESET') ||
-    msg.includes('fetch failed') ||
-    msg.includes('timeout')
+    msg.includes('fetch failed')
   );
 }
 
@@ -229,7 +244,7 @@ function formatUserFacingError(err: unknown): { status: number; message: string;
         'Le service Gemini connaît actuellement une forte affluence malgré la bascule de secours. Veuillez réessayer dans un instant.',
     };
   }
-  if (rawMessage.includes('timeout') || rawMessage.includes('aborted')) {
+  if (isTimeoutLikeError(err)) {
     return {
       status: 504,
       code: 'TIMEOUT',
@@ -528,6 +543,58 @@ function sendSseEvent(res: express.Response, event: string, data: unknown): void
 
 // ------------------------------------------------------------------ Gemini Call with Retry & Lock
 
+/**
+ * When falling back mid-conversation from a locked primary model to another model,
+ * strips model-specific `functionCall` / `thoughtSignature` parts and summarizes
+ * already-executed `functionResponse` payloads as plain user text so Gemini never
+ * rejects the history with `missing thought_signature`.
+ */
+export function flattenToolHistoryForModelSwitch(contents: Content[]): Content[] {
+  const normalized: Content[] = [];
+
+  const pushMerged = (role: 'user' | 'model', text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    const prev = normalized[normalized.length - 1];
+    if (prev && prev.role === role && Array.isArray(prev.parts)) {
+      prev.parts.push({ text: clean });
+    } else {
+      normalized.push({ role, parts: [{ text: clean }] });
+    }
+  };
+
+  for (const turn of contents) {
+    const parts = Array.isArray(turn.parts) ? turn.parts : [];
+    const textChunks: string[] = [];
+    const toolSummaries: string[] = [];
+
+    for (const part of parts) {
+      const p = part as Record<string, unknown>;
+      if (p['thought'] === true) continue;
+      if (typeof p['text'] === 'string' && p['text'].trim().length > 0) {
+        textChunks.push(p['text'].trim());
+      }
+      if (p['functionResponse'] && typeof p['functionResponse'] === 'object') {
+        const fr = p['functionResponse'] as { name?: string; response?: unknown };
+        const fnName = typeof fr.name === 'string' ? fr.name : 'outil';
+        toolSummaries.push(`- ${fnName}: ${JSON.stringify(fr.response ?? {})}`);
+      }
+    }
+
+    if (textChunks.length > 0) {
+      pushMerged(turn.role === 'model' ? 'model' : 'user', textChunks.join('\n'));
+    }
+    if (toolSummaries.length > 0) {
+      pushMerged(
+        'user',
+        `Données retournées par les outils métier déjà exécutés :\n${toolSummaries.join('\n')}\n\nBase ta réponse uniquement sur ces résultats (sans réinventer ni modifier les chiffres).`
+      );
+    }
+  }
+
+  return normalized;
+}
+
 async function callModelOnce(
   ai: AiClientLike,
   model: string,
@@ -557,6 +624,13 @@ async function callModelOnce(
         abortSignal: controller.signal,
       },
     });
+  } catch (err: unknown) {
+    if (controller.signal.aborted && !externalSignal?.aborted) {
+      const timeoutErr = new Error(`Request timeout after ${timeoutMs}ms`);
+      timeoutErr.name = 'TimeoutError';
+      throw timeoutErr;
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     if (externalSignal) {
@@ -650,6 +724,13 @@ async function callModelStreamOnce(
           ? [{ content: { role: 'model', parts: assembledParts } }]
           : undefined,
     };
+  } catch (err: unknown) {
+    if (controller.signal.aborted && !externalSignal?.aborted) {
+      const timeoutErr = new Error(`Request timeout after ${timeoutMs}ms`);
+      timeoutErr.name = 'TimeoutError';
+      throw timeoutErr;
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     if (externalSignal) {
@@ -668,26 +749,41 @@ async function callGeminiWithLockAndFallback(
   externalSignal?: AbortSignal,
   onDelta?: (delta: string) => void
 ) {
-  const models = copilotModelList(lockedModel);
-  const primary = models[0] ?? PRIMARY_MODEL;
-  const secondary = models[1];
+  const baseModels = copilotModelList(undefined);
+  const primary =
+    lockedModel && lockedModel.trim().length > 0
+      ? lockedModel.trim()
+      : (baseModels[0] ?? PRIMARY_MODEL);
+  const secondary =
+    lockedModel === FALLBACK_MODEL
+      ? undefined
+      : (baseModels.find((m) => m !== primary) ?? (primary !== FALLBACK_MODEL ? FALLBACK_MODEL : undefined));
 
-  const attempts: Array<{ model: string; delayBeforeMs: number; timeoutMs: number }> =
-    lockedModel || !secondary
+  const attempts: Array<{ model: string; delayBeforeMs: number; timeoutMs: number }> = lockedModel
+    ? [
+        {
+          model: primary,
+          delayBeforeMs: 0,
+          timeoutMs: secondary ? PRIMARY_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+        },
+        ...(secondary
+          ? [{ model: secondary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS }]
+          : [{ model: primary, delayBeforeMs: 250, timeoutMs: REQUEST_TIMEOUT_MS }]),
+      ]
+    : secondary
       ? [
-          { model: primary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS },
-          { model: primary, delayBeforeMs: 250, timeoutMs: REQUEST_TIMEOUT_MS },
-        ]
-      : [
           // Immediate failover on primary error/404/timeout instead of burning retries + sleep
           { model: primary, delayBeforeMs: 0, timeoutMs: PRIMARY_TIMEOUT_MS },
           { model: secondary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS },
           { model: secondary, delayBeforeMs: 300, timeoutMs: REQUEST_TIMEOUT_MS },
+        ]
+      : [
+          { model: primary, delayBeforeMs: 0, timeoutMs: REQUEST_TIMEOUT_MS },
+          { model: primary, delayBeforeMs: 250, timeoutMs: REQUEST_TIMEOUT_MS },
         ];
 
   const useTools = toolRound < MAX_TOOL_ROUNDS && allowedTools.length > 0;
   const declarations = useTools ? getToolDeclarations(allowedTools) : [];
-  const expectsJson = declarations.length === 0;
 
   let lastError: unknown;
   const unavailableModels = new Set<string>();
@@ -703,12 +799,19 @@ async function callGeminiWithLockAndFallback(
       throw new Error('aborted');
     }
 
+    const switchingMidQuestion = Boolean(lockedModel && attempt.model !== lockedModel);
+    const attemptContents = switchingMidQuestion
+      ? flattenToolHistoryForModelSwitch(contents)
+      : contents;
+    const attemptDeclarations = switchingMidQuestion ? [] : declarations;
+    const expectsJson = attemptDeclarations.length === 0;
+
     const thinkingLevel = thinkingLevelForModel(attempt.model);
     const config: GenerateContentConfig = {
       systemInstruction,
       ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
-      ...(declarations.length > 0
-        ? { tools: [{ functionDeclarations: declarations }] }
+      ...(attemptDeclarations.length > 0
+        ? { tools: [{ functionDeclarations: attemptDeclarations }] }
         : {
             responseMimeType: 'application/json',
             responseSchema: ASSISTANT_ANSWER_SCHEMA,
@@ -722,7 +825,7 @@ async function callGeminiWithLockAndFallback(
           ? await callModelStreamOnce(
               ai,
               attempt.model,
-              contents,
+              attemptContents,
               config,
               attempt.timeoutMs,
               expectsJson,
@@ -735,13 +838,16 @@ async function callGeminiWithLockAndFallback(
           : await callModelOnce(
               ai,
               attempt.model,
-              contents,
+              attemptContents,
               config,
               attempt.timeoutMs,
               externalSignal
             );
       return { response, modelUsed: attempt.model };
     } catch (err: unknown) {
+      if (externalSignal?.aborted) {
+        throw err;
+      }
       lastError = err;
       if (emittedDeltaOnAttempt) {
         // Never splice two model responses mid-stream

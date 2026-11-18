@@ -420,7 +420,7 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
     expect(levelsCalled).toEqual([ThinkingLevel.MINIMAL, ThinkingLevel.LOW, ThinkingLevel.LOW]);
   });
 
-  it('bascule immédiatement sur gemini-3.1-flash-lite en cas de timeout/AbortError au tour 0 et même en cours de question au tour 1', async () => {
+  it('bascule immédiatement sur FALLBACK_MODEL en cas de timeout/AbortError au tour 0 et même en cours de question au tour 1', async () => {
     // 1. Round 0 AbortError ("This operation was aborted") -> immediate switch to FALLBACK_MODEL without double primary timeout wait
     const round0Models: string[] = [];
     setCopilotClientFactoryForTests(() => ({
@@ -455,13 +455,13 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
         history: [],
         ctx: makeCtx('cellar_master', 'cellar'),
       });
-      expect(res.model).toBe('gemini-3.1-flash-lite');
+      expect(res.model).toBe(FALLBACK_MODEL);
       expect(res.answer.text).toContain('Reprise rapide');
     });
 
-    expect(round0Models).toEqual([PRIMARY_MODEL, 'gemini-3.1-flash-lite']);
+    expect(round0Models).toEqual([PRIMARY_MODEL, FALLBACK_MODEL]);
 
-    // 2. Round 0 succeeds on PRIMARY_MODEL with functionCall + thoughtSignature, then Round 1 times out on locked PRIMARY_MODEL -> flattens tool history onto gemini-3.1-flash-lite
+    // 2. Round 0 succeeds on PRIMARY_MODEL with functionCall + thoughtSignature, then Round 1 times out on locked PRIMARY_MODEL -> flattens tool history onto FALLBACK_MODEL
     resetQuestionTurnTrackerForTests();
     const round1Calls: Array<{
       model: string;
@@ -528,14 +528,14 @@ describe('Copilote IA Domaine (Outils Déterministes, Non-fuite & Boucle Multi-t
         history: [],
         ctx: makeCtx('cellar_master', 'cellar'),
       });
-      expect(res.model).toBe('gemini-3.1-flash-lite');
+      expect(res.model).toBe(FALLBACK_MODEL);
       expect(res.answer.text).toContain('1530 L');
     });
 
     expect(round1Calls.map((c) => c.model)).toEqual([
       PRIMARY_MODEL,
       PRIMARY_MODEL,
-      'gemini-3.1-flash-lite',
+      FALLBACK_MODEL,
     ]);
     const fallbackCall = round1Calls[2]!;
     expect(fallbackCall.hasResponseSchema).toBe(true);

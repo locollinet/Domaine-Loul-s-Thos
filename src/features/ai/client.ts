@@ -14,7 +14,7 @@ import type {
 
 export const MAX_TOOL_ROUNDS = 4;
 export const MAX_HISTORY_TURNS = 16;
-const CLIENT_TIMEOUT_MS = 30_000;
+const CLIENT_TIMEOUT_MS = 45_000;
 
 export interface CopilotStepEvent {
   toolName: AssistantToolName;
